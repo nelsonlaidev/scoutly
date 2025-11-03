@@ -1,0 +1,21 @@
+[package]
+name = "scoutly"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.41", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "gzip", "brotli", "deflate"] }
+scraper = "0.22"
+clap = { version = "4.5", features = ["derive"] }
+url = "2.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+colored = "2.1"
+anyhow = "1.0"
+futures = "0.3"
+chrono = "0.4"
+
+[dev-dependencies]
+actix-files = "0.6.8"
+actix-web = "4.11.0"

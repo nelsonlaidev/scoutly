@@ -1,0 +1,204 @@
+# Scoutly
+
+A fast, lightweight CLI website crawler and SEO analyzer built with Rust. Scoutly is inspired by Scrutiny and helps you analyze websites for broken links, SEO issues, and overall site health.
+
+## Features
+
+- **Website Crawling**: Recursively crawl websites with configurable depth limits
+- **Link Checking**: Validate all internal and external links, detect broken links (404s, 500s)
+- **SEO Analysis**:
+  - Check for missing or poorly optimized title tags
+  - Validate meta descriptions
+  - Detect missing or multiple H1 tags
+  - Find images without alt text
+  - Identify thin content
+- **Flexible Reporting**: Output results in human-readable text or JSON format
+- **Fast & Concurrent**: Built with Tokio for async I/O and parallel link checking
+
+## Installation
+
+### From Source
+
+```bash
+# Clone the repository
+git clone https://github.com/nelsonlaidev/scoutly.git
+cd scoutly
+
+# Build the project
+cargo build --release
+
+# The binary will be at target/release/scoutly
+```
+
+## Usage
+
+### Basic Usage
+
+```bash
+# Crawl a website with default settings (depth: 5, max pages: 200)
+scoutly https://example.com
+
+# Specify custom depth and page limits
+scoutly https://example.com --depth 3 --max-pages 100
+
+# Enable verbose output to see progress
+scoutly https://example.com --verbose
+```
+
+### Advanced Options
+
+```bash
+# Follow external links (by default, only internal links are followed)
+scoutly https://example.com --external
+
+# Ignore redirect issues in the report
+scoutly https://example.com --ignore-redirects
+
+# Output results in JSON format
+scoutly https://example.com --output json
+
+# Save report to a file
+scoutly https://example.com --save report.json
+
+# Combine options
+scoutly https://example.com --depth 4 --max-pages 200 --verbose --ignore-redirects --save report.json
+```
+
+### Command Line Options
+
+```
+Usage: scoutly [OPTIONS] <URL>
+
+Arguments:
+  <URL>  The URL to start crawling from
+
+Options:
+  -d, --depth <DEPTH>          Maximum crawl depth (default: 5)
+  -m, --max-pages <MAX_PAGES>  Maximum number of pages to crawl (default: 200)
+  -o, --output <OUTPUT>        Output format: text or json [default: text]
+  -s, --save <SAVE>            Save report to file
+  -e, --external               Follow external links
+  -v, --verbose                Verbose output
+      --ignore-redirects       Ignore redirect issues in the report
+  -h, --help                   Print help
+```
+
+## Example Output
+
+### Text Report
+
+```
+================================================================================
+Scoutly - Crawl Report
+================================================================================
+
+Start URL: https://example.com
+Timestamp: 2024-01-15T10:30:00Z
+
+Summary
+  Total Pages Crawled: 15
+  Total Links Found:   127
+  Broken Links:        2
+  Errors:              3
+  Warnings:            8
+  Info:                5
+
+Pages with Issues
+
+  URL: https://example.com/about
+    Status: 200
+    Depth:  1
+    Title:  About Us
+    Issues:
+      [WARN ] Page is missing a meta description
+      [WARN ] 3 image(s) missing alt text
+
+  URL: https://example.com/contact
+    Status: 200
+    Depth:  1
+    Title:  Contact
+    Issues:
+      [ERROR] Broken link: https://example.com/old-page (HTTP 404)
+```
+
+### JSON Report
+
+Use `--output json` to get machine-readable output suitable for integration with other tools or CI/CD pipelines.
+
+## How It Works
+
+1. **Crawling**: Starting from the provided URL, Scoutly fetches each page and extracts all links
+2. **Link Discovery**: Internal links (same domain) are queued for crawling based on depth limits
+3. **Link Validation**: All discovered links are checked asynchronously for HTTP status codes
+4. **SEO Analysis**: Each page is analyzed for common SEO issues
+5. **Report Generation**: Results are compiled into a comprehensive report
+
+## SEO Checks Performed
+
+- **Title Tag**
+
+  - Missing title
+  - Title too short (< 10 characters)
+  - Title too long (> 70 characters)
+
+- **Meta Description**
+
+  - Missing meta description
+  - Description too short (< 50 characters)
+  - Description too long (> 170 characters)
+
+- **Headings**
+
+  - Missing H1 tag
+  - Multiple H1 tags
+
+- **Images**
+
+  - Missing alt attributes
+
+- **Content**
+
+  - Thin content detection (basic)
+
+- **Links**
+  - Broken links (4xx and 5xx status codes)
+  - Redirect detection (3xx status codes)
+
+## Performance
+
+- Asynchronous I/O for fast crawling
+- Concurrent link checking
+- Configurable limits to prevent excessive resource usage
+- Typical crawl speed: 10-20 pages per second (depending on target site and network)
+
+## Limitations (Basic Version)
+
+- No JavaScript rendering (only parses initial HTML)
+- Basic content analysis (no detailed text analysis)
+- No authentication support
+- No sitemap generation (planned for future versions)
+
+## Future Enhancements
+
+- JavaScript rendering with headless browser support
+- Sitemap generation (XML)
+- Authentication support
+- More advanced SEO checks (keyword density, structured data)
+- Progress bar for long-running crawls
+- HTML validation
+- Accessibility checks (WCAG compliance)
+- PDF and document crawling
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+---
+
+<p align="center">
+Made with ❤️ in Hong Kong
+</p>

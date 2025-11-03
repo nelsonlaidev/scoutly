@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Media Elements Test</title>
+    <meta name="description" content="Testing video, audio, embed, and object extraction" />
+  </head>
+  <body>
+    <h1>Media Elements Test</h1>
+    <p>This page tests extraction of links from various media elements.</p>
+
+    <h2>Video Tags</h2>
+    <video src="/media/video1.mp4" controls></video>
+    <video controls>
+      <source src="/media/video2.webm" type="video/webm">
+      <source src="/media/video2.mp4" type="video/mp4">
+    </video>
+
+    <h2>Audio Tags</h2>
+    <audio src="/media/audio1.mp3" controls></audio>
+    <audio controls>
+      <source src="/media/audio2.ogg" type="audio/ogg">
+      <source src="/media/audio2.mp3" type="audio/mp3">
+    </audio>
+
+    <h2>Embed Tags</h2>
+    <embed src="/media/document.pdf" type="application/pdf">
+    <embed src="/media/flash.swf" type="application/x-shockwave-flash">
+
+    <h2>Object Tags</h2>
+    <object data="/media/object1.pdf" type="application/pdf"></object>
+    <object data="/media/object2.svg" type="image/svg+xml"></object>
+  </body>
+</html>
