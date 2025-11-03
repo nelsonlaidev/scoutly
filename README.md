@@ -54,6 +54,9 @@ scoutly https://example.com --external
 # Ignore redirect issues in the report
 scoutly https://example.com --ignore-redirects
 
+# Treat URLs with fragment identifiers (#) as unique links
+scoutly https://example.com --keep-fragments
+
 # Output results in JSON format
 scoutly https://example.com --output json
 
@@ -80,6 +83,7 @@ Options:
   -e, --external               Follow external links
   -v, --verbose                Verbose output
       --ignore-redirects       Ignore redirect issues in the report
+      --keep-fragments         Treat URLs with fragment identifiers (#) as unique links
   -h, --help                   Print help
 ```
 
@@ -93,7 +97,7 @@ Scoutly - Crawl Report
 ================================================================================
 
 Start URL: https://example.com
-Timestamp: 2024-01-15T10:30:00Z
+Timestamp: 2025-11-03T16:05:29.911833+00:00
 
 Summary
   Total Pages Crawled: 15
@@ -127,25 +131,36 @@ Use `--output json` to get machine-readable output suitable for integration with
 
 ## How It Works
 
-1. **Crawling**: Starting from the provided URL, Scoutly fetches each page and extracts all links
+1. **Crawling**: Starting from the provided URL, Scoutly fetches each page and extracts all links from various HTML elements (anchor tags, iframes, media elements, embeds, etc.)
 2. **Link Discovery**: Internal links (same domain) are queued for crawling based on depth limits
 3. **Link Validation**: All discovered links are checked asynchronously for HTTP status codes
 4. **SEO Analysis**: Each page is analyzed for common SEO issues
 5. **Report Generation**: Results are compiled into a comprehensive report
+
+### Link Extraction
+
+Scoutly extracts links from multiple HTML elements:
+
+- `<a href>` - Standard hyperlinks
+- `<iframe src>` - Embedded content
+- `<video src>` and `<source src>` - Video content
+- `<audio src>` - Audio content
+- `<embed src>` - Embedded plugins
+- `<object data>` - Embedded objects
 
 ## SEO Checks Performed
 
 - **Title Tag**
 
   - Missing title
-  - Title too short (< 10 characters)
-  - Title too long (> 70 characters)
+  - Title too short (< 50 characters, recommended: 50-60)
+  - Title too long (> 60 characters, recommended: 50-60)
 
 - **Meta Description**
 
   - Missing meta description
-  - Description too short (< 50 characters)
-  - Description too long (> 170 characters)
+  - Description too short (< 150 characters, recommended: 150-160)
+  - Description too long (> 160 characters, recommended: 150-160)
 
 - **Headings**
 
@@ -158,7 +173,7 @@ Use `--output json` to get machine-readable output suitable for integration with
 
 - **Content**
 
-  - Thin content detection (basic)
+  - Thin content detection (checks if page has fewer than 5 content indicators)
 
 - **Links**
   - Broken links (4xx and 5xx status codes)
@@ -192,6 +207,14 @@ Use `--output json` to get machine-readable output suitable for integration with
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Author
+
+- [@nelsonlaidev](https://github.com/nelsonlaidev)
+
+## Donation
+
+If you find this project helpful, consider supporting me by [sponsoring the project](https://github.com/sponsors/nelsonlaidev).
 
 ## License
 
