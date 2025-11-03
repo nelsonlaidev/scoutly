@@ -1,5 +1,5 @@
 use anyhow::Result;
-use reqwest::{header, Client, ClientBuilder};
+use reqwest::{Client, ClientBuilder, header};
 use std::time::Duration;
 
 /// Common HTTP headers used for all requests
