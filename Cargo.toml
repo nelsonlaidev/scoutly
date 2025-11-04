@@ -1,7 +1,19 @@
 [package]
 name = "scoutly"
+description = "A fast, lightweight CLI website crawler and SEO analyzer built with Rust."
+authors = ["Nelson Lai <me@nelsonlai.dev>"]
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+homepage = "https://github.com/nelsonlaidev/scoutly"
+repository = "https://github.com/nelsonlaidev/scoutly"
+readme = "README.md"
+keywords = ["cli", "crawler", "seo", "rust", "web-scraping"]
+categories = [
+  "command-line-utilities",
+  "web-programming",
+  "network-programming",
+]
 rust-version = "1.91"
 
 [dependencies]
