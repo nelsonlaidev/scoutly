@@ -7,4 +7,4 @@ pre-commit:
 
     - name: Lint
       glob: "*.rs"
-      run: cargo clippy --all-targets --all-features -- -D warnings {staged_files}
+      run: cargo clippy --all-targets --all-features -- -D warnings
