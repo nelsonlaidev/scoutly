@@ -75,5 +75,5 @@ pub struct CrawlSummary {
     pub broken_links: usize,
     pub errors: usize,
     pub warnings: usize,
-    pub info_count: usize,
+    pub infos: usize,
 }

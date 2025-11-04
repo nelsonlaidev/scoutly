@@ -399,3 +399,40 @@ async fn test_link_checker() {
         );
     }
 }
+
+#[tokio::test]
+async fn test_link_checker_default() {
+    start_link_test_server().await;
+
+    let base_url = get_test_server_url().await;
+
+    let mut crawler =
+        Crawler::new(&base_url, 2, 50, false, false).expect("Failed to create crawler");
+
+    crawler.crawl().await.expect("Crawl failed");
+
+    let checker = LinkChecker::default();
+
+    checker
+        .check_all_links(&mut crawler.pages, false)
+        .await
+        .expect("Link checking failed with default checker");
+
+    let url = format!("{}/links-working.html", base_url);
+    let page = crawler
+        .pages
+        .get(&url)
+        .expect("links-working.html not found");
+
+    let working_link = page
+        .links
+        .iter()
+        .find(|link| link.url == "http://127.0.0.1:3000/ok")
+        .expect("Working link not found");
+
+    assert_eq!(
+        working_link.status_code,
+        Some(200),
+        "Default checker should work the same as new()"
+    );
+}
