@@ -15,6 +15,22 @@ A fast, lightweight CLI website crawler and SEO analyzer built with Rust. Scoutl
 - **Flexible Reporting**: Output results in human-readable text or JSON format
 - **Fast & Concurrent**: Built with Tokio for async I/O and parallel link checking
 
+## Prerequisites
+
+- **Rust** (1.91 or later) - [Install Rust](https://www.rust-lang.org/tools/install)
+- **Cargo** (comes with Rust)
+
+### Optional Development Tools
+
+- **Lefthook** - Git hooks manager for running linters and formatters automatically
+  ```bash
+  # macOS
+  brew install lefthook
+
+  # After installation, initialize hooks
+  lefthook install
+  ```
+
 ## Installation
 
 ### From Source
