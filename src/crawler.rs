@@ -186,135 +186,135 @@ impl Crawler {
         // Extract from <a href> tags
         let a_selector = Selector::parse("a[href]").unwrap();
         for element in document.select(&a_selector) {
-            if let Some(href) = element.value().attr("href") {
-                if let Ok(absolute_url) = page_url_parsed.join(href) {
-                    let url_str = absolute_url.to_string();
-                    let is_external = absolute_url.host_str() != self.base_url.host_str();
-                    let text = element.text().collect::<String>().trim().to_string();
+            if let Some(href) = element.value().attr("href")
+                && let Ok(absolute_url) = page_url_parsed.join(href)
+            {
+                let url_str = absolute_url.to_string();
+                let is_external = absolute_url.host_str() != self.base_url.host_str();
+                let text = element.text().collect::<String>().trim().to_string();
 
-                    links.push(Link {
-                        url: url_str,
-                        text,
-                        is_external,
-                        status_code: None,
-                        redirected_url: None,
-                    });
-                }
+                links.push(Link {
+                    url: url_str,
+                    text,
+                    is_external,
+                    status_code: None,
+                    redirected_url: None,
+                });
             }
         }
 
         // Extract from <iframe src> tags
         let iframe_selector = Selector::parse("iframe[src]").unwrap();
         for element in document.select(&iframe_selector) {
-            if let Some(src) = element.value().attr("src") {
-                if let Ok(absolute_url) = page_url_parsed.join(src) {
-                    let url_str = absolute_url.to_string();
-                    let is_external = absolute_url.host_str() != self.base_url.host_str();
-                    let title = element.value().attr("title").unwrap_or("").to_string();
+            if let Some(src) = element.value().attr("src")
+                && let Ok(absolute_url) = page_url_parsed.join(src)
+            {
+                let url_str = absolute_url.to_string();
+                let is_external = absolute_url.host_str() != self.base_url.host_str();
+                let title = element.value().attr("title").unwrap_or("").to_string();
 
-                    links.push(Link {
-                        url: url_str,
-                        text: format!("[iframe] {}", title),
-                        is_external,
-                        status_code: None,
-                        redirected_url: None,
-                    });
-                }
+                links.push(Link {
+                    url: url_str,
+                    text: format!("[iframe] {}", title),
+                    is_external,
+                    status_code: None,
+                    redirected_url: None,
+                });
             }
         }
 
         // Extract from <video src> and <source src> tags
         let video_selector = Selector::parse("video[src]").unwrap();
         for element in document.select(&video_selector) {
-            if let Some(src) = element.value().attr("src") {
-                if let Ok(absolute_url) = page_url_parsed.join(src) {
-                    let url_str = absolute_url.to_string();
-                    let is_external = absolute_url.host_str() != self.base_url.host_str();
+            if let Some(src) = element.value().attr("src")
+                && let Ok(absolute_url) = page_url_parsed.join(src)
+            {
+                let url_str = absolute_url.to_string();
+                let is_external = absolute_url.host_str() != self.base_url.host_str();
 
-                    links.push(Link {
-                        url: url_str,
-                        text: "[video]".to_string(),
-                        is_external,
-                        status_code: None,
-                        redirected_url: None,
-                    });
-                }
+                links.push(Link {
+                    url: url_str,
+                    text: "[video]".to_string(),
+                    is_external,
+                    status_code: None,
+                    redirected_url: None,
+                });
             }
         }
 
         let source_selector = Selector::parse("source[src]").unwrap();
         for element in document.select(&source_selector) {
-            if let Some(src) = element.value().attr("src") {
-                if let Ok(absolute_url) = page_url_parsed.join(src) {
-                    let url_str = absolute_url.to_string();
-                    let is_external = absolute_url.host_str() != self.base_url.host_str();
-                    let media_type = element.value().attr("type").unwrap_or("").to_string();
+            if let Some(src) = element.value().attr("src")
+                && let Ok(absolute_url) = page_url_parsed.join(src)
+            {
+                let url_str = absolute_url.to_string();
+                let is_external = absolute_url.host_str() != self.base_url.host_str();
+                let media_type = element.value().attr("type").unwrap_or("").to_string();
 
-                    links.push(Link {
-                        url: url_str,
-                        text: format!("[source type={}]", media_type),
-                        is_external,
-                        status_code: None,
-                        redirected_url: None,
-                    });
-                }
+                links.push(Link {
+                    url: url_str,
+                    text: format!("[source type={}]", media_type),
+                    is_external,
+                    status_code: None,
+                    redirected_url: None,
+                });
             }
         }
 
         // Extract from <audio src> tags
         let audio_selector = Selector::parse("audio[src]").unwrap();
         for element in document.select(&audio_selector) {
-            if let Some(src) = element.value().attr("src") {
-                if let Ok(absolute_url) = page_url_parsed.join(src) {
-                    let url_str = absolute_url.to_string();
-                    let is_external = absolute_url.host_str() != self.base_url.host_str();
+            if let Some(src) = element.value().attr("src")
+                && let Ok(absolute_url) = page_url_parsed.join(src)
+            {
+                let url_str = absolute_url.to_string();
+                let is_external = absolute_url.host_str() != self.base_url.host_str();
 
-                    links.push(Link {
-                        url: url_str,
-                        text: "[audio]".to_string(),
-                        is_external,
-                        status_code: None,
-                        redirected_url: None,
-                    });
-                }
+                links.push(Link {
+                    url: url_str,
+                    text: "[audio]".to_string(),
+                    is_external,
+                    status_code: None,
+                    redirected_url: None,
+                });
             }
         }
 
         // Extract from <embed src> tags
         let embed_selector = Selector::parse("embed[src]").unwrap();
         for element in document.select(&embed_selector) {
-            if let Some(src) = element.value().attr("src") {
-                if let Ok(absolute_url) = page_url_parsed.join(src) {
-                    let url_str = absolute_url.to_string();
-                    let is_external = absolute_url.host_str() != self.base_url.host_str();
+            if let Some(src) = element.value().attr("src")
+                && let Ok(absolute_url) = page_url_parsed.join(src)
+            {
+                let url_str = absolute_url.to_string();
+                let is_external = absolute_url.host_str() != self.base_url.host_str();
 
-                    links.push(Link {
-                        url: url_str,
-                        text: "[embed]".to_string(),
-                        is_external,
-                        status_code: None,
-                        redirected_url: None,
-                    });
-                }
+                links.push(Link {
+                    url: url_str,
+                    text: "[embed]".to_string(),
+                    is_external,
+                    status_code: None,
+                    redirected_url: None,
+                });
             }
         }
 
         // Extract from <object data> tags
         let object_selector = Selector::parse("object[data]").unwrap();
         for element in document.select(&object_selector) {
-            if let Some(data) = element.value().attr("data") {
-                if let Ok(absolute_url) = page_url_parsed.join(data) {
-                    let url_str = absolute_url.to_string();
-                    let is_external = absolute_url.host_str() != self.base_url.host_str();
+            if let Some(data) = element.value().attr("data")
+                && let Ok(absolute_url) = page_url_parsed.join(data)
+            {
+                let url_str = absolute_url.to_string();
+                let is_external = absolute_url.host_str() != self.base_url.host_str();
 
-                    links.push(Link {
-                        url: url_str,
-                        text: "[object]".to_string(),
-                        is_external,
-                        status_code: None,
-                        redirected_url: None,
-                    });
-                }
+                links.push(Link {
+                    url: url_str,
+                    text: "[object]".to_string(),
+                    is_external,
+                    status_code: None,
+                    redirected_url: None,
+                });
             }
         }
 
@@ -327,14 +327,14 @@ impl Crawler {
         let mut images = Vec::new();
 
         for element in document.select(&selector) {
-            if let Some(src) = element.value().attr("src") {
-                if let Ok(absolute_url) = page_url_parsed.join(src) {
-                    let alt = element.value().attr("alt").map(|s| s.to_string());
-                    images.push(Image {
-                        src: absolute_url.to_string(),
-                        alt,
-                    });
-                }
+            if let Some(src) = element.value().attr("src")
+                && let Ok(absolute_url) = page_url_parsed.join(src)
+            {
+                let alt = element.value().attr("alt").map(|s| s.to_string());
+                images.push(Image {
+                    src: absolute_url.to_string(),
+                    alt,
+                });
             }
         }
 

@@ -41,7 +41,7 @@ impl Reporter {
             broken_links += page
                 .links
                 .iter()
-                .filter(|link| link.status_code.map_or(false, |code| code >= 400))
+                .filter(|link| link.status_code.is_some_and(|code| code >= 400))
                 .count();
         }
 

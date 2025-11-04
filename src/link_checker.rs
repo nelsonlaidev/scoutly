@@ -8,6 +8,12 @@ pub struct LinkChecker {
     client: reqwest::Client,
 }
 
+impl Default for LinkChecker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LinkChecker {
     pub fn new() -> Self {
         Self {
@@ -27,7 +33,7 @@ impl LinkChecker {
             for (idx, link) in page_info.links.iter().enumerate() {
                 all_links
                     .entry(link.url.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push((page_url.clone(), idx));
             }
         }
@@ -46,38 +52,35 @@ impl LinkChecker {
         for (url, (status_code, redirected_url)) in link_urls.iter().zip(results.iter()) {
             if let Some(locations) = all_links.get(url) {
                 for (page_url, link_idx) in locations {
-                    if let Some(page) = pages.get_mut(page_url) {
-                        if let Some(link) = page.links.get_mut(*link_idx) {
-                            link.status_code = *status_code;
-                            link.redirected_url = redirected_url.clone();
+                    if let Some(page) = pages.get_mut(page_url)
+                        && let Some(link) = page.links.get_mut(*link_idx) {
+                        link.status_code = *status_code;
+                        link.redirected_url = redirected_url.clone();
 
-                            // Add redirect issue if applicable (unless ignored)
-                            if !ignore_redirects {
-                                if let Some(redirect_to) = redirected_url {
-                                    page.issues.push(SeoIssue {
-                                        severity: IssueSeverity::Info,
-                                        issue_type: IssueType::Redirect,
-                                        message: format!(
-                                            "Link redirected: {} -> {}",
-                                            link.url, redirect_to
-                                        ),
-                                    });
-                                }
-                            }
+                        // Add redirect issue if applicable (unless ignored)
+                        if !ignore_redirects
+                            && let Some(redirect_to) = redirected_url {
+                            page.issues.push(SeoIssue {
+                                severity: IssueSeverity::Info,
+                                issue_type: IssueType::Redirect,
+                                message: format!(
+                                    "Link redirected: {} -> {}",
+                                    link.url, redirect_to
+                                ),
+                            });
+                        }
 
-                            // Add broken link issue if applicable
-                            if let Some(code) = status_code {
-                                if *code >= 400 {
-                                    page.issues.push(SeoIssue {
-                                        severity: IssueSeverity::Error,
-                                        issue_type: IssueType::BrokenLink,
-                                        message: format!(
-                                            "Broken link: {} (HTTP {})",
-                                            link.url, code
-                                        ),
-                                    });
-                                }
-                            }
+                        // Add broken link issue if applicable
+                        if let Some(code) = status_code
+                            && *code >= 400 {
+                            page.issues.push(SeoIssue {
+                                severity: IssueSeverity::Error,
+                                issue_type: IssueType::BrokenLink,
+                                message: format!(
+                                    "Broken link: {} (HTTP {})",
+                                    link.url, code
+                                ),
+                            });
                         }
                     }
                 }
