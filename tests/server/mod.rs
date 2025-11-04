@@ -17,7 +17,8 @@ pub async fn get_test_server_url() -> String {
     .expect("Failed to bind test server");
 
     let addr = http_server
-        .addrs().first()
+        .addrs()
+        .first()
         .cloned()
         .expect("No address bound");
     let url = format!("http://{}", addr);

@@ -53,13 +53,13 @@ impl LinkChecker {
             if let Some(locations) = all_links.get(url) {
                 for (page_url, link_idx) in locations {
                     if let Some(page) = pages.get_mut(page_url)
-                        && let Some(link) = page.links.get_mut(*link_idx) {
+                        && let Some(link) = page.links.get_mut(*link_idx)
+                    {
                         link.status_code = *status_code;
                         link.redirected_url = redirected_url.clone();
 
                         // Add redirect issue if applicable (unless ignored)
-                        if !ignore_redirects
-                            && let Some(redirect_to) = redirected_url {
+                        if !ignore_redirects && let Some(redirect_to) = redirected_url {
                             page.issues.push(SeoIssue {
                                 severity: IssueSeverity::Info,
                                 issue_type: IssueType::Redirect,
@@ -72,14 +72,12 @@ impl LinkChecker {
 
                         // Add broken link issue if applicable
                         if let Some(code) = status_code
-                            && *code >= 400 {
+                            && *code >= 400
+                        {
                             page.issues.push(SeoIssue {
                                 severity: IssueSeverity::Error,
                                 issue_type: IssueType::BrokenLink,
-                                message: format!(
-                                    "Broken link: {} (HTTP {})",
-                                    link.url, code
-                                ),
+                                message: format!("Broken link: {} (HTTP {})", link.url, code),
                             });
                         }
                     }

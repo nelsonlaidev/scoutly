@@ -8,7 +8,8 @@ impl SeoAnalyzer {
         for page in pages.values_mut() {
             // Only analyze SEO for HTML pages
             if let Some(content_type) = &page.content_type
-                && content_type.to_lowercase().contains("text/html") {
+                && content_type.to_lowercase().contains("text/html")
+            {
                 Self::analyze_page(page);
             }
         }
