@@ -23,7 +23,7 @@ impl Reporter {
     fn calculate_summary(pages: &HashMap<String, PageInfo>) -> CrawlSummary {
         let mut errors = 0;
         let mut warnings = 0;
-        let mut info_count = 0;
+        let mut infos = 0;
         let mut broken_links = 0;
         let mut total_links = 0;
 
@@ -34,7 +34,7 @@ impl Reporter {
                 match issue.severity {
                     IssueSeverity::Error => errors += 1,
                     IssueSeverity::Warning => warnings += 1,
-                    IssueSeverity::Info => info_count += 1,
+                    IssueSeverity::Info => infos += 1,
                 }
             }
 
@@ -51,7 +51,7 @@ impl Reporter {
             broken_links,
             errors,
             warnings,
-            info_count,
+            infos,
         }
     }
 
@@ -109,7 +109,7 @@ impl Reporter {
         );
         println!(
             "  Info:                {}",
-            report.summary.info_count.to_string().bright_cyan()
+            report.summary.infos.to_string().bright_cyan()
         );
         println!();
 
