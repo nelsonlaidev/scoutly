@@ -2,6 +2,7 @@
 name = "scoutly"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.91"
 
 [dependencies]
 tokio = { version = "1.41", features = ["full"] }
