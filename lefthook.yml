@@ -1,0 +1,10 @@
+pre-commit:
+  parallel: true
+  jobs:
+    - name: Format
+      glob: "*.rs"
+      run: cargo fmt -- {staged_files}
+
+    - name: Lint
+      glob: "*.rs"
+      run: cargo clippy --all-targets --all-features -- -D warnings {staged_files}
