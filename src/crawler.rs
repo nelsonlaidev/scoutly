@@ -94,6 +94,7 @@ impl Crawler {
                         PageInfo {
                             url: url.clone(),
                             status_code: None,
+                            content_type: None,
                             title: None,
                             meta_description: None,
                             h1_tags: vec![],
@@ -113,6 +114,14 @@ impl Crawler {
     async fn fetch_page(&self, url: &str, depth: usize) -> Result<PageInfo> {
         let response = self.client.get(url).send().await?;
         let status_code = response.status().as_u16();
+
+        // Extract content type from response headers
+        let content_type = response
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
         let html_content = response.text().await?;
         let document = Html::parse_document(&html_content);
 
@@ -134,6 +143,7 @@ impl Crawler {
         Ok(PageInfo {
             url: url.to_string(),
             status_code: Some(status_code),
+            content_type,
             title,
             meta_description,
             h1_tags,

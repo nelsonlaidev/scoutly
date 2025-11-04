@@ -5,6 +5,7 @@ use std::collections::HashMap;
 pub struct PageInfo {
     pub url: String,
     pub status_code: Option<u16>,
+    pub content_type: Option<String>,
     pub title: Option<String>,
     pub meta_description: Option<String>,
     pub h1_tags: Vec<String>,
