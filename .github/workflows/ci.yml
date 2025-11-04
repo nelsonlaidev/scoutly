@@ -51,6 +51,43 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
 
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/main' || github.base_ref == 'main' }}
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rust-src
+
+      - name: Setup Rust Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
+
+      - name: Run tarpaulin
+        run: cargo tarpaulin --out Xml --ignore-tests
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
@@ -63,7 +100,8 @@ jobs:
         with:
           components: clippy
 
-      - uses: actions/cache@v4
+      - name: Setup Rust Cache
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin
@@ -90,7 +128,8 @@ jobs:
         with:
           components: rustfmt
 
-      - uses: actions/cache@v4
+      - name: Setup Rust Cache
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin
