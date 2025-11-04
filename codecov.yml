@@ -9,6 +9,9 @@ coverage:
         target: 50%
         threshold: 1%
 
+ignore:
+  - "./src/main.rs"
+
 comment:
   layout: "header, diff, flags, files"
   behavior: default
