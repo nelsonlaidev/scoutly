@@ -7,12 +7,33 @@ members = ["cargo:."]
 cargo-dist-version = "0.30.2"
 # CI backends to support
 ci = "github"
+# Which actions to run on pull requests
+pr-run-mode = "plan"
 # The installers to generate for each app
 installers = ["shell", "powershell", "npm", "homebrew"]
 # A GitHub repo to push Homebrew formulas to
 tap = "nelsonlaidev/homebrew-tap"
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "aarch64-unknown-linux-musl", "aarch64-pc-windows-msvc", "arm-unknown-linux-musleabihf", "armv7-unknown-linux-gnueabihf", "armv7-unknown-linux-musleabihf", "x86_64-apple-darwin", "powerpc64-unknown-linux-gnu", "powerpc64le-unknown-linux-gnu", "riscv64gc-unknown-linux-gnu", "s390x-unknown-linux-gnu", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl", "x86_64-pc-windows-msvc", "i686-unknown-linux-gnu", "i686-unknown-linux-musl", "i686-pc-windows-msvc"]
+targets = [
+  "aarch64-apple-darwin",
+  "aarch64-unknown-linux-gnu",
+  "aarch64-unknown-linux-musl",
+  "aarch64-pc-windows-msvc",
+  "arm-unknown-linux-musleabihf",
+  "armv7-unknown-linux-gnueabihf",
+  "armv7-unknown-linux-musleabihf",
+  "x86_64-apple-darwin",
+  "powerpc64-unknown-linux-gnu",
+  "powerpc64le-unknown-linux-gnu",
+  "riscv64gc-unknown-linux-gnu",
+  "s390x-unknown-linux-gnu",
+  "x86_64-unknown-linux-gnu",
+  "x86_64-unknown-linux-musl",
+  "x86_64-pc-windows-msvc",
+  "i686-unknown-linux-gnu",
+  "i686-unknown-linux-musl",
+  "i686-pc-windows-msvc",
+]
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
 # Publish jobs to run in CI
