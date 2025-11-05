@@ -2,7 +2,7 @@
 name = "scoutly"
 description = "A fast, lightweight CLI website crawler and SEO analyzer built with Rust."
 authors = ["Nelson Lai <me@nelsonlai.dev>"]
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 edition = "2024"
 license = "MIT"
 homepage = "https://github.com/nelsonlaidev/scoutly"
