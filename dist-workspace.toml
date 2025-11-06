@@ -38,8 +38,8 @@ targets = [
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
 # Publish jobs to run in CI
-publish-jobs = ["homebrew"]
+publish-jobs = ["homebrew", "npm"]
 # Whether to install an updater program
 install-updater = false
-# The npm package should have this name
-npm-package = "scoutly"
+# A namespace to use when publishing this package to the npm registry
+npm-scope = "@nelsonlaidev"
