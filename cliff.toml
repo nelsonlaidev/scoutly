@@ -1,6 +1,6 @@
 [remote.github]
 owner = "nelsonlaidev"
-repo = "cliff"
+repo = "scoutly"
 
 [changelog]
 header = """
@@ -16,7 +16,7 @@ body = """
 {% macro print_commit(commit) -%}
     - {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
         {% if commit.breaking %}[**breaking**] {% endif %}\
-        {{ commit.message | upper_first }} \
+        {{ commit.message | upper_first }} - \
         ([{{ commit.id | truncate(length=7, end="") }}]({{ self::remote_url() }}/commit/{{ commit.id }}))\
 {% endmacro -%}
 
@@ -44,16 +44,17 @@ body = """
         {% endif -%}
     {% endfor -%}
 {% endfor -%}
-
-{% if github.contributors | length != 0 %}
-## Contributors
+{%- if github -%}
+{% if github.contributors | filter(attribute="is_first_time", value=true) | length != 0 %}
+  ## New Contributors ❤️
 {% endif %}\
-{% for contributor in github.contributors %}
-* [@{{ contributor.username }}](https://github.com/{{ contributor.username }})
+{% for contributor in github.contributors | filter(attribute="is_first_time", value=true) %}
+  * @{{ contributor.username }} made their first contribution
     {%- if contributor.pr_number %} in \
-    [#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }}) \
+      [#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }}) \
     {%- endif %}
 {%- endfor -%}
+{%- endif %}
 """
 footer = """
 """
@@ -69,8 +70,8 @@ filter_unconventional = true
 topo_order = false
 tag_pattern = "v[0-9].*"
 commit_parsers = [
-    { message = "^feat", group = "Features" },
-    { message = "^fix", group = "Bug Fixes" },
+    { message = "^feat", group = "<!-- 0 -->Features" },
+    { message = "^fix", group = "<!-- 1 -->Bug Fixes" },
     { message = "^docs", group = "Documentation" },
     { message = "^style", group = "Styling" },
     { message = "^refactor", group = "Refactor" },
