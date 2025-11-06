@@ -41,3 +41,5 @@ install-path = "CARGO_HOME"
 publish-jobs = ["homebrew"]
 # Whether to install an updater program
 install-updater = false
+# The npm package should have this name
+npm-package = "scoutly"
