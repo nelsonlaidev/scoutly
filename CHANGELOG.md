@@ -2,9 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
-
-Initial release.
+## [0.1.0] - 2025-11-05
 
 ### Bug Fixes
 
@@ -44,6 +42,7 @@ Initial release.
 - Update readme ([cd352fd](https://github.com/nelsonlaidev/cliff/commit/cd352fdbf13db1fccc661699e2a264e1f1e11d34))
 - Update readme ([fe0820e](https://github.com/nelsonlaidev/cliff/commit/fe0820e7ef5035b89e7a5387db61b84e1414347c))
 - Changelog ([66cf905](https://github.com/nelsonlaidev/cliff/commit/66cf9052961412860e4fe86e701d60ab2e580789))
+- Changelog ([c04f108](https://github.com/nelsonlaidev/cliff/commit/c04f108fc2646e4ca690759e9e5d2da5fb3b6e12))
 
 ### Refactor
 
@@ -55,3 +54,4 @@ Initial release.
 
 - Coverage (#1) ([979e6eb](https://github.com/nelsonlaidev/cliff/commit/979e6eb0dba070dd7a7b85f73d38a92f0873bf88))
 - More coverage (#2) ([3290f46](https://github.com/nelsonlaidev/cliff/commit/3290f465ffc706eada1c44a34b073a11daf6960b))
+
