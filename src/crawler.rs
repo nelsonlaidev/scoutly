@@ -1,5 +1,6 @@
 use crate::http_client::build_http_client;
 use crate::models::{Image, Link, PageInfo};
+use anyhow::{Context, Result, anyhow};
 use once_cell::sync::Lazy;
 use scraper::{Html, Selector};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -51,6 +52,18 @@ impl Crawler {
         keep_fragments: bool,
     ) -> Result<Self> {
         let base_url = Url::parse(start_url).context("Invalid URL")?;
+
+        // Validate URL scheme - only allow http and https
+        match base_url.scheme() {
+            "http" | "https" => {}
+            scheme => {
+                return Err(anyhow!(
+                    "Invalid URL scheme '{}': only http and https are supported",
+                    scheme
+                ));
+            }
+        }
+
         let mut to_visit = VecDeque::new();
         to_visit.push_back((start_url.to_string(), 0));
 
