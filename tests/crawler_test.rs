@@ -8,82 +8,150 @@ async fn test_crawler() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
 
-    // Test case 1: keep_fragments = true
+    // Test case 1: Test keep_fragments parameter
     {
-        let mut crawler =
-            Crawler::new(&base_url, 2, 50, false, true).expect("Failed to create crawler");
+        // Part 1: keep_fragments = true
+        {
+            let mut crawler =
+                Crawler::new(&base_url, 2, 50, false, true).expect("Failed to create crawler");
 
-        crawler.crawl().await.expect("Crawl failed");
+            crawler.crawl().await.expect("Crawl failed");
 
-        let url = format!("{}/crawler-fragments.html", base_url);
-        let page = crawler
-            .pages
-            .get(&url)
-            .expect("crawler-fragments.html not found");
+            let url = format!("{}/crawler-fragments.html", base_url);
+            let page = crawler
+                .pages
+                .get(&url)
+                .expect("crawler-fragments.html not found");
 
-        // Check that fragment links are extracted with fragments intact
-        let fragment_links: Vec<_> = page
-            .links
-            .iter()
-            .filter(|link| link.url.contains("#section"))
-            .collect();
-
-        assert!(
-            !fragment_links.is_empty(),
-            "Should find links with fragments when keep_fragments is true"
-        );
-
-        // Verify specific fragment links exist
-        let section1_link = page
-            .links
-            .iter()
-            .find(|link| link.url.contains("/crawler-fragments.html#section1"));
-
-        assert!(
-            section1_link.is_some(),
-            "Should find link to #section1 with fragment preserved"
-        );
-
-        let section2_link = page
-            .links
-            .iter()
-            .find(|link| link.url.contains("/crawler-fragments.html#section2"));
-
-        assert!(
-            section2_link.is_some(),
-            "Should find link to #section2 with fragment preserved"
-        );
-
-        let section3_link = page
-            .links
-            .iter()
-            .find(|link| link.url.contains("/crawler-fragments.html#section3"));
-
-        assert!(
-            section3_link.is_some(),
-            "Should find link to #section3 with fragment preserved"
-        );
-
-        // Test that the same URL with different fragments creates different entries
-        let intro_link = page
-            .links
-            .iter()
-            .find(|link| link.url.contains("/missing-title.html#intro"));
-
-        assert!(
-            intro_link.is_some(),
-            "Should find link with fragment to another page"
-        );
-
-        // When keep_fragments is true, the crawler should visit and store different URLs with fragments
-        // However, since fragments are typically not followed during crawling (they're client-side),
-        // we mainly verify that the links are extracted correctly with fragments preserved
-        assert!(
-            page.links
+            // Check that fragment links are extracted with fragments intact
+            let fragment_links: Vec<_> = page
+                .links
                 .iter()
-                .any(|link| link.url.ends_with("#section1")),
-            "Fragment URLs should be preserved in extracted links"
-        );
+                .filter(|link| link.url.contains("#section"))
+                .collect();
+
+            assert!(
+                !fragment_links.is_empty(),
+                "Should find links with fragments when keep_fragments is true"
+            );
+
+            // Verify specific fragment links exist
+            let section1_link = page
+                .links
+                .iter()
+                .find(|link| link.url.contains("/crawler-fragments.html#section1"));
+
+            assert!(
+                section1_link.is_some(),
+                "Should find link to #section1 with fragment preserved"
+            );
+
+            let section2_link = page
+                .links
+                .iter()
+                .find(|link| link.url.contains("/crawler-fragments.html#section2"));
+
+            assert!(
+                section2_link.is_some(),
+                "Should find link to #section2 with fragment preserved"
+            );
+
+            let section3_link = page
+                .links
+                .iter()
+                .find(|link| link.url.contains("/crawler-fragments.html#section3"));
+
+            assert!(
+                section3_link.is_some(),
+                "Should find link to #section3 with fragment preserved"
+            );
+
+            // Test that the same URL with different fragments creates different entries
+            let intro_link = page
+                .links
+                .iter()
+                .find(|link| link.url.contains("/missing-title.html#intro"));
+
+            assert!(
+                intro_link.is_some(),
+                "Should find link with fragment to another page"
+            );
+
+            // When keep_fragments is true, the crawler should visit and store different URLs with fragments
+            // However, since fragments are typically not followed during crawling (they're client-side),
+            // we mainly verify that the links are extracted correctly with fragments preserved
+            assert!(
+                page.links
+                    .iter()
+                    .any(|link| link.url.ends_with("#section1")),
+                "Fragment URLs should be preserved in extracted links"
+            );
+        }
+
+        // Part 2: keep_fragments = false
+        {
+            let mut crawler =
+                Crawler::new(&base_url, 2, 50, false, false).expect("Failed to create crawler");
+
+            crawler.crawl().await.expect("Crawl failed");
+
+            // When keep_fragments is false, the page is stored with normalized URL (no fragment)
+            let url = format!("{}/crawler-fragments.html", base_url);
+            let page = crawler
+                .pages
+                .get(&url)
+                .expect("crawler-fragments.html not found");
+
+            // Links are still extracted WITH fragments in their original form
+            let links_with_fragments: Vec<_> = page
+                .links
+                .iter()
+                .filter(|link| link.url.contains("#section"))
+                .collect();
+
+            assert!(
+                !links_with_fragments.is_empty(),
+                "Links are still extracted with fragments (for display/reporting purposes)"
+            );
+
+            // The key difference is in how pages are stored: fragments are normalized
+            // Verify that URLs with different fragments point to the same stored page
+            let fragment_url_1 = format!("{}/crawler-fragments.html#section1", base_url);
+            let fragment_url_2 = format!("{}/crawler-fragments.html#section2", base_url);
+
+            // These should NOT exist as separate pages (fragments are stripped for storage)
+            assert!(
+                !crawler.pages.contains_key(&fragment_url_1),
+                "Pages should not be stored with fragment keys when keep_fragments is false"
+            );
+
+            assert!(
+                !crawler.pages.contains_key(&fragment_url_2),
+                "Pages should not be stored with fragment keys when keep_fragments is false"
+            );
+
+            // But the base URL without fragment should exist
+            assert!(
+                crawler.pages.contains_key(&url),
+                "Page should be stored with normalized URL (no fragment)"
+            );
+
+            // The total number of pages should be less when keep_fragments=false
+            // because URLs with different fragments are treated as the same page
+            let pages_count_no_fragments = crawler.pages.len();
+
+            // Compare with keep_fragments=true crawler
+            let mut crawler_with_fragments =
+                Crawler::new(&base_url, 2, 50, false, true).expect("Failed to create crawler");
+
+            crawler_with_fragments.crawl().await.expect("Crawl failed");
+            let pages_count_with_fragments = crawler_with_fragments.pages.len();
+
+            assert!(
+                pages_count_no_fragments <= pages_count_with_fragments,
+                "Should have same or fewer pages when fragments are normalized"
+            );
+        }
     }
 
     // Test case 2: Extract from <iframe src> tags
@@ -141,11 +209,11 @@ async fn test_crawler() {
             .find(|link| link.url.contains("127.0.0.1:3000/ok") && link.text.contains("[iframe]"))
             .expect("Should find iframe link to different port");
 
-        // Note: Since both servers are on 127.0.0.1, this is considered internal
-        // (only hostname is compared, not port)
+        // Note: Different port on same hostname is considered external
+        // (both hostname and port are compared)
         assert!(
-            !port_different_iframe.is_external,
-            "Same hostname on different port is considered internal"
+            port_different_iframe.is_external,
+            "Same hostname on different port should be considered external"
         );
 
         assert_eq!(
@@ -469,14 +537,28 @@ async fn test_crawler() {
             }
         }
 
-        if !external_link_urls.is_empty() {
-            for external_url in &external_link_urls {
-                assert!(
-                    !crawler_no_external.pages.contains_key(external_url),
-                    "External URL {} should not be crawled when follow_external=false",
-                    external_url
-                );
-            }
+        // Verify that external links (including those on different ports) were extracted
+        assert!(
+            !external_link_urls.is_empty(),
+            "Should find external links (e.g., different port on same host)"
+        );
+
+        // Verify the specific iframe link to different port is marked as external
+        let has_different_port_link = external_link_urls
+            .iter()
+            .any(|url| url.contains("127.0.0.1:3000/ok"));
+        assert!(
+            has_different_port_link,
+            "Should have external link to different port (127.0.0.1:3000)"
+        );
+
+        // Verify that external links were extracted but not crawled
+        for external_url in &external_link_urls {
+            assert!(
+                !crawler_no_external.pages.contains_key(external_url),
+                "External URL {} should not be crawled when follow_external=false",
+                external_url
+            );
         }
 
         let crawled_external_count = crawler_no_external
@@ -490,6 +572,7 @@ async fn test_crawler() {
             "No external links should be crawled when follow_external=false"
         );
 
+        // Now crawl with follow_external = true
         let mut crawler_with_external =
             Crawler::new(&base_url, 5, 50, true, false).expect("Failed to create crawler");
 
@@ -504,6 +587,8 @@ async fn test_crawler() {
             }
         }
 
+        // The set of extracted external links should be the same in both cases
+        // (extraction happens regardless of follow_external setting)
         assert_eq!(
             external_link_urls.len(),
             external_links_with_follow.len(),

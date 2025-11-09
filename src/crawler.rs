@@ -56,6 +56,11 @@ impl Crawler {
         }
     }
 
+    /// Checks if a URL is external by comparing host and port with base_url
+    fn is_external_url(&self, url: &Url) -> bool {
+        url.host_str() != self.base_url.host_str() || url.port() != self.base_url.port()
+    }
+
     pub async fn crawl(&mut self) -> Result<()> {
         while let Some((url, depth)) = self.to_visit.pop_front() {
             if self.visited.len() >= self.max_pages {
@@ -190,7 +195,7 @@ impl Crawler {
                 && let Ok(absolute_url) = page_url_parsed.join(href)
             {
                 let url_str = absolute_url.to_string();
-                let is_external = absolute_url.host_str() != self.base_url.host_str();
+                let is_external = self.is_external_url(&absolute_url);
                 let text = element.text().collect::<String>().trim().to_string();
 
                 links.push(Link {
@@ -210,7 +215,7 @@ impl Crawler {
                 && let Ok(absolute_url) = page_url_parsed.join(src)
             {
                 let url_str = absolute_url.to_string();
-                let is_external = absolute_url.host_str() != self.base_url.host_str();
+                let is_external = self.is_external_url(&absolute_url);
                 let title = element.value().attr("title").unwrap_or("").to_string();
 
                 links.push(Link {
@@ -230,7 +235,7 @@ impl Crawler {
                 && let Ok(absolute_url) = page_url_parsed.join(src)
             {
                 let url_str = absolute_url.to_string();
-                let is_external = absolute_url.host_str() != self.base_url.host_str();
+                let is_external = self.is_external_url(&absolute_url);
 
                 links.push(Link {
                     url: url_str,
@@ -248,7 +253,7 @@ impl Crawler {
                 && let Ok(absolute_url) = page_url_parsed.join(src)
             {
                 let url_str = absolute_url.to_string();
-                let is_external = absolute_url.host_str() != self.base_url.host_str();
+                let is_external = self.is_external_url(&absolute_url);
                 let media_type = element.value().attr("type").unwrap_or("").to_string();
 
                 links.push(Link {
@@ -268,7 +273,7 @@ impl Crawler {
                 && let Ok(absolute_url) = page_url_parsed.join(src)
             {
                 let url_str = absolute_url.to_string();
-                let is_external = absolute_url.host_str() != self.base_url.host_str();
+                let is_external = self.is_external_url(&absolute_url);
 
                 links.push(Link {
                     url: url_str,
@@ -287,7 +292,7 @@ impl Crawler {
                 && let Ok(absolute_url) = page_url_parsed.join(src)
             {
                 let url_str = absolute_url.to_string();
-                let is_external = absolute_url.host_str() != self.base_url.host_str();
+                let is_external = self.is_external_url(&absolute_url);
 
                 links.push(Link {
                     url: url_str,
@@ -306,7 +311,7 @@ impl Crawler {
                 && let Ok(absolute_url) = page_url_parsed.join(data)
             {
                 let url_str = absolute_url.to_string();
-                let is_external = absolute_url.host_str() != self.base_url.host_str();
+                let is_external = self.is_external_url(&absolute_url);
 
                 links.push(Link {
                     url: url_str,
