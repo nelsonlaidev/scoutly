@@ -1,8 +1,9 @@
 use crate::http_client::build_http_client;
 use crate::models::{Image, Link, PageInfo};
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
+use futures::stream::{self, StreamExt};
 use governor::{
-    Quota, RateLimiter, clock::DefaultClock, state::InMemoryState, state::direct::NotKeyed,
+    clock::DefaultClock, state::direct::NotKeyed, state::InMemoryState, Quota, RateLimiter,
 };
 use once_cell::sync::Lazy;
 use scraper::{Html, Selector};
@@ -110,55 +111,82 @@ impl Crawler {
     }
 
     pub async fn crawl(&mut self) -> Result<()> {
-        while let Some((url, depth)) = self.to_visit.pop_front() {
-            let normalized_url = self.normalize_url(&url);
+        while !self.to_visit.is_empty() && self.visited.len() < self.max_pages {
+            // Collect up to concurrent_requests URLs to fetch
+            let mut batch = Vec::new();
+            while let Some((url, depth)) = self.to_visit.pop_front() {
+                let normalized_url = self.normalize_url(&url);
 
-            // Check if already visited or depth exceeded before processing
-            if self.visited.contains(&normalized_url) || depth > self.max_depth {
-                continue;
+                // Check if already visited or depth exceeded before processing
+                if self.visited.contains(&normalized_url) || depth > self.max_depth {
+                    continue;
+                }
+
+                // Check if adding this would exceed max_pages
+                if self.visited.len() + batch.len() >= self.max_pages {
+                    break;
+                }
+
+                self.visited.insert(normalized_url.clone());
+                batch.push((url, depth, normalized_url));
+
+                // Stop if we've reached the batch size
+                if batch.len() >= self.concurrent_requests {
+                    break;
+                }
             }
 
-            // Check max_pages limit before marking as visited to prevent off-by-one
-            if self.visited.len() >= self.max_pages {
+            if batch.is_empty() {
                 break;
             }
 
-            self.visited.insert(normalized_url.clone());
+            // Fetch batch concurrently using buffer_unordered
+            let results = stream::iter(&batch)
+                .map(|(url, depth, _normalized_url)| self.fetch_page(url, *depth))
+                .buffer_unordered(self.concurrent_requests)
+                .collect::<Vec<_>>()
+                .await;
 
-            match self.fetch_page(&url, depth).await {
-                Ok(page_info) => {
-                    // Queue internal links for crawling
-                    if depth < self.max_depth {
-                        for link in &page_info.links {
-                            if !link.is_external || self.follow_external {
-                                let normalized_link_url = self.normalize_url(&link.url);
-                                if !self.visited.contains(&normalized_link_url) {
-                                    self.to_visit.push_back((link.url.clone(), depth + 1));
+            // Combine results with batch data
+            let results: Vec<_> = batch.into_iter().zip(results).collect();
+
+            // Process results and queue new links
+            for ((url, depth, normalized_url), result) in results {
+                match result {
+                    Ok(page_info) => {
+                        // Queue internal links for crawling
+                        if depth < self.max_depth {
+                            for link in &page_info.links {
+                                if !link.is_external || self.follow_external {
+                                    let normalized_link_url = self.normalize_url(&link.url);
+                                    if !self.visited.contains(&normalized_link_url) {
+                                        self.to_visit.push_back((link.url.clone(), depth + 1));
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    self.pages.insert(normalized_url.clone(), page_info);
-                }
-                Err(e) => {
-                    tracing::error!(url = %url, error = %e, "Failed to crawl page");
-                    // Still insert a minimal page info for failed pages
-                    self.pages.insert(
-                        normalized_url.clone(),
-                        PageInfo {
-                            url: url.clone(),
-                            status_code: None,
-                            content_type: None,
-                            title: None,
-                            meta_description: None,
-                            h1_tags: vec![],
-                            links: vec![],
-                            images: vec![],
-                            issues: vec![],
-                            crawl_depth: depth,
-                        },
-                    );
+                        self.pages.insert(normalized_url, page_info);
+                    }
+                    Err(e) => {
+                        tracing::error!(url = %url, error = %e, "Failed to crawl page");
+                        // Still insert a minimal page info for failed pages
+                        self.pages.insert(
+                            normalized_url,
+                            PageInfo {
+                                url,
+                                status_code: None,
+                                content_type: None,
+                                title: None,
+                                meta_description: None,
+                                h1_tags: vec![],
+                                links: vec![],
+                                images: vec![],
+                                issues: vec![],
+                                crawl_depth: depth,
+                            },
+                        );
+                    }
                 }
             }
         }
