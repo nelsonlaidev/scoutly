@@ -14,22 +14,14 @@ static META_DESC_SELECTOR: Lazy<Selector> = Lazy::new(|| {
 });
 static H1_SELECTOR: Lazy<Selector> =
     Lazy::new(|| Selector::parse("h1").expect("h1 selector should be valid"));
-static A_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("a[href]").expect("a[href] selector should be valid"));
-static IFRAME_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("iframe[src]").expect("iframe[src] selector should be valid"));
-static VIDEO_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("video[src]").expect("video[src] selector should be valid"));
-static SOURCE_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("source[src]").expect("source[src] selector should be valid"));
-static AUDIO_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("audio[src]").expect("audio[src] selector should be valid"));
-static EMBED_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("embed[src]").expect("embed[src] selector should be valid"));
-static OBJECT_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("object[data]").expect("object[data] selector should be valid"));
 static IMG_SELECTOR: Lazy<Selector> =
     Lazy::new(|| Selector::parse("img[src]").expect("img[src] selector should be valid"));
+
+// Unified selector for all link-bearing elements (single DOM pass optimization)
+static LINK_ELEMENTS_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+    Selector::parse("a[href], iframe[src], video[src], source[src], audio[src], embed[src], object[data]")
+        .expect("link elements selector should be valid")
+});
 
 pub struct Crawler {
     client: reqwest::Client,
@@ -245,131 +237,48 @@ impl Crawler {
     fn extract_links(&self, document: &Html, page_url: &Url) -> Result<Vec<Link>> {
         let mut links = Vec::new();
 
-        // Extract from <a href> tags
-        for element in document.select(&A_SELECTOR) {
-            if let Some(href) = element.value().attr("href")
-                && let Ok(absolute_url) = page_url.join(href)
-            {
-                let url_str = absolute_url.to_string();
-                let is_external = self.is_external_url(&absolute_url);
-                let text = element.text().collect::<String>().trim().to_string();
+        // Single-pass extraction: iterate through all link-bearing elements once
+        for element in document.select(&LINK_ELEMENTS_SELECTOR) {
+            let element_name = element.value().name();
 
-                links.push(Link {
-                    url: url_str,
-                    text,
-                    is_external,
-                    status_code: None,
-                    redirected_url: None,
-                });
-            }
-        }
+            // Get the URL attribute based on element type
+            let url_attr = match element_name {
+                "a" => element.value().attr("href"),
+                "object" => element.value().attr("data"),
+                _ => element.value().attr("src"), // iframe, video, source, audio, embed
+            };
 
-        // Extract from <iframe src> tags
-        for element in document.select(&IFRAME_SELECTOR) {
-            if let Some(src) = element.value().attr("src")
-                && let Ok(absolute_url) = page_url.join(src)
-            {
-                let url_str = absolute_url.to_string();
-                let is_external = self.is_external_url(&absolute_url);
-                let title = element.value().attr("title").unwrap_or("").to_string();
+            if let Some(url_value) = url_attr {
+                if let Ok(absolute_url) = page_url.join(url_value) {
+                    let url_str = absolute_url.to_string();
+                    let is_external = self.is_external_url(&absolute_url);
 
-                links.push(Link {
-                    url: url_str,
-                    text: format!("[iframe] {}", title),
-                    is_external,
-                    status_code: None,
-                    redirected_url: None,
-                });
-            }
-        }
+                    // Generate text based on element type
+                    let text = match element_name {
+                        "a" => element.text().collect::<String>().trim().to_string(),
+                        "iframe" => {
+                            let title = element.value().attr("title").unwrap_or("");
+                            format!("[iframe] {}", title)
+                        }
+                        "video" => "[video]".to_string(),
+                        "source" => {
+                            let media_type = element.value().attr("type").unwrap_or("");
+                            format!("[source type={}]", media_type)
+                        }
+                        "audio" => "[audio]".to_string(),
+                        "embed" => "[embed]".to_string(),
+                        "object" => "[object]".to_string(),
+                        _ => continue, // Skip unknown elements
+                    };
 
-        // Extract from <video src> and <source src> tags
-        for element in document.select(&VIDEO_SELECTOR) {
-            if let Some(src) = element.value().attr("src")
-                && let Ok(absolute_url) = page_url.join(src)
-            {
-                let url_str = absolute_url.to_string();
-                let is_external = self.is_external_url(&absolute_url);
-
-                links.push(Link {
-                    url: url_str,
-                    text: "[video]".to_string(),
-                    is_external,
-                    status_code: None,
-                    redirected_url: None,
-                });
-            }
-        }
-
-        for element in document.select(&SOURCE_SELECTOR) {
-            if let Some(src) = element.value().attr("src")
-                && let Ok(absolute_url) = page_url.join(src)
-            {
-                let url_str = absolute_url.to_string();
-                let is_external = self.is_external_url(&absolute_url);
-                let media_type = element.value().attr("type").unwrap_or("").to_string();
-
-                links.push(Link {
-                    url: url_str,
-                    text: format!("[source type={}]", media_type),
-                    is_external,
-                    status_code: None,
-                    redirected_url: None,
-                });
-            }
-        }
-
-        // Extract from <audio src> tags
-        for element in document.select(&AUDIO_SELECTOR) {
-            if let Some(src) = element.value().attr("src")
-                && let Ok(absolute_url) = page_url.join(src)
-            {
-                let url_str = absolute_url.to_string();
-                let is_external = self.is_external_url(&absolute_url);
-
-                links.push(Link {
-                    url: url_str,
-                    text: "[audio]".to_string(),
-                    is_external,
-                    status_code: None,
-                    redirected_url: None,
-                });
-            }
-        }
-
-        // Extract from <embed src> tags
-        for element in document.select(&EMBED_SELECTOR) {
-            if let Some(src) = element.value().attr("src")
-                && let Ok(absolute_url) = page_url.join(src)
-            {
-                let url_str = absolute_url.to_string();
-                let is_external = self.is_external_url(&absolute_url);
-
-                links.push(Link {
-                    url: url_str,
-                    text: "[embed]".to_string(),
-                    is_external,
-                    status_code: None,
-                    redirected_url: None,
-                });
-            }
-        }
-
-        // Extract from <object data> tags
-        for element in document.select(&OBJECT_SELECTOR) {
-            if let Some(data) = element.value().attr("data")
-                && let Ok(absolute_url) = page_url.join(data)
-            {
-                let url_str = absolute_url.to_string();
-                let is_external = self.is_external_url(&absolute_url);
-
-                links.push(Link {
-                    url: url_str,
-                    text: "[object]".to_string(),
-                    is_external,
-                    status_code: None,
-                    redirected_url: None,
-                });
+                    links.push(Link {
+                        url: url_str,
+                        text,
+                        is_external,
+                        status_code: None,
+                        redirected_url: None,
+                    });
+                }
             }
         }
 
