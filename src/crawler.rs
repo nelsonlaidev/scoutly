@@ -165,6 +165,18 @@ impl Crawler {
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
 
+        // Validate content type before attempting to parse as HTML
+        if let Some(ref ct) = content_type {
+            let ct_lower = ct.to_lowercase();
+            if !ct_lower.contains("text/html") && !ct_lower.contains("application/xhtml") {
+                tracing::warn!(
+                    url = %url,
+                    content_type = %ct,
+                    "Non-HTML content type detected, parsing may fail"
+                );
+            }
+        }
+
         let html_content = response.text().await?;
         let document = Html::parse_document(&html_content);
 
