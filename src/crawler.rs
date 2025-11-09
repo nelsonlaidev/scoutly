@@ -1,9 +1,9 @@
 use crate::http_client::build_http_client;
 use crate::models::{Image, Link, PageInfo};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use futures::stream::{self, StreamExt};
 use governor::{
-    clock::DefaultClock, state::direct::NotKeyed, state::InMemoryState, Quota, RateLimiter,
+    Quota, RateLimiter, clock::DefaultClock, state::InMemoryState, state::direct::NotKeyed,
 };
 use once_cell::sync::Lazy;
 use scraper::{Html, Selector};

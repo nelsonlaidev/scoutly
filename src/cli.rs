@@ -39,4 +39,12 @@ pub struct Cli {
     /// Treat URLs with fragment identifiers (#) as unique links
     #[arg(long)]
     pub keep_fragments: bool,
+
+    /// Rate limit for requests per second (optional, e.g., 1.0 for 1 req/s)
+    #[arg(short = 'r', long)]
+    pub rate_limit: Option<f64>,
+
+    /// Number of concurrent requests (default: 5)
+    #[arg(short = 'c', long, default_value_t = 5)]
+    pub concurrency: usize,
 }

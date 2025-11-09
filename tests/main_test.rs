@@ -18,6 +18,8 @@ async fn test_invalid_url_no_protocol() {
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
@@ -46,6 +48,8 @@ async fn test_invalid_url_missing_https() {
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
@@ -70,6 +74,8 @@ async fn test_valid_http_url() {
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
@@ -88,6 +94,8 @@ async fn test_valid_https_url() {
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
@@ -115,6 +123,8 @@ async fn test_full_crawl_with_text_output() {
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
@@ -136,6 +146,8 @@ async fn test_full_crawl_with_json_output() {
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
@@ -160,6 +172,8 @@ async fn test_crawl_with_save_file() {
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
@@ -192,6 +206,8 @@ async fn test_crawl_with_verbose_flag() {
         verbose: true,
         ignore_redirects: false,
         keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
@@ -216,6 +232,8 @@ async fn test_crawl_with_external_flag() {
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
@@ -240,6 +258,8 @@ async fn test_crawl_with_ignore_redirects_flag() {
         verbose: false,
         ignore_redirects: true,
         keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
@@ -264,6 +284,8 @@ async fn test_crawl_with_keep_fragments_flag() {
         verbose: false,
         ignore_redirects: false,
         keep_fragments: true,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
@@ -288,6 +310,8 @@ async fn test_crawl_with_custom_depth_and_max_pages() {
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
@@ -315,6 +339,8 @@ async fn test_crawl_with_all_flags_combined() {
         verbose: true,
         ignore_redirects: true,
         keep_fragments: true,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
@@ -346,6 +372,8 @@ async fn test_crawl_with_default_text_output() {
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
@@ -373,6 +401,8 @@ async fn test_crawl_with_save_and_json_output() {
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
@@ -407,6 +437,8 @@ async fn test_crawl_with_verbose_and_json_output() {
         verbose: true,
         ignore_redirects: false,
         keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
     };
 
     let result = run(args).await;
