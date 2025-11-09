@@ -101,14 +101,16 @@ impl Crawler {
 
     pub async fn crawl(&mut self) -> Result<()> {
         while let Some((url, depth)) = self.to_visit.pop_front() {
-            if self.visited.len() >= self.max_pages {
-                break;
-            }
-
             let normalized_url = self.normalize_url(&url);
 
+            // Check if already visited or depth exceeded before processing
             if self.visited.contains(&normalized_url) || depth > self.max_depth {
                 continue;
+            }
+
+            // Check max_pages limit before marking as visited to prevent off-by-one
+            if self.visited.len() >= self.max_pages {
+                break;
             }
 
             self.visited.insert(normalized_url.clone());
