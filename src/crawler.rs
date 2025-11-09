@@ -132,7 +132,7 @@ impl Crawler {
                     self.pages.insert(normalized_url.clone(), page_info);
                 }
                 Err(e) => {
-                    eprintln!("Error crawling {}: {}", url, e);
+                    tracing::error!(url = %url, error = %e, "Failed to crawl page");
                     // Still insert a minimal page info for failed pages
                     self.pages.insert(
                         normalized_url.clone(),
