@@ -1,9 +1,34 @@
 use crate::http_client::build_http_client;
 use crate::models::{Image, Link, PageInfo};
-use anyhow::{Context, Result};
+use once_cell::sync::Lazy;
 use scraper::{Html, Selector};
 use std::collections::{HashMap, HashSet, VecDeque};
 use url::Url;
+
+// Cached selectors to avoid repeated parsing and eliminate unwrap() calls
+static TITLE_SELECTOR: Lazy<Selector> =
+    Lazy::new(|| Selector::parse("title").expect("title selector should be valid"));
+static META_DESC_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+    Selector::parse("meta[name='description']").expect("meta description selector should be valid")
+});
+static H1_SELECTOR: Lazy<Selector> =
+    Lazy::new(|| Selector::parse("h1").expect("h1 selector should be valid"));
+static A_SELECTOR: Lazy<Selector> =
+    Lazy::new(|| Selector::parse("a[href]").expect("a[href] selector should be valid"));
+static IFRAME_SELECTOR: Lazy<Selector> =
+    Lazy::new(|| Selector::parse("iframe[src]").expect("iframe[src] selector should be valid"));
+static VIDEO_SELECTOR: Lazy<Selector> =
+    Lazy::new(|| Selector::parse("video[src]").expect("video[src] selector should be valid"));
+static SOURCE_SELECTOR: Lazy<Selector> =
+    Lazy::new(|| Selector::parse("source[src]").expect("source[src] selector should be valid"));
+static AUDIO_SELECTOR: Lazy<Selector> =
+    Lazy::new(|| Selector::parse("audio[src]").expect("audio[src] selector should be valid"));
+static EMBED_SELECTOR: Lazy<Selector> =
+    Lazy::new(|| Selector::parse("embed[src]").expect("embed[src] selector should be valid"));
+static OBJECT_SELECTOR: Lazy<Selector> =
+    Lazy::new(|| Selector::parse("object[data]").expect("object[data] selector should be valid"));
+static IMG_SELECTOR: Lazy<Selector> =
+    Lazy::new(|| Selector::parse("img[src]").expect("img[src] selector should be valid"));
 
 pub struct Crawler {
     client: reqwest::Client,
@@ -160,26 +185,23 @@ impl Crawler {
     }
 
     fn extract_title(document: &Html) -> Option<String> {
-        let selector = Selector::parse("title").ok()?;
         document
-            .select(&selector)
+            .select(&TITLE_SELECTOR)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
     }
 
     fn extract_meta_description(document: &Html) -> Option<String> {
-        let selector = Selector::parse("meta[name='description']").ok()?;
         document
-            .select(&selector)
+            .select(&META_DESC_SELECTOR)
             .next()
             .and_then(|el| el.value().attr("content"))
             .map(|s| s.to_string())
     }
 
     fn extract_h1_tags(document: &Html) -> Vec<String> {
-        let selector = Selector::parse("h1").unwrap();
         document
-            .select(&selector)
+            .select(&H1_SELECTOR)
             .map(|el| el.text().collect::<String>().trim().to_string())
             .collect()
     }
@@ -189,8 +211,7 @@ impl Crawler {
         let mut links = Vec::new();
 
         // Extract from <a href> tags
-        let a_selector = Selector::parse("a[href]").unwrap();
-        for element in document.select(&a_selector) {
+        for element in document.select(&A_SELECTOR) {
             if let Some(href) = element.value().attr("href")
                 && let Ok(absolute_url) = page_url_parsed.join(href)
             {
@@ -209,8 +230,7 @@ impl Crawler {
         }
 
         // Extract from <iframe src> tags
-        let iframe_selector = Selector::parse("iframe[src]").unwrap();
-        for element in document.select(&iframe_selector) {
+        for element in document.select(&IFRAME_SELECTOR) {
             if let Some(src) = element.value().attr("src")
                 && let Ok(absolute_url) = page_url_parsed.join(src)
             {
@@ -229,8 +249,7 @@ impl Crawler {
         }
 
         // Extract from <video src> and <source src> tags
-        let video_selector = Selector::parse("video[src]").unwrap();
-        for element in document.select(&video_selector) {
+        for element in document.select(&VIDEO_SELECTOR) {
             if let Some(src) = element.value().attr("src")
                 && let Ok(absolute_url) = page_url_parsed.join(src)
             {
@@ -247,8 +266,7 @@ impl Crawler {
             }
         }
 
-        let source_selector = Selector::parse("source[src]").unwrap();
-        for element in document.select(&source_selector) {
+        for element in document.select(&SOURCE_SELECTOR) {
             if let Some(src) = element.value().attr("src")
                 && let Ok(absolute_url) = page_url_parsed.join(src)
             {
@@ -267,8 +285,7 @@ impl Crawler {
         }
 
         // Extract from <audio src> tags
-        let audio_selector = Selector::parse("audio[src]").unwrap();
-        for element in document.select(&audio_selector) {
+        for element in document.select(&AUDIO_SELECTOR) {
             if let Some(src) = element.value().attr("src")
                 && let Ok(absolute_url) = page_url_parsed.join(src)
             {
@@ -286,8 +303,7 @@ impl Crawler {
         }
 
         // Extract from <embed src> tags
-        let embed_selector = Selector::parse("embed[src]").unwrap();
-        for element in document.select(&embed_selector) {
+        for element in document.select(&EMBED_SELECTOR) {
             if let Some(src) = element.value().attr("src")
                 && let Ok(absolute_url) = page_url_parsed.join(src)
             {
@@ -305,8 +321,7 @@ impl Crawler {
         }
 
         // Extract from <object data> tags
-        let object_selector = Selector::parse("object[data]").unwrap();
-        for element in document.select(&object_selector) {
+        for element in document.select(&OBJECT_SELECTOR) {
             if let Some(data) = element.value().attr("data")
                 && let Ok(absolute_url) = page_url_parsed.join(data)
             {
@@ -327,11 +342,10 @@ impl Crawler {
     }
 
     fn extract_images(&self, document: &Html, page_url: &str) -> Result<Vec<Image>> {
-        let selector = Selector::parse("img[src]").unwrap();
         let page_url_parsed = Url::parse(page_url)?;
         let mut images = Vec::new();
 
-        for element in document.select(&selector) {
+        for element in document.select(&IMG_SELECTOR) {
             if let Some(src) = element.value().attr("src")
                 && let Ok(absolute_url) = page_url_parsed.join(src)
             {
