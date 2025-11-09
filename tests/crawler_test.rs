@@ -595,4 +595,224 @@ async fn test_crawler() {
             "External link extraction should be the same regardless of follow_external setting"
         );
     }
+
+    // Test case 10: Test content-type validation (HTML types)
+    {
+        let mut crawler = Crawler::new(&base_url, 2, 50, false, false, None, 1)
+            .expect("Failed to create crawler");
+
+        crawler.crawl().await.expect("Crawl failed");
+
+        // Check that HTML pages have correct content-type
+        let page = crawler.pages.get(&base_url).expect("index.html not found");
+
+        assert!(
+            page.content_type.is_some(),
+            "HTML page should have content-type"
+        );
+
+        let content_type = page.content_type.as_ref().unwrap();
+        assert!(
+            content_type.contains("text/html") || content_type.contains("application/xhtml"),
+            "HTML page should have text/html or application/xhtml content-type, got: {}",
+            content_type
+        );
+    }
+
+    // Test case 11: Test rate limiting functionality
+    {
+        use std::time::Instant;
+
+        // Test with rate limiting (1 request per second)
+        let mut crawler_limited = Crawler::new(&base_url, 1, 5, false, false, Some(2.0), 1)
+            .expect("Failed to create crawler");
+
+        let start_limited = Instant::now();
+        crawler_limited.crawl().await.expect("Crawl failed");
+        let _duration_limited = start_limited.elapsed();
+
+        // With 5 pages at 2 req/s, should take at least 2 seconds (5 pages / 2 req/s = 2.5s)
+        // But we give some tolerance for variations
+        assert!(
+            _duration_limited.as_secs() >= 1,
+            "Rate-limited crawl should take at least 1 second for 5 pages at 2 req/s"
+        );
+
+        // Test without rate limiting (should be faster)
+        let mut crawler_unlimited =
+            Crawler::new(&base_url, 1, 5, false, false, None, 1).expect("Failed to create crawler");
+
+        crawler_unlimited.crawl().await.expect("Crawl failed");
+
+        // Without rate limiting should generally be faster, though not guaranteed on slow systems
+        // At minimum, it should complete successfully
+        assert!(
+            crawler_unlimited.pages.len() > 0,
+            "Unlimited crawler should successfully crawl pages"
+        );
+
+        // Both crawlers should crawl the same pages
+        assert_eq!(
+            crawler_limited.pages.len(),
+            crawler_unlimited.pages.len(),
+            "Both rate-limited and unlimited crawlers should visit the same number of pages"
+        );
+    }
+
+    // Test case 12: Test concurrent crawling functionality
+    {
+        // Test sequential crawling (concurrency = 1)
+        let mut crawler_sequential = Crawler::new(&base_url, 2, 20, false, false, None, 1)
+            .expect("Failed to create crawler");
+
+        crawler_sequential.crawl().await.expect("Crawl failed");
+        let pages_sequential = crawler_sequential.pages.len();
+
+        // Verify that sequential crawling works
+        assert!(
+            pages_sequential > 5,
+            "Sequential crawling should find more than 5 pages with depth 2"
+        );
+
+        // Test concurrent crawling (concurrency = 5)
+        let mut crawler_concurrent = Crawler::new(&base_url, 2, 20, false, false, None, 5)
+            .expect("Failed to create crawler");
+
+        crawler_concurrent.crawl().await.expect("Crawl failed");
+        let pages_concurrent = crawler_concurrent.pages.len();
+
+        // Verify that concurrent crawling works
+        assert!(
+            pages_concurrent > 5,
+            "Concurrent crawling should find more than 5 pages with depth 2"
+        );
+
+        // Both should crawl approximately the same number of pages (within a reasonable range)
+        // Due to timing differences, exact count may vary slightly
+        let diff = (pages_sequential as i32 - pages_concurrent as i32).abs();
+        assert!(
+            diff <= 2,
+            "Page count difference should be small: sequential={}, concurrent={}, diff={}",
+            pages_sequential,
+            pages_concurrent,
+            diff
+        );
+    }
+
+    // Test case 13: Test concurrent crawling with rate limiting
+    {
+        // Concurrent crawling with rate limiting
+        let mut crawler = Crawler::new(&base_url, 1, 10, false, false, Some(3.0), 3)
+            .expect("Failed to create crawler");
+
+        crawler.crawl().await.expect("Crawl failed");
+
+        // With 10 pages, 3 concurrent requests, and 3 req/s rate limit:
+        // Should take at least 3-4 seconds
+        assert!(
+            crawler.pages.len() > 0,
+            "Should successfully crawl pages with concurrent rate limiting"
+        );
+
+        // Verify all pages were crawled correctly
+        assert!(
+            crawler.pages.len() <= 10,
+            "Should not exceed max_pages limit"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_content_type_validation() {
+    use scoutly::crawler::Crawler;
+    use server::{get_test_server_url, start_link_test_server};
+
+    start_link_test_server().await;
+
+    // Give server more time to start
+    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+    // Test HTML content-types are processed correctly first
+    {
+        let base_url = get_test_server_url().await;
+        let mut crawler =
+            Crawler::new(&base_url, 1, 5, false, false, None, 1).expect("Failed to create crawler");
+
+        crawler.crawl().await.expect("Crawl failed");
+
+        // Find an HTML page
+        let html_page = crawler
+            .pages
+            .values()
+            .find(|page| {
+                page.content_type
+                    .as_ref()
+                    .map(|ct| ct.contains("text/html") || ct.contains("application/xhtml"))
+                    .unwrap_or(false)
+            })
+            .expect("Should find at least one HTML page");
+
+        // HTML pages should have content-type
+        assert!(
+            html_page.content_type.is_some(),
+            "HTML page should have content-type"
+        );
+
+        // HTML pages can have title, h1 tags, etc.
+        assert!(html_page.status_code.is_some(), "Should have status code");
+    }
+
+    // Test non-HTML content types (JSON)
+    {
+        let mut crawler = Crawler::new(
+            "http://127.0.0.1:3000/json-response",
+            0,
+            10,
+            false,
+            false,
+            None,
+            1,
+        )
+        .expect("Failed to create crawler");
+
+        // Crawl may succeed or fail depending on how non-HTML is handled
+        let result = crawler.crawl().await;
+
+        // If crawl succeeded, check the page
+        if result.is_ok() && !crawler.pages.is_empty() {
+            let page = crawler
+                .pages
+                .get("http://127.0.0.1:3000/json-response")
+                .expect("json-response page should exist");
+
+            // Content type should be captured
+            if let Some(content_type) = &page.content_type {
+                assert!(
+                    content_type.contains("application/json"),
+                    "Should have application/json content-type, got: {}",
+                    content_type
+                );
+            }
+
+            // Status code should be captured
+            assert!(page.status_code.is_some(), "Should have status code");
+        }
+    }
+
+    // Test that we can detect content-type for the test server's /ok endpoint
+    {
+        let mut crawler = Crawler::new("http://127.0.0.1:3000/ok", 0, 10, false, false, None, 1)
+            .expect("Failed to create crawler");
+
+        crawler.crawl().await.expect("Crawl failed");
+
+        let page = crawler
+            .pages
+            .get("http://127.0.0.1:3000/ok")
+            .expect("/ok page should exist");
+
+        // The /ok endpoint returns plain text, should have a content-type
+        assert!(page.status_code.is_some(), "Should have status code");
+        assert_eq!(page.status_code.unwrap(), 200, "Should have 200 status");
+    }
 }

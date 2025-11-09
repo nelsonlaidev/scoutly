@@ -69,6 +69,30 @@ pub async fn start_link_test_server() {
                         web::get()
                             .to(|| async { HttpResponse::InternalServerError().body("Error") }),
                     )
+                    .route(
+                        "/json-response",
+                        web::get().to(|| async {
+                            HttpResponse::Ok()
+                                .content_type("application/json")
+                                .body(r#"{"message": "This is JSON"}"#)
+                        }),
+                    )
+                    .route(
+                        "/image-response",
+                        web::get().to(|| async {
+                            HttpResponse::Ok()
+                                .content_type("image/png")
+                                .body(vec![0u8; 100]) // Fake image data
+                        }),
+                    )
+                    .route(
+                        "/pdf-response",
+                        web::get().to(|| async {
+                            HttpResponse::Ok()
+                                .content_type("application/pdf")
+                                .body(vec![0u8; 100]) // Fake PDF data
+                        }),
+                    )
             })
             .bind(("127.0.0.1", 3000))
             .expect("Failed to bind link test server on port 3000");
