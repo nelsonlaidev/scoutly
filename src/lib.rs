@@ -41,6 +41,8 @@ pub async fn run(args: Cli) -> Result<()> {
         args.max_pages,
         args.external,
         args.keep_fragments,
+        None, // requests_per_second: None = unlimited (for now)
+        1,    // concurrent_requests: 1 = sequential (for now)
     )?;
 
     if args.verbose {

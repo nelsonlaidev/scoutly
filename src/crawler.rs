@@ -41,6 +41,8 @@ pub struct Crawler {
     visited: HashSet<String>,
     to_visit: VecDeque<(String, usize)>,
     pub pages: HashMap<String, PageInfo>,
+    requests_per_second: Option<f64>,
+    concurrent_requests: usize,
 }
 
 impl Crawler {
@@ -50,6 +52,8 @@ impl Crawler {
         max_pages: usize,
         follow_external: bool,
         keep_fragments: bool,
+        requests_per_second: Option<f64>,
+        concurrent_requests: usize,
     ) -> Result<Self> {
         let base_url = Url::parse(start_url).context("Invalid URL")?;
 
@@ -77,6 +81,8 @@ impl Crawler {
             visited: HashSet::new(),
             to_visit,
             pages: HashMap::new(),
+            requests_per_second,
+            concurrent_requests,
         })
     }
 

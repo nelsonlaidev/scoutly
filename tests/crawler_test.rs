@@ -12,8 +12,8 @@ async fn test_crawler() {
     {
         // Part 1: keep_fragments = true
         {
-            let mut crawler =
-                Crawler::new(&base_url, 2, 50, false, true).expect("Failed to create crawler");
+            let mut crawler = Crawler::new(&base_url, 2, 50, false, true, None, 1)
+                .expect("Failed to create crawler");
 
             crawler.crawl().await.expect("Crawl failed");
 
@@ -90,8 +90,8 @@ async fn test_crawler() {
 
         // Part 2: keep_fragments = false
         {
-            let mut crawler =
-                Crawler::new(&base_url, 2, 50, false, false).expect("Failed to create crawler");
+            let mut crawler = Crawler::new(&base_url, 2, 50, false, false, None, 1)
+                .expect("Failed to create crawler");
 
             crawler.crawl().await.expect("Crawl failed");
 
@@ -141,8 +141,8 @@ async fn test_crawler() {
             let pages_count_no_fragments = crawler.pages.len();
 
             // Compare with keep_fragments=true crawler
-            let mut crawler_with_fragments =
-                Crawler::new(&base_url, 2, 50, false, true).expect("Failed to create crawler");
+            let mut crawler_with_fragments = Crawler::new(&base_url, 2, 50, false, true, None, 1)
+                .expect("Failed to create crawler");
 
             crawler_with_fragments.crawl().await.expect("Crawl failed");
             let pages_count_with_fragments = crawler_with_fragments.pages.len();
@@ -156,8 +156,8 @@ async fn test_crawler() {
 
     // Test case 2: Extract from <iframe src> tags
     {
-        let mut crawler =
-            Crawler::new(&base_url, 2, 50, false, false).expect("Failed to create crawler");
+        let mut crawler = Crawler::new(&base_url, 2, 50, false, false, None, 1)
+            .expect("Failed to create crawler");
 
         crawler.crawl().await.expect("Crawl failed");
 
@@ -224,8 +224,8 @@ async fn test_crawler() {
 
     // Test case 3: Extract from <video src> and <source src> tags
     {
-        let mut crawler =
-            Crawler::new(&base_url, 2, 50, false, false).expect("Failed to create crawler");
+        let mut crawler = Crawler::new(&base_url, 2, 50, false, false, None, 1)
+            .expect("Failed to create crawler");
 
         crawler.crawl().await.expect("Crawl failed");
 
@@ -298,8 +298,8 @@ async fn test_crawler() {
 
     // Test case 4: Extract from <audio src> tags
     {
-        let mut crawler =
-            Crawler::new(&base_url, 2, 50, false, false).expect("Failed to create crawler");
+        let mut crawler = Crawler::new(&base_url, 2, 50, false, false, None, 1)
+            .expect("Failed to create crawler");
 
         crawler.crawl().await.expect("Crawl failed");
 
@@ -359,8 +359,8 @@ async fn test_crawler() {
 
     // Test case 5: Extract from <embed src> tags
     {
-        let mut crawler =
-            Crawler::new(&base_url, 2, 50, false, false).expect("Failed to create crawler");
+        let mut crawler = Crawler::new(&base_url, 2, 50, false, false, None, 1)
+            .expect("Failed to create crawler");
 
         crawler.crawl().await.expect("Crawl failed");
 
@@ -404,8 +404,8 @@ async fn test_crawler() {
 
     // Test case 6: Extract from <object data> tags
     {
-        let mut crawler =
-            Crawler::new(&base_url, 2, 50, false, false).expect("Failed to create crawler");
+        let mut crawler = Crawler::new(&base_url, 2, 50, false, false, None, 1)
+            .expect("Failed to create crawler");
 
         crawler.crawl().await.expect("Crawl failed");
 
@@ -451,7 +451,7 @@ async fn test_crawler() {
     {
         // Create a crawler with a low max_pages limit
         let mut crawler =
-            Crawler::new(&base_url, 5, 3, false, false).expect("Failed to create crawler");
+            Crawler::new(&base_url, 5, 3, false, false, None, 1).expect("Failed to create crawler");
 
         crawler.crawl().await.expect("Crawl failed");
 
@@ -478,8 +478,8 @@ async fn test_crawler() {
 
     // Test case 8: Test max_depth limit
     {
-        let mut crawler =
-            Crawler::new(&base_url, 1, 100, false, false).expect("Failed to create crawler");
+        let mut crawler = Crawler::new(&base_url, 1, 100, false, false, None, 1)
+            .expect("Failed to create crawler");
 
         crawler.crawl().await.expect("Crawl failed");
 
@@ -501,8 +501,8 @@ async fn test_crawler() {
             "With max_depth=1, should crawl more than just the starting page"
         );
 
-        let mut crawler_depth_0 =
-            Crawler::new(&base_url, 0, 100, false, false).expect("Failed to create crawler");
+        let mut crawler_depth_0 = Crawler::new(&base_url, 0, 100, false, false, None, 1)
+            .expect("Failed to create crawler");
 
         crawler_depth_0.crawl().await.expect("Crawl failed");
 
@@ -523,8 +523,8 @@ async fn test_crawler() {
 
     // Test case 9: Test follow_external parameter
     {
-        let mut crawler_no_external =
-            Crawler::new(&base_url, 5, 50, false, false).expect("Failed to create crawler");
+        let mut crawler_no_external = Crawler::new(&base_url, 5, 50, false, false, None, 1)
+            .expect("Failed to create crawler");
 
         crawler_no_external.crawl().await.expect("Crawl failed");
 
@@ -574,7 +574,7 @@ async fn test_crawler() {
 
         // Now crawl with follow_external = true
         let mut crawler_with_external =
-            Crawler::new(&base_url, 5, 50, true, false).expect("Failed to create crawler");
+            Crawler::new(&base_url, 5, 50, true, false, None, 1).expect("Failed to create crawler");
 
         crawler_with_external.crawl().await.expect("Crawl failed");
 

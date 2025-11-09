@@ -10,7 +10,7 @@ async fn test_seo_analyzer() {
     let base_url = get_test_server_url().await;
 
     let mut crawler =
-        Crawler::new(&base_url, 2, 50, false, false).expect("Failed to create crawler");
+        Crawler::new(&base_url, 2, 50, false, false, None, 1).expect("Failed to create crawler");
 
     crawler.crawl().await.expect("Crawl failed");
 
