@@ -1892,12 +1892,14 @@ dependencies = [
  "clap",
  "colored",
  "futures",
+ "once_cell",
  "predicates",
  "reqwest",
  "scraper",
  "serde",
  "serde_json",
  "tokio",
+ "tracing",
  "url",
 ]
 
