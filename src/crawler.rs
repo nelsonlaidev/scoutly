@@ -188,6 +188,9 @@ impl Crawler {
         let html_content = response.text().await?;
         let document = Html::parse_document(&html_content);
 
+        // Parse URL once for use in extraction methods
+        let page_url = Url::parse(url)?;
+
         // Extract title
         let title = Self::extract_title(&document);
 
@@ -198,10 +201,10 @@ impl Crawler {
         let h1_tags = Self::extract_h1_tags(&document);
 
         // Extract links
-        let links = self.extract_links(&document, url)?;
+        let links = self.extract_links(&document, &page_url)?;
 
         // Extract images
-        let images = self.extract_images(&document, url)?;
+        let images = self.extract_images(&document, &page_url)?;
 
         Ok(PageInfo {
             url: url.to_string(),
@@ -239,14 +242,13 @@ impl Crawler {
             .collect()
     }
 
-    fn extract_links(&self, document: &Html, page_url: &str) -> Result<Vec<Link>> {
-        let page_url_parsed = Url::parse(page_url)?;
+    fn extract_links(&self, document: &Html, page_url: &Url) -> Result<Vec<Link>> {
         let mut links = Vec::new();
 
         // Extract from <a href> tags
         for element in document.select(&A_SELECTOR) {
             if let Some(href) = element.value().attr("href")
-                && let Ok(absolute_url) = page_url_parsed.join(href)
+                && let Ok(absolute_url) = page_url.join(href)
             {
                 let url_str = absolute_url.to_string();
                 let is_external = self.is_external_url(&absolute_url);
@@ -265,7 +267,7 @@ impl Crawler {
         // Extract from <iframe src> tags
         for element in document.select(&IFRAME_SELECTOR) {
             if let Some(src) = element.value().attr("src")
-                && let Ok(absolute_url) = page_url_parsed.join(src)
+                && let Ok(absolute_url) = page_url.join(src)
             {
                 let url_str = absolute_url.to_string();
                 let is_external = self.is_external_url(&absolute_url);
@@ -284,7 +286,7 @@ impl Crawler {
         // Extract from <video src> and <source src> tags
         for element in document.select(&VIDEO_SELECTOR) {
             if let Some(src) = element.value().attr("src")
-                && let Ok(absolute_url) = page_url_parsed.join(src)
+                && let Ok(absolute_url) = page_url.join(src)
             {
                 let url_str = absolute_url.to_string();
                 let is_external = self.is_external_url(&absolute_url);
@@ -301,7 +303,7 @@ impl Crawler {
 
         for element in document.select(&SOURCE_SELECTOR) {
             if let Some(src) = element.value().attr("src")
-                && let Ok(absolute_url) = page_url_parsed.join(src)
+                && let Ok(absolute_url) = page_url.join(src)
             {
                 let url_str = absolute_url.to_string();
                 let is_external = self.is_external_url(&absolute_url);
@@ -320,7 +322,7 @@ impl Crawler {
         // Extract from <audio src> tags
         for element in document.select(&AUDIO_SELECTOR) {
             if let Some(src) = element.value().attr("src")
-                && let Ok(absolute_url) = page_url_parsed.join(src)
+                && let Ok(absolute_url) = page_url.join(src)
             {
                 let url_str = absolute_url.to_string();
                 let is_external = self.is_external_url(&absolute_url);
@@ -338,7 +340,7 @@ impl Crawler {
         // Extract from <embed src> tags
         for element in document.select(&EMBED_SELECTOR) {
             if let Some(src) = element.value().attr("src")
-                && let Ok(absolute_url) = page_url_parsed.join(src)
+                && let Ok(absolute_url) = page_url.join(src)
             {
                 let url_str = absolute_url.to_string();
                 let is_external = self.is_external_url(&absolute_url);
@@ -356,7 +358,7 @@ impl Crawler {
         // Extract from <object data> tags
         for element in document.select(&OBJECT_SELECTOR) {
             if let Some(data) = element.value().attr("data")
-                && let Ok(absolute_url) = page_url_parsed.join(data)
+                && let Ok(absolute_url) = page_url.join(data)
             {
                 let url_str = absolute_url.to_string();
                 let is_external = self.is_external_url(&absolute_url);
@@ -374,13 +376,12 @@ impl Crawler {
         Ok(links)
     }
 
-    fn extract_images(&self, document: &Html, page_url: &str) -> Result<Vec<Image>> {
-        let page_url_parsed = Url::parse(page_url)?;
+    fn extract_images(&self, document: &Html, page_url: &Url) -> Result<Vec<Image>> {
         let mut images = Vec::new();
 
         for element in document.select(&IMG_SELECTOR) {
             if let Some(src) = element.value().attr("src")
-                && let Ok(absolute_url) = page_url_parsed.join(src)
+                && let Ok(absolute_url) = page_url.join(src)
             {
                 let alt = element.value().attr("alt").map(|s| s.to_string());
                 images.push(Image {
