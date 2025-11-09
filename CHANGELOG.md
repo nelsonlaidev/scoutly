@@ -2,7 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.0] - 2025-11-06
+## [0.1.1](https://github.com/nelsonlaidev/scoutly/compare/v0.1.0..v0.1.1) - 2025-11-09
+
+### Bug Fixes
+
+- Should compare port when checking external url - ([7533344](https://github.com/nelsonlaidev/scoutly/commit/75333448888fb944e5307cf4660841db43073af2))
+
+### Testing
+
+- Add basic cli test - ([19efafc](https://github.com/nelsonlaidev/scoutly/commit/19efafcec5efa2147708c97e90598579bac1e145))
+- Add tests for max_depth, follow_external params - ([ba9b4ef](https://github.com/nelsonlaidev/scoutly/commit/ba9b4ef7a6f4fc5f06d4779f5d5b4de16ab062a5))
+
+## [0.1.0](https://github.com/nelsonlaidev/scoutly/tree/v0.1.0) - 2025-11-06
 
 ### Bug Fixes
 
@@ -28,6 +39,7 @@ All notable changes to this project will be documented in this file.
 - Version 0.1.0 - ([6a035ca](https://github.com/nelsonlaidev/scoutly/commit/6a035ca4fbd5cbdf010c8760401c87a7d660a11a))
 - Add npm package name to dist-workspace - ([36ddb41](https://github.com/nelsonlaidev/scoutly/commit/36ddb41f304314e1416e566e4c691bf89cac0fc6))
 - Publish to npm - ([570f726](https://github.com/nelsonlaidev/scoutly/commit/570f726de3db590e1dd7a1b03b84b08efc6c09e1))
+- *(release)* Prepare for v0.1.0 - ([638755a](https://github.com/nelsonlaidev/scoutly/commit/638755adfdf0b5ed851b1ab7faea94211e355171))
 
 ### Continuous Integration
 
@@ -58,6 +70,6 @@ All notable changes to this project will be documented in this file.
 - Coverage (#1) - ([979e6eb](https://github.com/nelsonlaidev/scoutly/commit/979e6eb0dba070dd7a7b85f73d38a92f0873bf88))
 - More coverage (#2) - ([3290f46](https://github.com/nelsonlaidev/scoutly/commit/3290f465ffc706eada1c44a34b073a11daf6960b))
 
-## New Contributors ❤️
+## New Contributors
 
 * @nelsonlaidev made their first contribution
