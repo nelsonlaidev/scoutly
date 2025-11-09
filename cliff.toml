@@ -56,6 +56,7 @@ filter_unconventional = true
 topo_order = false
 tag_pattern = "v[0-9].*"
 commit_parsers = [
+    { message = ".*changelog.*", skip = true },
     { message = "^feat", group = "<!-- 0 -->Features" },
     { message = "^fix", group = "<!-- 1 -->Bug Fixes" },
     { message = "^docs", group = "Documentation" },

@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 - Add basic cli test - ([19efafc](https://github.com/nelsonlaidev/scoutly/commit/19efafcec5efa2147708c97e90598579bac1e145))
 - Add tests for max_depth, follow_external params - ([ba9b4ef](https://github.com/nelsonlaidev/scoutly/commit/ba9b4ef7a6f4fc5f06d4779f5d5b4de16ab062a5))
+- Platform-specific pattern in cli_test - ([a02985e](https://github.com/nelsonlaidev/scoutly/commit/a02985e0daf9e5d3e7e098c9a33db8a2cf18539d))
 
 ## [0.1.0](https://github.com/nelsonlaidev/scoutly/tree/v0.1.0) - 2025-11-06
 
@@ -55,9 +56,6 @@ All notable changes to this project will be documented in this file.
 
 - Update readme - ([cd352fd](https://github.com/nelsonlaidev/scoutly/commit/cd352fdbf13db1fccc661699e2a264e1f1e11d34))
 - Update readme - ([fe0820e](https://github.com/nelsonlaidev/scoutly/commit/fe0820e7ef5035b89e7a5387db61b84e1414347c))
-- Changelog - ([66cf905](https://github.com/nelsonlaidev/scoutly/commit/66cf9052961412860e4fe86e701d60ab2e580789))
-- Changelog - ([c04f108](https://github.com/nelsonlaidev/scoutly/commit/c04f108fc2646e4ca690759e9e5d2da5fb3b6e12))
-- Changelog - ([f32fc9a](https://github.com/nelsonlaidev/scoutly/commit/f32fc9a208c44ea1bb70e6a016901682bb9fca2f))
 
 ### Refactor
 
