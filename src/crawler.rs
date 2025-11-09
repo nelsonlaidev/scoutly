@@ -1,9 +1,13 @@
 use crate::http_client::build_http_client;
 use crate::models::{Image, Link, PageInfo};
 use anyhow::{Context, Result, anyhow};
+use governor::{
+    Quota, RateLimiter, clock::DefaultClock, state::InMemoryState, state::direct::NotKeyed,
+};
 use once_cell::sync::Lazy;
 use scraper::{Html, Selector};
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::num::NonZeroU32;
 use url::Url;
 
 // Cached selectors to avoid repeated parsing and eliminate unwrap() calls
@@ -19,8 +23,10 @@ static IMG_SELECTOR: Lazy<Selector> =
 
 // Unified selector for all link-bearing elements (single DOM pass optimization)
 static LINK_ELEMENTS_SELECTOR: Lazy<Selector> = Lazy::new(|| {
-    Selector::parse("a[href], iframe[src], video[src], source[src], audio[src], embed[src], object[data]")
-        .expect("link elements selector should be valid")
+    Selector::parse(
+        "a[href], iframe[src], video[src], source[src], audio[src], embed[src], object[data]",
+    )
+    .expect("link elements selector should be valid")
 });
 
 pub struct Crawler {
@@ -33,7 +39,7 @@ pub struct Crawler {
     visited: HashSet<String>,
     to_visit: VecDeque<(String, usize)>,
     pub pages: HashMap<String, PageInfo>,
-    requests_per_second: Option<f64>,
+    rate_limiter: Option<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
     concurrent_requests: usize,
 }
 
@@ -63,6 +69,12 @@ impl Crawler {
         let mut to_visit = VecDeque::new();
         to_visit.push_back((start_url.to_string(), 0));
 
+        // Initialize rate limiter if requests_per_second is specified
+        let rate_limiter = requests_per_second.map(|rps| {
+            let quota = Quota::per_second(NonZeroU32::new(rps.ceil() as u32).unwrap());
+            RateLimiter::direct(quota)
+        });
+
         Ok(Self {
             client: build_http_client(30)?,
             base_url,
@@ -73,7 +85,7 @@ impl Crawler {
             visited: HashSet::new(),
             to_visit,
             pages: HashMap::new(),
-            requests_per_second,
+            rate_limiter,
             concurrent_requests,
         })
     }
@@ -155,6 +167,11 @@ impl Crawler {
     }
 
     async fn fetch_page(&self, url: &str, depth: usize) -> Result<PageInfo> {
+        // Wait for rate limiter before making request
+        if let Some(limiter) = &self.rate_limiter {
+            limiter.until_ready().await;
+        }
+
         let response = self.client.get(url).send().await?;
         let status_code = response.status().as_u16();
 
