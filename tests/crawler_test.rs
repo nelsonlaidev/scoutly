@@ -407,4 +407,107 @@ async fn test_crawler() {
             "Should not exceed max_pages limit"
         );
     }
+
+    // Test case 8: Test max_depth limit
+    {
+        let mut crawler =
+            Crawler::new(&base_url, 1, 100, false, false).expect("Failed to create crawler");
+
+        crawler.crawl().await.expect("Crawl failed");
+
+        for (_url, page) in crawler.pages.iter() {
+            assert!(
+                page.crawl_depth <= 1,
+                "Page at depth {} exceeds max_depth of 1",
+                page.crawl_depth
+            );
+        }
+
+        assert!(
+            crawler.pages.values().any(|page| page.crawl_depth == 0),
+            "Should have at least one page at depth 0 (the starting page)"
+        );
+
+        assert!(
+            crawler.pages.len() > 1,
+            "With max_depth=1, should crawl more than just the starting page"
+        );
+
+        let mut crawler_depth_0 =
+            Crawler::new(&base_url, 0, 100, false, false).expect("Failed to create crawler");
+
+        crawler_depth_0.crawl().await.expect("Crawl failed");
+
+        assert_eq!(
+            crawler_depth_0.pages.len(),
+            1,
+            "With max_depth=0, should only crawl the starting page"
+        );
+
+        assert!(
+            crawler_depth_0
+                .pages
+                .values()
+                .all(|page| page.crawl_depth == 0),
+            "All pages should be at depth 0 when max_depth=0"
+        );
+    }
+
+    // Test case 9: Test follow_external parameter
+    {
+        let mut crawler_no_external =
+            Crawler::new(&base_url, 5, 50, false, false).expect("Failed to create crawler");
+
+        crawler_no_external.crawl().await.expect("Crawl failed");
+
+        let mut external_link_urls = std::collections::HashSet::new();
+        for page in crawler_no_external.pages.values() {
+            for link in &page.links {
+                if link.is_external {
+                    external_link_urls.insert(link.url.clone());
+                }
+            }
+        }
+
+        if !external_link_urls.is_empty() {
+            for external_url in &external_link_urls {
+                assert!(
+                    !crawler_no_external.pages.contains_key(external_url),
+                    "External URL {} should not be crawled when follow_external=false",
+                    external_url
+                );
+            }
+        }
+
+        let crawled_external_count = crawler_no_external
+            .pages
+            .keys()
+            .filter(|url| external_link_urls.contains(*url))
+            .count();
+
+        assert_eq!(
+            crawled_external_count, 0,
+            "No external links should be crawled when follow_external=false"
+        );
+
+        let mut crawler_with_external =
+            Crawler::new(&base_url, 5, 50, true, false).expect("Failed to create crawler");
+
+        crawler_with_external.crawl().await.expect("Crawl failed");
+
+        let mut external_links_with_follow = std::collections::HashSet::new();
+        for page in crawler_with_external.pages.values() {
+            for link in &page.links {
+                if link.is_external {
+                    external_links_with_follow.insert(link.url.clone());
+                }
+            }
+        }
+
+        assert_eq!(
+            external_link_urls.len(),
+            external_links_with_follow.len(),
+            "External link extraction should be the same regardless of follow_external setting"
+        );
+    }
 }
