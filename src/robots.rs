@@ -18,6 +18,12 @@ pub struct RobotsTxt {
     cache: HashMap<String, bool>,
 }
 
+impl Default for RobotsTxt {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RobotsTxt {
     pub fn new() -> Self {
         Self {
@@ -162,7 +168,7 @@ impl RobotsTxt {
 
         // Process rules in order, keeping track of most specific match
         for rule in rules {
-            if self.path_matches(&rule.pattern, path) {
+            if Self::path_matches(&rule.pattern, path) {
                 let pattern_len = rule.pattern.len();
                 // Use the most specific (longest) matching rule
                 if pattern_len >= most_specific_length {
@@ -176,15 +182,15 @@ impl RobotsTxt {
     }
 
     /// Checks if a path matches a pattern (supports * and $ wildcards)
-    fn path_matches(&self, pattern: &str, path: &str) -> bool {
+    fn path_matches(pattern: &str, path: &str) -> bool {
         // Handle exact match
         if pattern == path {
             return true;
         }
 
         // Handle end-of-string marker ($)
-        let (pattern, must_end) = if pattern.ends_with('$') {
-            (&pattern[..pattern.len() - 1], true)
+        let (pattern, must_end) = if let Some(stripped) = pattern.strip_suffix('$') {
+            (stripped, true)
         } else {
             (pattern, false)
         };
@@ -214,14 +220,17 @@ impl RobotsTxt {
 
                 // Try matching rest of pattern at each position in path
                 for i in path_idx..=path_chars.len() {
-                    let remaining_pattern: String = pattern_chars[pattern_idx + 1..].iter().collect();
+                    let remaining_pattern: String =
+                        pattern_chars[pattern_idx + 1..].iter().collect();
                     let remaining_path: String = path_chars[i..].iter().collect();
-                    if self.path_matches(&remaining_pattern, &remaining_path) {
+                    if Self::path_matches(&remaining_pattern, &remaining_path) {
                         return !must_end || remaining_path.is_empty();
                     }
                 }
                 return false;
-            } else if path_idx < path_chars.len() && pattern_chars[pattern_idx] == path_chars[path_idx] {
+            } else if path_idx < path_chars.len()
+                && pattern_chars[pattern_idx] == path_chars[path_idx]
+            {
                 pattern_idx += 1;
                 path_idx += 1;
             } else {
@@ -255,9 +264,7 @@ impl RobotsTxt {
             "{}://{}{}",
             url.scheme(),
             url.host_str().unwrap_or(""),
-            url.port()
-                .map(|p| format!(":{}", p))
-                .unwrap_or_default()
+            url.port().map(|p| format!(":{}", p)).unwrap_or_default()
         )
     }
 }
@@ -268,34 +275,30 @@ mod tests {
 
     #[test]
     fn test_path_matches_exact() {
-        let robots = RobotsTxt::new();
-        assert!(robots.path_matches("/admin", "/admin"));
-        assert!(!robots.path_matches("/admin", "/user"));
+        assert!(RobotsTxt::path_matches("/admin", "/admin"));
+        assert!(!RobotsTxt::path_matches("/admin", "/user"));
     }
 
     #[test]
     fn test_path_matches_prefix() {
-        let robots = RobotsTxt::new();
-        assert!(robots.path_matches("/admin", "/admin/page"));
-        assert!(robots.path_matches("/admin", "/admin"));
-        assert!(!robots.path_matches("/admin", "/user"));
+        assert!(RobotsTxt::path_matches("/admin", "/admin/page"));
+        assert!(RobotsTxt::path_matches("/admin", "/admin"));
+        assert!(!RobotsTxt::path_matches("/admin", "/user"));
     }
 
     #[test]
     fn test_path_matches_wildcard() {
-        let robots = RobotsTxt::new();
-        assert!(robots.path_matches("/admin/*", "/admin/page"));
-        assert!(robots.path_matches("/admin/*", "/admin/"));
-        assert!(robots.path_matches("/*.php", "/index.php"));
-        assert!(robots.path_matches("/*.php", "/admin/index.php"));
+        assert!(RobotsTxt::path_matches("/admin/*", "/admin/page"));
+        assert!(RobotsTxt::path_matches("/admin/*", "/admin/"));
+        assert!(RobotsTxt::path_matches("/*.php", "/index.php"));
+        assert!(RobotsTxt::path_matches("/*.php", "/admin/index.php"));
     }
 
     #[test]
     fn test_path_matches_end_marker() {
-        let robots = RobotsTxt::new();
-        assert!(robots.path_matches("/admin$", "/admin"));
-        assert!(!robots.path_matches("/admin$", "/admin/"));
-        assert!(!robots.path_matches("/admin$", "/admin/page"));
+        assert!(RobotsTxt::path_matches("/admin$", "/admin"));
+        assert!(!RobotsTxt::path_matches("/admin$", "/admin/"));
+        assert!(!RobotsTxt::path_matches("/admin$", "/admin/page"));
     }
 
     #[test]

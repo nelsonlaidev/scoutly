@@ -11,8 +11,8 @@ async fn test_link_checker() {
 
     let base_url = get_test_server_url().await;
 
-    let mut crawler =
-        Crawler::new(&base_url, 2, 50, false, false, None, 1, false).expect("Failed to create crawler");
+    let mut crawler = Crawler::new(&base_url, 2, 50, false, false, None, 1, false)
+        .expect("Failed to create crawler");
 
     crawler.crawl().await.expect("Crawl failed");
 
@@ -406,8 +406,8 @@ async fn test_link_checker_default() {
 
     let base_url = get_test_server_url().await;
 
-    let mut crawler =
-        Crawler::new(&base_url, 2, 50, false, false, None, 1, false).expect("Failed to create crawler");
+    let mut crawler = Crawler::new(&base_url, 2, 50, false, false, None, 1, false)
+        .expect("Failed to create crawler");
 
     crawler.crawl().await.expect("Crawl failed");
 

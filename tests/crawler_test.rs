@@ -141,8 +141,9 @@ async fn test_crawler() {
             let pages_count_no_fragments = crawler.pages.len();
 
             // Compare with keep_fragments=true crawler
-            let mut crawler_with_fragments = Crawler::new(&base_url, 2, 50, false, true, None, 1, false)
-                .expect("Failed to create crawler");
+            let mut crawler_with_fragments =
+                Crawler::new(&base_url, 2, 50, false, true, None, 1, false)
+                    .expect("Failed to create crawler");
 
             crawler_with_fragments.crawl().await.expect("Crawl failed");
             let pages_count_with_fragments = crawler_with_fragments.pages.len();
@@ -450,8 +451,8 @@ async fn test_crawler() {
     // Test case 7: Test max_pages limit
     {
         // Create a crawler with a low max_pages limit
-        let mut crawler =
-            Crawler::new(&base_url, 5, 3, false, false, None, 1, false).expect("Failed to create crawler");
+        let mut crawler = Crawler::new(&base_url, 5, 3, false, false, None, 1, false)
+            .expect("Failed to create crawler");
 
         crawler.crawl().await.expect("Crawl failed");
 
@@ -573,8 +574,8 @@ async fn test_crawler() {
         );
 
         // Now crawl with follow_external = true
-        let mut crawler_with_external =
-            Crawler::new(&base_url, 5, 50, true, false, None, 1, false).expect("Failed to create crawler");
+        let mut crawler_with_external = Crawler::new(&base_url, 5, 50, true, false, None, 1, false)
+            .expect("Failed to create crawler");
 
         crawler_with_external.crawl().await.expect("Crawl failed");
 
@@ -639,15 +640,15 @@ async fn test_crawler() {
         );
 
         // Test without rate limiting (should be faster)
-        let mut crawler_unlimited =
-            Crawler::new(&base_url, 1, 5, false, false, None, 1, false).expect("Failed to create crawler");
+        let mut crawler_unlimited = Crawler::new(&base_url, 1, 5, false, false, None, 1, false)
+            .expect("Failed to create crawler");
 
         crawler_unlimited.crawl().await.expect("Crawl failed");
 
         // Without rate limiting should generally be faster, though not guaranteed on slow systems
         // At minimum, it should complete successfully
         assert!(
-            crawler_unlimited.pages.len() > 0,
+            !crawler_unlimited.pages.is_empty(),
             "Unlimited crawler should successfully crawl pages"
         );
 
@@ -710,7 +711,7 @@ async fn test_crawler() {
         // With 10 pages, 3 concurrent requests, and 3 req/s rate limit:
         // Should take at least 3-4 seconds
         assert!(
-            crawler.pages.len() > 0,
+            !crawler.pages.is_empty(),
             "Should successfully crawl pages with concurrent rate limiting"
         );
 
@@ -735,8 +736,8 @@ async fn test_content_type_validation() {
     // Test HTML content-types are processed correctly first
     {
         let base_url = get_test_server_url().await;
-        let mut crawler =
-            Crawler::new(&base_url, 1, 5, false, false, None, 1, false).expect("Failed to create crawler");
+        let mut crawler = Crawler::new(&base_url, 1, 5, false, false, None, 1, false)
+            .expect("Failed to create crawler");
 
         crawler.crawl().await.expect("Crawl failed");
 
@@ -802,8 +803,17 @@ async fn test_content_type_validation() {
 
     // Test that we can detect content-type for the test server's /ok endpoint
     {
-        let mut crawler = Crawler::new("http://127.0.0.1:3000/ok", 0, 10, false, false, None, 1, false)
-            .expect("Failed to create crawler");
+        let mut crawler = Crawler::new(
+            "http://127.0.0.1:3000/ok",
+            0,
+            10,
+            false,
+            false,
+            None,
+            1,
+            false,
+        )
+        .expect("Failed to create crawler");
 
         crawler.crawl().await.expect("Crawl failed");
 

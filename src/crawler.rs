@@ -118,10 +118,10 @@ impl Crawler {
 
     pub async fn crawl(&mut self) -> Result<()> {
         // Fetch robots.txt for the base domain if respect_robots_txt is enabled
-        if self.respect_robots_txt {
-            if let Err(e) = self.robots_txt.fetch(&self.client, &self.base_url).await {
-                tracing::warn!(error = %e, "Failed to fetch robots.txt, continuing anyway");
-            }
+        if self.respect_robots_txt
+            && let Err(e) = self.robots_txt.fetch(&self.client, &self.base_url).await
+        {
+            tracing::warn!(error = %e, "Failed to fetch robots.txt, continuing anyway");
         }
 
         while !self.to_visit.is_empty() && self.visited.len() < self.max_pages {
@@ -136,14 +136,13 @@ impl Crawler {
                 }
 
                 // Check robots.txt if enabled
-                if self.respect_robots_txt {
-                    if let Ok(parsed_url) = Url::parse(&url) {
-                        if !self.robots_txt.is_allowed(&parsed_url, "scoutly") {
-                            tracing::info!(url = %url, "Skipping URL disallowed by robots.txt");
-                            self.visited.insert(normalized_url.clone());
-                            continue;
-                        }
-                    }
+                if self.respect_robots_txt
+                    && let Ok(parsed_url) = Url::parse(&url)
+                    && !self.robots_txt.is_allowed(&parsed_url, "scoutly")
+                {
+                    tracing::info!(url = %url, "Skipping URL disallowed by robots.txt");
+                    self.visited.insert(normalized_url.clone());
+                    continue;
                 }
 
                 // Check if adding this would exceed max_pages
@@ -317,37 +316,37 @@ impl Crawler {
                 _ => element.value().attr("src"), // iframe, video, source, audio, embed
             };
 
-            if let Some(url_value) = url_attr {
-                if let Ok(absolute_url) = page_url.join(url_value) {
-                    let url_str = absolute_url.to_string();
-                    let is_external = self.is_external_url(&absolute_url);
+            if let Some(url_value) = url_attr
+                && let Ok(absolute_url) = page_url.join(url_value)
+            {
+                let url_str = absolute_url.to_string();
+                let is_external = self.is_external_url(&absolute_url);
 
-                    // Generate text based on element type
-                    let text = match element_name {
-                        "a" => element.text().collect::<String>().trim().to_string(),
-                        "iframe" => {
-                            let title = element.value().attr("title").unwrap_or("");
-                            format!("[iframe] {}", title)
-                        }
-                        "video" => "[video]".to_string(),
-                        "source" => {
-                            let media_type = element.value().attr("type").unwrap_or("");
-                            format!("[source type={}]", media_type)
-                        }
-                        "audio" => "[audio]".to_string(),
-                        "embed" => "[embed]".to_string(),
-                        "object" => "[object]".to_string(),
-                        _ => continue, // Skip unknown elements
-                    };
+                // Generate text based on element type
+                let text = match element_name {
+                    "a" => element.text().collect::<String>().trim().to_string(),
+                    "iframe" => {
+                        let title = element.value().attr("title").unwrap_or("");
+                        format!("[iframe] {}", title)
+                    }
+                    "video" => "[video]".to_string(),
+                    "source" => {
+                        let media_type = element.value().attr("type").unwrap_or("");
+                        format!("[source type={}]", media_type)
+                    }
+                    "audio" => "[audio]".to_string(),
+                    "embed" => "[embed]".to_string(),
+                    "object" => "[object]".to_string(),
+                    _ => continue, // Skip unknown elements
+                };
 
-                    links.push(Link {
-                        url: url_str,
-                        text,
-                        is_external,
-                        status_code: None,
-                        redirected_url: None,
-                    });
-                }
+                links.push(Link {
+                    url: url_str,
+                    text,
+                    is_external,
+                    status_code: None,
+                    redirected_url: None,
+                });
             }
         }
 

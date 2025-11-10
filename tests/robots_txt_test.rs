@@ -1,7 +1,7 @@
 mod server;
 
+use actix_web::{App, HttpResponse, HttpServer, web};
 use scoutly::crawler::Crawler;
-use actix_web::{App, HttpServer, web, HttpResponse};
 
 /// Create a test server with a robots.txt file
 async fn start_robots_test_server() -> String {
