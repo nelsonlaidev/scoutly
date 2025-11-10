@@ -10,7 +10,7 @@ pub mod seo_analyzer;
 use anyhow::Result;
 use cli::Cli;
 use colored::*;
-use crawler::Crawler;
+use crawler::{Crawler, CrawlerConfig};
 use link_checker::LinkChecker;
 use reporter::Reporter;
 use seo_analyzer::SeoAnalyzer;
@@ -36,16 +36,16 @@ pub async fn run(args: Cli) -> Result<()> {
     println!();
 
     // Create crawler and start crawling
-    let mut crawler = Crawler::new(
-        &args.url,
-        args.depth,
-        args.max_pages,
-        args.external,
-        args.keep_fragments,
-        args.rate_limit,
-        args.concurrency,
-        args.respect_robots_txt,
-    )?;
+    let config = CrawlerConfig {
+        max_depth: args.depth,
+        max_pages: args.max_pages,
+        follow_external: args.external,
+        keep_fragments: args.keep_fragments,
+        requests_per_second: args.rate_limit,
+        concurrent_requests: args.concurrency,
+        respect_robots_txt: args.respect_robots_txt,
+    };
+    let mut crawler = Crawler::new(&args.url, config)?;
 
     if args.verbose {
         println!("{}", "Crawling pages...".bright_yellow());

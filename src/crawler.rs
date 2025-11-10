@@ -12,6 +12,17 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::num::NonZeroU32;
 use url::Url;
 
+/// Configuration for the crawler
+pub struct CrawlerConfig {
+    pub max_depth: usize,
+    pub max_pages: usize,
+    pub follow_external: bool,
+    pub keep_fragments: bool,
+    pub requests_per_second: Option<f64>,
+    pub concurrent_requests: usize,
+    pub respect_robots_txt: bool,
+}
+
 // Cached selectors to avoid repeated parsing and eliminate unwrap() calls
 static TITLE_SELECTOR: Lazy<Selector> =
     Lazy::new(|| Selector::parse("title").expect("title selector should be valid"));
@@ -48,17 +59,7 @@ pub struct Crawler {
 }
 
 impl Crawler {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        start_url: &str,
-        max_depth: usize,
-        max_pages: usize,
-        follow_external: bool,
-        keep_fragments: bool,
-        requests_per_second: Option<f64>,
-        concurrent_requests: usize,
-        respect_robots_txt: bool,
-    ) -> Result<Self> {
+    pub fn new(start_url: &str, config: CrawlerConfig) -> Result<Self> {
         let base_url = Url::parse(start_url).context("Invalid URL")?;
 
         // Validate URL scheme - only allow http and https
@@ -76,7 +77,7 @@ impl Crawler {
         to_visit.push_back((start_url.to_string(), 0));
 
         // Initialize rate limiter if requests_per_second is specified
-        let rate_limiter = requests_per_second.map(|rps| {
+        let rate_limiter = config.requests_per_second.map(|rps| {
             let quota = Quota::per_second(NonZeroU32::new(rps.ceil() as u32).unwrap());
             RateLimiter::direct(quota)
         });
@@ -84,16 +85,16 @@ impl Crawler {
         Ok(Self {
             client: build_http_client(30)?,
             base_url,
-            max_depth,
-            max_pages,
-            follow_external,
-            keep_fragments,
+            max_depth: config.max_depth,
+            max_pages: config.max_pages,
+            follow_external: config.follow_external,
+            keep_fragments: config.keep_fragments,
             visited: HashSet::new(),
             to_visit,
             pages: HashMap::new(),
             rate_limiter,
-            concurrent_requests,
-            respect_robots_txt,
+            concurrent_requests: config.concurrent_requests,
+            respect_robots_txt: config.respect_robots_txt,
             robots_txt: RobotsTxt::new(),
         })
     }

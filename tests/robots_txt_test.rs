@@ -1,7 +1,7 @@
 mod server;
 
 use actix_web::{App, HttpResponse, HttpServer, web};
-use scoutly::crawler::Crawler;
+use scoutly::crawler::{Crawler, CrawlerConfig};
 
 /// Create a test server with a robots.txt file
 async fn start_robots_test_server() -> String {
@@ -84,8 +84,16 @@ async fn test_robots_txt_respected() {
     let base_url = start_robots_test_server().await;
 
     // Create crawler with robots.txt respect enabled
-    let mut crawler = Crawler::new(&base_url, 2, 50, false, false, None, 1, true)
-        .expect("Failed to create crawler");
+    let config = CrawlerConfig {
+        max_depth: 2,
+        max_pages: 50,
+        follow_external: false,
+        keep_fragments: false,
+        requests_per_second: None,
+        concurrent_requests: 1,
+        respect_robots_txt: true,
+    };
+    let mut crawler = Crawler::new(&base_url, config).expect("Failed to create crawler");
 
     crawler.crawl().await.expect("Crawl failed");
 
@@ -136,8 +144,16 @@ async fn test_robots_txt_disabled() {
     let base_url = start_robots_test_server().await;
 
     // Create crawler with robots.txt respect disabled
-    let mut crawler = Crawler::new(&base_url, 2, 50, false, false, None, 1, false)
-        .expect("Failed to create crawler");
+    let config = CrawlerConfig {
+        max_depth: 2,
+        max_pages: 50,
+        follow_external: false,
+        keep_fragments: false,
+        requests_per_second: None,
+        concurrent_requests: 1,
+        respect_robots_txt: false,
+    };
+    let mut crawler = Crawler::new(&base_url, config).expect("Failed to create crawler");
 
     crawler.crawl().await.expect("Crawl failed");
 
