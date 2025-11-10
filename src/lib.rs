@@ -4,6 +4,7 @@ pub mod http_client;
 pub mod link_checker;
 pub mod models;
 pub mod reporter;
+pub mod robots;
 pub mod seo_analyzer;
 
 use anyhow::Result;
@@ -43,6 +44,7 @@ pub async fn run(args: Cli) -> Result<()> {
         args.keep_fragments,
         args.rate_limit,
         args.concurrency,
+        args.respect_robots_txt,
     )?;
 
     if args.verbose {

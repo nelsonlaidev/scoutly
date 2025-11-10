@@ -1,5 +1,6 @@
 use crate::http_client::build_http_client;
 use crate::models::{Image, Link, PageInfo};
+use crate::robots::RobotsTxt;
 use anyhow::{Context, Result, anyhow};
 use futures::stream::{self, StreamExt};
 use governor::{
@@ -42,6 +43,8 @@ pub struct Crawler {
     pub pages: HashMap<String, PageInfo>,
     rate_limiter: Option<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
     concurrent_requests: usize,
+    respect_robots_txt: bool,
+    robots_txt: RobotsTxt,
 }
 
 impl Crawler {
@@ -53,6 +56,7 @@ impl Crawler {
         keep_fragments: bool,
         requests_per_second: Option<f64>,
         concurrent_requests: usize,
+        respect_robots_txt: bool,
     ) -> Result<Self> {
         let base_url = Url::parse(start_url).context("Invalid URL")?;
 
@@ -88,6 +92,8 @@ impl Crawler {
             pages: HashMap::new(),
             rate_limiter,
             concurrent_requests,
+            respect_robots_txt,
+            robots_txt: RobotsTxt::new(),
         })
     }
 
@@ -111,6 +117,13 @@ impl Crawler {
     }
 
     pub async fn crawl(&mut self) -> Result<()> {
+        // Fetch robots.txt for the base domain if respect_robots_txt is enabled
+        if self.respect_robots_txt {
+            if let Err(e) = self.robots_txt.fetch(&self.client, &self.base_url).await {
+                tracing::warn!(error = %e, "Failed to fetch robots.txt, continuing anyway");
+            }
+        }
+
         while !self.to_visit.is_empty() && self.visited.len() < self.max_pages {
             // Collect up to concurrent_requests URLs to fetch
             let mut batch = Vec::new();
@@ -120,6 +133,17 @@ impl Crawler {
                 // Check if already visited or depth exceeded before processing
                 if self.visited.contains(&normalized_url) || depth > self.max_depth {
                     continue;
+                }
+
+                // Check robots.txt if enabled
+                if self.respect_robots_txt {
+                    if let Ok(parsed_url) = Url::parse(&url) {
+                        if !self.robots_txt.is_allowed(&parsed_url, "scoutly") {
+                            tracing::info!(url = %url, "Skipping URL disallowed by robots.txt");
+                            self.visited.insert(normalized_url.clone());
+                            continue;
+                        }
+                    }
                 }
 
                 // Check if adding this would exceed max_pages

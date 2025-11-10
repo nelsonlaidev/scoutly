@@ -47,4 +47,8 @@ pub struct Cli {
     /// Number of concurrent requests (default: 5)
     #[arg(short = 'c', long, default_value_t = 5)]
     pub concurrency: usize,
+
+    /// Respect robots.txt rules (default: true)
+    #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
+    pub respect_robots_txt: bool,
 }
