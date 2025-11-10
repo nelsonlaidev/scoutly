@@ -293,37 +293,37 @@ impl Crawler {
                 _ => element.value().attr("src"), // iframe, video, source, audio, embed
             };
 
-            if let Some(url_value) = url_attr {
-                if let Ok(absolute_url) = page_url.join(url_value) {
-                    let url_str = absolute_url.to_string();
-                    let is_external = self.is_external_url(&absolute_url);
+            if let Some(url_value) = url_attr
+                && let Ok(absolute_url) = page_url.join(url_value)
+            {
+                let url_str = absolute_url.to_string();
+                let is_external = self.is_external_url(&absolute_url);
 
-                    // Generate text based on element type
-                    let text = match element_name {
-                        "a" => element.text().collect::<String>().trim().to_string(),
-                        "iframe" => {
-                            let title = element.value().attr("title").unwrap_or("");
-                            format!("[iframe] {}", title)
-                        }
-                        "video" => "[video]".to_string(),
-                        "source" => {
-                            let media_type = element.value().attr("type").unwrap_or("");
-                            format!("[source type={}]", media_type)
-                        }
-                        "audio" => "[audio]".to_string(),
-                        "embed" => "[embed]".to_string(),
-                        "object" => "[object]".to_string(),
-                        _ => continue, // Skip unknown elements
-                    };
+                // Generate text based on element type
+                let text = match element_name {
+                    "a" => element.text().collect::<String>().trim().to_string(),
+                    "iframe" => {
+                        let title = element.value().attr("title").unwrap_or("");
+                        format!("[iframe] {}", title)
+                    }
+                    "video" => "[video]".to_string(),
+                    "source" => {
+                        let media_type = element.value().attr("type").unwrap_or("");
+                        format!("[source type={}]", media_type)
+                    }
+                    "audio" => "[audio]".to_string(),
+                    "embed" => "[embed]".to_string(),
+                    "object" => "[object]".to_string(),
+                    _ => continue, // Skip unknown elements
+                };
 
-                    links.push(Link {
-                        url: url_str,
-                        text,
-                        is_external,
-                        status_code: None,
-                        redirected_url: None,
-                    });
-                }
+                links.push(Link {
+                    url: url_str,
+                    text,
+                    is_external,
+                    status_code: None,
+                    redirected_url: None,
+                });
             }
         }
 

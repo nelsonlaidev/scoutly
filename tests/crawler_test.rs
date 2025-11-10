@@ -647,7 +647,7 @@ async fn test_crawler() {
         // Without rate limiting should generally be faster, though not guaranteed on slow systems
         // At minimum, it should complete successfully
         assert!(
-            crawler_unlimited.pages.len() > 0,
+            !crawler_unlimited.pages.is_empty(),
             "Unlimited crawler should successfully crawl pages"
         );
 
@@ -710,7 +710,7 @@ async fn test_crawler() {
         // With 10 pages, 3 concurrent requests, and 3 req/s rate limit:
         // Should take at least 3-4 seconds
         assert!(
-            crawler.pages.len() > 0,
+            !crawler.pages.is_empty(),
             "Should successfully crawl pages with concurrent rate limiting"
         );
 
