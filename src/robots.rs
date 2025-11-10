@@ -274,6 +274,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_default() {
+        let robots = RobotsTxt::default();
+        assert!(robots.rules.is_empty());
+        assert!(robots.cache.is_empty());
+    }
+
+    #[test]
     fn test_path_matches_exact() {
         assert!(RobotsTxt::path_matches("/admin", "/admin"));
         assert!(!RobotsTxt::path_matches("/admin", "/user"));
@@ -302,6 +309,16 @@ mod tests {
     }
 
     #[test]
+    fn test_path_matches_pattern_consumed() {
+        // Test case where pattern is consumed but path continues
+        assert!(RobotsTxt::path_matches("/api", "/api/v1"));
+        assert!(RobotsTxt::path_matches("/api", "/api"));
+
+        // Test case where pattern is not fully consumed
+        assert!(!RobotsTxt::path_matches("/api/v1", "/api"));
+    }
+
+    #[test]
     fn test_parse_robots_txt() {
         let content = r#"
 User-agent: *
@@ -323,6 +340,41 @@ Disallow: /secret
         // Check googlebot-specific rules
         let google_rules = robots.rules.get("http://example.com:googlebot").unwrap();
         assert_eq!(google_rules.len(), 1);
+    }
+
+    #[test]
+    fn test_is_allowed_with_specific_user_agent() {
+        let content = r#"
+User-agent: scoutly
+Disallow: /private
+Allow: /private/public
+"#;
+
+        let mut robots = RobotsTxt::new();
+        robots.parse("http://example.com", content);
+
+        let url1 = Url::parse("http://example.com/private").unwrap();
+        let url2 = Url::parse("http://example.com/private/public").unwrap();
+        let url3 = Url::parse("http://example.com/allowed").unwrap();
+
+        // Should be disallowed
+        assert!(!robots.is_allowed(&url1, "scoutly"));
+
+        // Should be allowed (more specific rule)
+        assert!(robots.is_allowed(&url2, "scoutly"));
+
+        // Should be allowed (no matching rules)
+        assert!(robots.is_allowed(&url3, "scoutly"));
+    }
+
+    #[test]
+    fn test_is_allowed_no_rules() {
+        let robots = RobotsTxt::new();
+
+        let url = Url::parse("http://example.com/anything").unwrap();
+
+        // Should be allowed by default when no rules exist
+        assert!(robots.is_allowed(&url, "scoutly"));
     }
 
     #[test]
@@ -351,5 +403,48 @@ Disallow: /secret
 
         // /public should be allowed (no matching rule)
         assert!(robots.check_rules(&rules, "/public"));
+    }
+
+    #[test]
+    fn test_cache_functionality() {
+        let mut robots = RobotsTxt::new();
+
+        // Simulate that robots.txt was already fetched for a domain
+        robots.cache.insert("http://example.com".to_string(), true);
+
+        // Verify cache contains the entry
+        assert!(robots.cache.contains_key("http://example.com"));
+    }
+
+    #[test]
+    fn test_get_robots_url() {
+        let robots = RobotsTxt::new();
+        let base_url = Url::parse("http://example.com/path/to/page?query=1#fragment").unwrap();
+
+        let robots_url = robots.get_robots_url(&base_url).unwrap();
+
+        assert_eq!(robots_url, "http://example.com/robots.txt");
+    }
+
+    #[test]
+    fn test_get_domain_key() {
+        let robots = RobotsTxt::new();
+
+        // Test without explicit port
+        let url1 = Url::parse("http://example.com/path").unwrap();
+        assert_eq!(robots.get_domain_key(&url1), "http://example.com");
+
+        // Test with non-default port
+        let url2 = Url::parse("https://example.com:8080/path").unwrap();
+        assert_eq!(robots.get_domain_key(&url2), "https://example.com:8080");
+
+        // Test with explicit default port - Url library normalizes and drops it
+        let url3 = Url::parse("http://example.com:80/path").unwrap();
+        // Note: Url::parse normalizes default ports, so :80 is dropped
+        assert_eq!(robots.get_domain_key(&url3), "http://example.com");
+
+        // Test HTTPS default port - also normalized
+        let url4 = Url::parse("https://example.com:443/path").unwrap();
+        assert_eq!(robots.get_domain_key(&url4), "https://example.com");
     }
 }
