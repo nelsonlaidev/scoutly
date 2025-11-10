@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### Features
+
+- Add URL scheme validation - ([53d9bf8](https://github.com/nelsonlaidev/scoutly/commit/53d9bf888848170290b897b229075e2ac287ffee))
+- Add content-type validation - ([9faf08a](https://github.com/nelsonlaidev/scoutly/commit/9faf08ae880f29ed049fb0be6c1eee6f3db8e5a2))
+- Replace eprintln! with structured logging - ([4e15269](https://github.com/nelsonlaidev/scoutly/commit/4e15269133b3e162c501928373a035347b5d98a7))
+- Add rate limiting configuration structure - ([6659a69](https://github.com/nelsonlaidev/scoutly/commit/6659a69c357e405b012279aefb3c3e32ad1afe6d))
+- Implement rate limiting with governor - ([0cbff74](https://github.com/nelsonlaidev/scoutly/commit/0cbff747c891d4134b2d8269fc712d9595c0bf0f))
+- Concurrent crawling - ([39209ab](https://github.com/nelsonlaidev/scoutly/commit/39209abb19c7a5458c7caf7fee692a076217d0ee))
+- Expose more CLI options - ([600d10a](https://github.com/nelsonlaidev/scoutly/commit/600d10a1728d2e1eaef89c697ec0e92208c69d5c))
+
+### Bug Fixes
+
+- No pontential panic in selector parsing - ([624ad3c](https://github.com/nelsonlaidev/scoutly/commit/624ad3c975ae9a2454532a468bd2bf6568d2e664))
+- Max_pages off-by-one issue - ([01d72a7](https://github.com/nelsonlaidev/scoutly/commit/01d72a76db1a5e07321f401f3d17ce1bd0a060f9))
+
+### Chores
+
+- New deps - ([13cdb8e](https://github.com/nelsonlaidev/scoutly/commit/13cdb8e3974e30f2aa941a05be70c71878bd0ba8))
+
+### Performance
+
+- Optimize URL parsing by parsing once and reusing - ([59a1f5f](https://github.com/nelsonlaidev/scoutly/commit/59a1f5fcbd4f50321adb631841182f8fa94c841f))
+
+### Refactor
+
+- Link extraction to single DOM pass - ([a3cc9a3](https://github.com/nelsonlaidev/scoutly/commit/a3cc9a3c6e98bbd6e9643c7e8b47879d69fa6e91))
+
+### Testing
+
+- Add tests for content-type validation, rate limiting, concurrency - ([acef227](https://github.com/nelsonlaidev/scoutly/commit/acef227a50cb60e5feb2a220c6110d07c9d84b67))
+
 ## [0.1.1](https://github.com/nelsonlaidev/scoutly/compare/v0.1.0..v0.1.1) - 2025-11-09
 
 ### Bug Fixes
