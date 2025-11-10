@@ -48,6 +48,7 @@ pub struct Crawler {
 }
 
 impl Crawler {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         start_url: &str,
         max_depth: usize,
