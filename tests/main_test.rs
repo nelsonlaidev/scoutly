@@ -20,6 +20,7 @@ async fn test_invalid_url_no_protocol() {
         keep_fragments: false,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;
@@ -50,6 +51,7 @@ async fn test_invalid_url_missing_https() {
         keep_fragments: false,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;
@@ -76,6 +78,7 @@ async fn test_valid_http_url() {
         keep_fragments: false,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;
@@ -96,6 +99,7 @@ async fn test_valid_https_url() {
         keep_fragments: false,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;
@@ -125,6 +129,7 @@ async fn test_full_crawl_with_text_output() {
         keep_fragments: false,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;
@@ -148,6 +153,7 @@ async fn test_full_crawl_with_json_output() {
         keep_fragments: false,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;
@@ -174,6 +180,7 @@ async fn test_crawl_with_save_file() {
         keep_fragments: false,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;
@@ -208,6 +215,7 @@ async fn test_crawl_with_verbose_flag() {
         keep_fragments: false,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;
@@ -234,6 +242,7 @@ async fn test_crawl_with_external_flag() {
         keep_fragments: false,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;
@@ -260,6 +269,7 @@ async fn test_crawl_with_ignore_redirects_flag() {
         keep_fragments: false,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;
@@ -286,6 +296,7 @@ async fn test_crawl_with_keep_fragments_flag() {
         keep_fragments: true,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;
@@ -312,6 +323,7 @@ async fn test_crawl_with_custom_depth_and_max_pages() {
         keep_fragments: false,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;
@@ -341,6 +353,7 @@ async fn test_crawl_with_all_flags_combined() {
         keep_fragments: true,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;
@@ -374,6 +387,7 @@ async fn test_crawl_with_default_text_output() {
         keep_fragments: false,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;
@@ -403,6 +417,7 @@ async fn test_crawl_with_save_and_json_output() {
         keep_fragments: false,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;
@@ -439,6 +454,7 @@ async fn test_crawl_with_verbose_and_json_output() {
         keep_fragments: false,
         rate_limit: None,
         concurrency: 5,
+        respect_robots_txt: false,
     };
 
     let result = run(args).await;

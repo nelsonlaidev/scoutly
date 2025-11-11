@@ -5,6 +5,7 @@ use std::sync::Once;
 #[allow(dead_code)]
 static INIT: Once = Once::new();
 
+#[allow(dead_code)]
 pub async fn get_test_server_url() -> String {
     let http_server = HttpServer::new(|| {
         App::new().service(

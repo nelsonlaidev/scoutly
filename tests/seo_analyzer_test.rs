@@ -1,6 +1,6 @@
 mod server;
 
-use scoutly::crawler::Crawler;
+use scoutly::crawler::{Crawler, CrawlerConfig};
 use scoutly::models::{IssueSeverity, IssueType};
 use scoutly::seo_analyzer::SeoAnalyzer;
 use server::get_test_server_url;
@@ -9,8 +9,16 @@ use server::get_test_server_url;
 async fn test_seo_analyzer() {
     let base_url = get_test_server_url().await;
 
-    let mut crawler =
-        Crawler::new(&base_url, 2, 50, false, false, None, 1).expect("Failed to create crawler");
+    let config = CrawlerConfig {
+        max_depth: 2,
+        max_pages: 50,
+        follow_external: false,
+        keep_fragments: false,
+        requests_per_second: None,
+        concurrent_requests: 1,
+        respect_robots_txt: false,
+    };
+    let mut crawler = Crawler::new(&base_url, config).expect("Failed to create crawler");
 
     crawler.crawl().await.expect("Crawl failed");
 

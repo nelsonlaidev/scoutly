@@ -1,5 +1,6 @@
 use crate::http_client::build_http_client;
 use crate::models::{Image, Link, PageInfo};
+use crate::robots::RobotsTxt;
 use anyhow::{Context, Result, anyhow};
 use futures::stream::{self, StreamExt};
 use governor::{
@@ -10,6 +11,17 @@ use scraper::{Html, Selector};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::num::NonZeroU32;
 use url::Url;
+
+/// Configuration for the crawler
+pub struct CrawlerConfig {
+    pub max_depth: usize,
+    pub max_pages: usize,
+    pub follow_external: bool,
+    pub keep_fragments: bool,
+    pub requests_per_second: Option<f64>,
+    pub concurrent_requests: usize,
+    pub respect_robots_txt: bool,
+}
 
 // Cached selectors to avoid repeated parsing and eliminate unwrap() calls
 static TITLE_SELECTOR: Lazy<Selector> =
@@ -42,18 +54,12 @@ pub struct Crawler {
     pub pages: HashMap<String, PageInfo>,
     rate_limiter: Option<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
     concurrent_requests: usize,
+    respect_robots_txt: bool,
+    robots_txt: RobotsTxt,
 }
 
 impl Crawler {
-    pub fn new(
-        start_url: &str,
-        max_depth: usize,
-        max_pages: usize,
-        follow_external: bool,
-        keep_fragments: bool,
-        requests_per_second: Option<f64>,
-        concurrent_requests: usize,
-    ) -> Result<Self> {
+    pub fn new(start_url: &str, config: CrawlerConfig) -> Result<Self> {
         let base_url = Url::parse(start_url).context("Invalid URL")?;
 
         // Validate URL scheme - only allow http and https
@@ -71,7 +77,7 @@ impl Crawler {
         to_visit.push_back((start_url.to_string(), 0));
 
         // Initialize rate limiter if requests_per_second is specified
-        let rate_limiter = requests_per_second.map(|rps| {
+        let rate_limiter = config.requests_per_second.map(|rps| {
             let quota = Quota::per_second(NonZeroU32::new(rps.ceil() as u32).unwrap());
             RateLimiter::direct(quota)
         });
@@ -79,15 +85,17 @@ impl Crawler {
         Ok(Self {
             client: build_http_client(30)?,
             base_url,
-            max_depth,
-            max_pages,
-            follow_external,
-            keep_fragments,
+            max_depth: config.max_depth,
+            max_pages: config.max_pages,
+            follow_external: config.follow_external,
+            keep_fragments: config.keep_fragments,
             visited: HashSet::new(),
             to_visit,
             pages: HashMap::new(),
             rate_limiter,
-            concurrent_requests,
+            concurrent_requests: config.concurrent_requests,
+            respect_robots_txt: config.respect_robots_txt,
+            robots_txt: RobotsTxt::new(),
         })
     }
 
@@ -111,6 +119,13 @@ impl Crawler {
     }
 
     pub async fn crawl(&mut self) -> Result<()> {
+        // Fetch robots.txt for the base domain if respect_robots_txt is enabled
+        if self.respect_robots_txt
+            && let Err(e) = self.robots_txt.fetch(&self.client, &self.base_url).await
+        {
+            tracing::warn!(error = %e, "Failed to fetch robots.txt, continuing anyway");
+        }
+
         while !self.to_visit.is_empty() && self.visited.len() < self.max_pages {
             // Collect up to concurrent_requests URLs to fetch
             let mut batch = Vec::new();
@@ -119,6 +134,16 @@ impl Crawler {
 
                 // Check if already visited or depth exceeded before processing
                 if self.visited.contains(&normalized_url) || depth > self.max_depth {
+                    continue;
+                }
+
+                // Check robots.txt if enabled
+                if self.respect_robots_txt
+                    && let Ok(parsed_url) = Url::parse(&url)
+                    && !self.robots_txt.is_allowed(&parsed_url, "scoutly")
+                {
+                    tracing::info!(url = %url, "Skipping URL disallowed by robots.txt");
+                    self.visited.insert(normalized_url.clone());
                     continue;
                 }
 
