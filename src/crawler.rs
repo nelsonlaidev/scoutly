@@ -104,14 +104,13 @@ impl Crawler {
 
     /// Enable progress bar for crawling
     pub fn enable_progress_bar(&mut self) {
-        let pb = ProgressBar::new(self.max_pages as u64);
+        let pb = ProgressBar::new_spinner();
         pb.set_style(
-            ProgressStyle::default_bar()
-                .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} pages ({eta})")
-                .expect("Progress bar template should be valid")
-                .progress_chars("=>-"),
+            ProgressStyle::default_spinner()
+                .template("[{elapsed_precise}] {spinner:.cyan} Crawling: {pos} pages (max: {msg})")
+                .expect("Progress bar template should be valid"),
         );
-        pb.set_message("Crawling");
+        pb.set_message(self.max_pages.to_string());
         self.progress_bar = Some(pb);
     }
 
@@ -244,7 +243,7 @@ impl Crawler {
 
         // Finish progress bar
         if let Some(ref pb) = self.progress_bar {
-            pb.finish_with_message("Crawling complete");
+            pb.finish_with_message(format!("Crawled {} pages", self.pages.len()));
         }
 
         Ok(())

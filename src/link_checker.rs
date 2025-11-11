@@ -113,7 +113,7 @@ impl LinkChecker {
 
         // Finish progress bar
         if let Some(ref pb) = self.progress_bar {
-            pb.finish_with_message("Link checking complete");
+            pb.finish_with_message(format!("Checked {} links", link_urls.len()));
         }
 
         Ok(())
