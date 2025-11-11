@@ -194,7 +194,6 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
     use tempfile::NamedTempFile;
 
     #[test]
@@ -230,7 +229,7 @@ mod tests {
             "concurrency": 10
         }"#;
 
-        let mut temp_file = NamedTempFile::new().unwrap();
+        let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().with_extension("json");
         fs::write(&temp_path, json_content).unwrap();
 
@@ -258,7 +257,7 @@ verbose = true
 concurrency = 10
 "#;
 
-        let mut temp_file = NamedTempFile::new().unwrap();
+        let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().with_extension("toml");
         fs::write(&temp_path, toml_content).unwrap();
 
@@ -286,7 +285,7 @@ verbose: true
 concurrency: 10
 "#;
 
-        let mut temp_file = NamedTempFile::new().unwrap();
+        let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().with_extension("yaml");
         fs::write(&temp_path, yaml_content).unwrap();
 
@@ -309,7 +308,7 @@ concurrency: 10
             "concurrency": 20
         }"#;
 
-        let mut temp_file = NamedTempFile::new().unwrap();
+        let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().with_extension("json");
         fs::write(&temp_path, json_content).unwrap();
 
@@ -326,7 +325,7 @@ concurrency: 10
     fn test_invalid_json_config() {
         let invalid_json = r#"{ invalid json }"#;
 
-        let mut temp_file = NamedTempFile::new().unwrap();
+        let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().with_extension("json");
         fs::write(&temp_path, invalid_json).unwrap();
 
@@ -340,7 +339,7 @@ concurrency: 10
     fn test_invalid_toml_config() {
         let invalid_toml = r#"[[[ invalid toml"#;
 
-        let mut temp_file = NamedTempFile::new().unwrap();
+        let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().with_extension("toml");
         fs::write(&temp_path, invalid_toml).unwrap();
 
@@ -357,7 +356,7 @@ url: "test
   depth: invalid
 "#;
 
-        let mut temp_file = NamedTempFile::new().unwrap();
+        let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().with_extension("yaml");
         fs::write(&temp_path, invalid_yaml).unwrap();
 
@@ -447,10 +446,10 @@ url: "test
         assert_eq!(merged.output, "xml"); // CLI override
         assert_eq!(merged.concurrency, 15); // CLI override
         assert_eq!(merged.save, Some("report.txt".to_string())); // CLI value
-        assert_eq!(merged.verbose, true); // CLI value
-        assert_eq!(merged.ignore_redirects, true); // CLI value
+        assert!(merged.verbose); // CLI value
+        assert!(merged.ignore_redirects); // CLI value
         assert_eq!(merged.rate_limit, Some(2.0)); // CLI value
-        assert_eq!(merged.respect_robots_txt, false); // CLI override
+        assert!(!merged.respect_robots_txt); // CLI override
     }
 
     #[test]
@@ -485,7 +484,7 @@ depth: 8
 concurrency: 12
 "#;
 
-        let mut temp_file = NamedTempFile::new().unwrap();
+        let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().with_extension("yml");
         fs::write(&temp_path, yaml_content).unwrap();
 
