@@ -51,6 +51,11 @@ pub async fn run(args: Cli) -> Result<()> {
         println!("{}", "Crawling pages...".bright_yellow());
     }
 
+    // Enable progress bar for non-JSON output
+    if args.output != "json" {
+        crawler.enable_progress_bar();
+    }
+
     crawler.crawl().await?;
 
     let unique_links: std::collections::HashSet<String> = crawler
@@ -81,7 +86,14 @@ pub async fn run(args: Cli) -> Result<()> {
         println!("{}", "Checking links...".bright_yellow());
     }
 
-    let link_checker = LinkChecker::new();
+    let mut link_checker = LinkChecker::new();
+
+    // Enable progress bar for link checking (non-JSON output)
+    if args.output != "json" {
+        let total_links = unique_links.len();
+        link_checker.enable_progress_bar(total_links);
+    }
+
     link_checker
         .check_all_links(&mut crawler.pages, args.ignore_redirects)
         .await?;
