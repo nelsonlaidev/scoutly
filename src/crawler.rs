@@ -107,10 +107,9 @@ impl Crawler {
         let pb = ProgressBar::new_spinner();
         pb.set_style(
             ProgressStyle::default_spinner()
-                .template("[{elapsed_precise}] {spinner:.cyan} Crawling: {pos} pages (max: {msg})")
+                .template("[{elapsed_precise}] {spinner:.cyan} Crawling: {pos} pages")
                 .expect("Progress bar template should be valid"),
         );
-        pb.set_message(self.max_pages.to_string());
         self.progress_bar = Some(pb);
     }
 
