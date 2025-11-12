@@ -231,15 +231,17 @@ mod tests {
 
     #[test]
     fn test_load_json_config() {
-        let json_content = r#"{
-            "url": "https://example.com",
-            "depth": 10,
-            "max_pages": 500,
-            "output": "json",
-            "external": true,
-            "verbose": true,
-            "concurrency": 10
-        }"#;
+        let json_content = r#"
+{
+    "url": "https://example.com",
+    "depth": 10,
+    "max_pages": 500,
+    "output": "json",
+    "external": true,
+    "verbose": true,
+    "concurrency": 10
+}
+        "#;
 
         let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().with_extension("json");
@@ -267,7 +269,7 @@ output = "json"
 external = true
 verbose = true
 concurrency = 10
-"#;
+        "#;
 
         let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().with_extension("toml");
@@ -295,7 +297,7 @@ output: "json"
 external: true
 verbose: true
 concurrency: 10
-"#;
+        "#;
 
         let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().with_extension("yaml");
@@ -315,10 +317,12 @@ concurrency: 10
 
     #[test]
     fn test_partial_config() {
-        let json_content = r#"{
-            "depth": 15,
-            "concurrency": 20
-        }"#;
+        let json_content = r#"
+{
+    "depth": 15,
+    "concurrency": 20
+}
+        "#;
 
         let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().with_extension("json");
@@ -365,8 +369,8 @@ concurrency: 10
     fn test_invalid_yaml_config() {
         let invalid_yaml = r#"
 url: "test
-  depth: invalid
-"#;
+    depth: invalid
+        "#;
 
         let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().with_extension("yaml");
@@ -500,7 +504,7 @@ url: "test
         let yaml_content = r#"
 depth: 8
 concurrency: 12
-"#;
+        "#;
 
         let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path().with_extension("yml");
