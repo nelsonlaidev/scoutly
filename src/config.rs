@@ -458,15 +458,21 @@ url: "test
         assert!(!paths.is_empty());
 
         // Check that current directory paths are included
-        assert!(paths
-            .iter()
-            .any(|p| p.to_string_lossy().contains("scoutly.json")));
-        assert!(paths
-            .iter()
-            .any(|p| p.to_string_lossy().contains("scoutly.toml")));
-        assert!(paths
-            .iter()
-            .any(|p| p.to_string_lossy().contains("scoutly.yaml")));
+        assert!(
+            paths
+                .iter()
+                .any(|p| p.to_string_lossy().contains("scoutly.json"))
+        );
+        assert!(
+            paths
+                .iter()
+                .any(|p| p.to_string_lossy().contains("scoutly.toml"))
+        );
+        assert!(
+            paths
+                .iter()
+                .any(|p| p.to_string_lossy().contains("scoutly.yaml"))
+        );
     }
 
     #[test]
