@@ -110,9 +110,21 @@ impl Config {
             }
         }
 
-        // Check user config directory
-        if let Some(config_dir) = dirs::config_dir() {
-            let scoutly_config_dir = config_dir.join("scoutly");
+        // Check user config directory (~/.config/scoutly)
+        // Use XDG_CONFIG_HOME if set, otherwise fall back to ~/.config
+        let config_home = std::env::var("XDG_CONFIG_HOME")
+            .ok()
+            .and_then(|p| {
+                if p.is_empty() {
+                    None
+                } else {
+                    Some(PathBuf::from(p))
+                }
+            })
+            .or_else(|| dirs::home_dir().map(|home| home.join(".config")));
+
+        if let Some(config_home) = config_home {
+            let scoutly_config_dir = config_home.join("scoutly");
             for format in &[ConfigFormat::Json, ConfigFormat::Toml, ConfigFormat::Yaml] {
                 for ext in format.extensions() {
                     paths.push(scoutly_config_dir.join(format!("config.{}", ext)));
