@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Implement rate limiting with governor - ([0cbff74](https://github.com/nelsonlaidev/scoutly/commit/0cbff747c891d4134b2d8269fc712d9595c0bf0f))
 - Concurrent crawling - ([39209ab](https://github.com/nelsonlaidev/scoutly/commit/39209abb19c7a5458c7caf7fee692a076217d0ee))
 - Expose more CLI options - ([600d10a](https://github.com/nelsonlaidev/scoutly/commit/600d10a1728d2e1eaef89c697ec0e92208c69d5c))
+- Add robots.txt support to web crawler (#3) - ([e334454](https://github.com/nelsonlaidev/scoutly/commit/e334454799e190b47677056349f64608ded4b315))
 
 ### Bug Fixes
 
@@ -22,6 +23,7 @@ All notable changes to this project will be documented in this file.
 ### Chores
 
 - New deps - ([13cdb8e](https://github.com/nelsonlaidev/scoutly/commit/13cdb8e3974e30f2aa941a05be70c71878bd0ba8))
+- Try to build for aarch64-pc-windows-msvc - ([8aa4dbc](https://github.com/nelsonlaidev/scoutly/commit/8aa4dbcaf05d4d229eac8783a45bec038c7e8f73))
 
 ### Performance
 
@@ -30,6 +32,7 @@ All notable changes to this project will be documented in this file.
 ### Refactor
 
 - Link extraction to single DOM pass - ([a3cc9a3](https://github.com/nelsonlaidev/scoutly/commit/a3cc9a3c6e98bbd6e9643c7e8b47879d69fa6e91))
+- Use let-chains and idiomatic empty checks - ([04259b0](https://github.com/nelsonlaidev/scoutly/commit/04259b0b722816a2aaeda5d093c2ac3b6e40d780))
 
 ### Testing
 
@@ -73,7 +76,7 @@ All notable changes to this project will be documented in this file.
 - Version 0.1.0 - ([6a035ca](https://github.com/nelsonlaidev/scoutly/commit/6a035ca4fbd5cbdf010c8760401c87a7d660a11a))
 - Add npm package name to dist-workspace - ([36ddb41](https://github.com/nelsonlaidev/scoutly/commit/36ddb41f304314e1416e566e4c691bf89cac0fc6))
 - Publish to npm - ([570f726](https://github.com/nelsonlaidev/scoutly/commit/570f726de3db590e1dd7a1b03b84b08efc6c09e1))
-- *(release)* Prepare for v0.1.0 - ([638755a](https://github.com/nelsonlaidev/scoutly/commit/638755adfdf0b5ed851b1ab7faea94211e355171))
+- _(release)_ Prepare for v0.1.0 - ([638755a](https://github.com/nelsonlaidev/scoutly/commit/638755adfdf0b5ed851b1ab7faea94211e355171))
 
 ### Continuous Integration
 
@@ -103,4 +106,4 @@ All notable changes to this project will be documented in this file.
 
 ## New Contributors
 
-* @nelsonlaidev made their first contribution
+- @nelsonlaidev made their first contribution
