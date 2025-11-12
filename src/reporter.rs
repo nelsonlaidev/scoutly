@@ -146,6 +146,37 @@ impl Reporter {
                     println!("    Title:  {}", title.bright_white());
                 }
 
+                // Display Open Graph information if present
+                if page.open_graph.og_title.is_some()
+                    || page.open_graph.og_description.is_some()
+                    || page.open_graph.og_image.is_some()
+                    || page.open_graph.og_url.is_some()
+                    || page.open_graph.og_type.is_some()
+                {
+                    println!("    Open Graph:");
+                    if let Some(og_title) = &page.open_graph.og_title {
+                        println!("      og:title:       {}", og_title.bright_white());
+                    }
+                    if let Some(og_desc) = &page.open_graph.og_description {
+                        println!("      og:description: {}", og_desc.bright_white());
+                    }
+                    if let Some(og_image) = &page.open_graph.og_image {
+                        println!("      og:image:       {}", og_image.bright_white());
+                    }
+                    if let Some(og_url) = &page.open_graph.og_url {
+                        println!("      og:url:         {}", og_url.bright_white());
+                    }
+                    if let Some(og_type) = &page.open_graph.og_type {
+                        println!("      og:type:        {}", og_type.bright_white());
+                    }
+                    if let Some(og_site_name) = &page.open_graph.og_site_name {
+                        println!("      og:site_name:   {}", og_site_name.bright_white());
+                    }
+                    if let Some(og_locale) = &page.open_graph.og_locale {
+                        println!("      og:locale:      {}", og_locale.bright_white());
+                    }
+                }
+
                 println!("    Issues:");
                 for issue in &page.issues {
                     let severity_str = match issue.severity {

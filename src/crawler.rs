@@ -1,5 +1,5 @@
 use crate::http_client::build_http_client;
-use crate::models::{Image, Link, PageInfo};
+use crate::models::{Image, Link, OpenGraphTags, PageInfo};
 use crate::robots::RobotsTxt;
 use anyhow::{Context, Result, anyhow};
 use futures::stream::{self, StreamExt};
@@ -33,6 +33,31 @@ static H1_SELECTOR: Lazy<Selector> =
     Lazy::new(|| Selector::parse("h1").expect("h1 selector should be valid"));
 static IMG_SELECTOR: Lazy<Selector> =
     Lazy::new(|| Selector::parse("img[src]").expect("img[src] selector should be valid"));
+
+// Open Graph meta tag selectors
+static OG_TITLE_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+    Selector::parse("meta[property='og:title']").expect("og:title selector should be valid")
+});
+static OG_DESCRIPTION_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+    Selector::parse("meta[property='og:description']")
+        .expect("og:description selector should be valid")
+});
+static OG_IMAGE_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+    Selector::parse("meta[property='og:image']").expect("og:image selector should be valid")
+});
+static OG_URL_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+    Selector::parse("meta[property='og:url']").expect("og:url selector should be valid")
+});
+static OG_TYPE_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+    Selector::parse("meta[property='og:type']").expect("og:type selector should be valid")
+});
+static OG_SITE_NAME_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+    Selector::parse("meta[property='og:site_name']")
+        .expect("og:site_name selector should be valid")
+});
+static OG_LOCALE_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+    Selector::parse("meta[property='og:locale']").expect("og:locale selector should be valid")
+});
 
 // Unified selector for all link-bearing elements (single DOM pass optimization)
 static LINK_ELEMENTS_SELECTOR: Lazy<Selector> = Lazy::new(|| {
@@ -207,6 +232,7 @@ impl Crawler {
                                 h1_tags: vec![],
                                 links: vec![],
                                 images: vec![],
+                                open_graph: OpenGraphTags::default(),
                                 issues: vec![],
                                 crawl_depth: depth,
                             },
@@ -262,6 +288,9 @@ impl Crawler {
         // Extract H1 tags
         let h1_tags = Self::extract_h1_tags(&document);
 
+        // Extract Open Graph tags
+        let open_graph = Self::extract_open_graph_tags(&document);
+
         // Extract links
         let links = self.extract_links(&document, &page_url)?;
 
@@ -277,6 +306,7 @@ impl Crawler {
             h1_tags,
             links,
             images,
+            open_graph,
             issues: vec![],
             crawl_depth: depth,
         })
@@ -302,6 +332,46 @@ impl Crawler {
             .select(&H1_SELECTOR)
             .map(|el| el.text().collect::<String>().trim().to_string())
             .collect()
+    }
+
+    fn extract_open_graph_tags(document: &Html) -> OpenGraphTags {
+        OpenGraphTags {
+            og_title: document
+                .select(&OG_TITLE_SELECTOR)
+                .next()
+                .and_then(|el| el.value().attr("content"))
+                .map(|s| s.to_string()),
+            og_description: document
+                .select(&OG_DESCRIPTION_SELECTOR)
+                .next()
+                .and_then(|el| el.value().attr("content"))
+                .map(|s| s.to_string()),
+            og_image: document
+                .select(&OG_IMAGE_SELECTOR)
+                .next()
+                .and_then(|el| el.value().attr("content"))
+                .map(|s| s.to_string()),
+            og_url: document
+                .select(&OG_URL_SELECTOR)
+                .next()
+                .and_then(|el| el.value().attr("content"))
+                .map(|s| s.to_string()),
+            og_type: document
+                .select(&OG_TYPE_SELECTOR)
+                .next()
+                .and_then(|el| el.value().attr("content"))
+                .map(|s| s.to_string()),
+            og_site_name: document
+                .select(&OG_SITE_NAME_SELECTOR)
+                .next()
+                .and_then(|el| el.value().attr("content"))
+                .map(|s| s.to_string()),
+            og_locale: document
+                .select(&OG_LOCALE_SELECTOR)
+                .next()
+                .and_then(|el| el.value().attr("content"))
+                .map(|s| s.to_string()),
+        }
     }
 
     fn extract_links(&self, document: &Html, page_url: &Url) -> Result<Vec<Link>> {

@@ -1,4 +1,4 @@
-use scoutly::models::{CrawlReport, IssueSeverity, IssueType, Link, PageInfo, SeoIssue};
+use scoutly::models::{CrawlReport, IssueSeverity, IssueType, Link, OpenGraphTags, PageInfo, SeoIssue};
 use scoutly::reporter::Reporter;
 use std::collections::HashMap;
 use std::fs;
@@ -20,6 +20,7 @@ fn create_test_page(
         h1_tags: vec![],
         links,
         images: vec![],
+        open_graph: OpenGraphTags::default(),
         issues,
         crawl_depth,
     }
