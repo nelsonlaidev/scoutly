@@ -51,4 +51,8 @@ pub struct Cli {
     /// Respect robots.txt rules (default: true)
     #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
     pub respect_robots_txt: bool,
+
+    /// Path to configuration file (JSON, TOML, or YAML)
+    #[arg(long)]
+    pub config: Option<String>,
 }

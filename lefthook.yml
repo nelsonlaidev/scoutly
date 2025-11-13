@@ -3,6 +3,7 @@ pre-commit:
   jobs:
     - name: Format
       glob: "*.rs"
+      stage_fixed: true
       run: cargo fmt -- {staged_files}
 
     - name: Lint

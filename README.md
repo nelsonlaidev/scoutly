@@ -12,8 +12,10 @@ A fast, lightweight CLI website crawler and SEO analyzer built with Rust. Scoutl
   - Detect missing or multiple H1 tags
   - Find images without alt text
   - Identify thin content
+- **Configuration Files**: Support for JSON, TOML, and YAML configuration files with automatic detection
 - **Flexible Reporting**: Output results in human-readable text or JSON format
 - **Fast & Concurrent**: Built with Tokio for async I/O and parallel link checking
+- **robots.txt Support**: Respects robots.txt rules by default
 
 ## Prerequisites
 
@@ -83,6 +85,91 @@ scoutly https://example.com --save report.json
 scoutly https://example.com --depth 4 --max-pages 200 --verbose --ignore-redirects --save report.json
 ```
 
+### Configuration Files
+
+Scoutly supports configuration files in JSON, TOML, or YAML format. Configuration files allow you to set default values for options without having to specify them on the command line every time.
+
+#### Default Configuration Paths
+
+Scoutly automatically looks for configuration files in the following locations (in order of priority):
+
+1. **Current directory:**
+   - `scoutly.json`
+   - `scoutly.toml`
+   - `scoutly.yaml`
+   - `scoutly.yml`
+
+2. **User config directory:**
+   - Linux/macOS: `~/.config/scoutly/config.{json,toml,yaml,yml}`
+   - Windows: `%APPDATA%\scoutly\config.{json,toml,yaml,yml}`
+
+#### Example Configuration Files
+
+All configuration fields are optional. You can provide only the fields you want to customize.
+
+**JSON** (`scoutly.json`):
+```json
+{
+  "depth": 10,
+  "max_pages": 500,
+  "output": "json",
+  "external": true,
+  "verbose": true,
+  "ignore_redirects": false,
+  "keep_fragments": false,
+  "rate_limit": 2.0,
+  "concurrency": 10,
+  "respect_robots_txt": true
+}
+```
+
+**TOML** (`scoutly.toml`):
+```toml
+depth = 10
+max_pages = 500
+output = "json"
+external = true
+verbose = true
+ignore_redirects = false
+keep_fragments = false
+rate_limit = 2.0
+concurrency = 10
+respect_robots_txt = true
+```
+
+**YAML** (`scoutly.yaml`):
+```yaml
+depth: 10
+max_pages: 500
+output: json
+external: true
+verbose: true
+ignore_redirects: false
+keep_fragments: false
+rate_limit: 2.0
+concurrency: 10
+respect_robots_txt: true
+```
+
+#### Using a Custom Config File
+
+You can specify a custom configuration file path using the `--config` option:
+
+```bash
+scoutly https://example.com --config ./my-config.json
+```
+
+#### Configuration Priority
+
+Command-line arguments always take precedence over configuration file values. For example:
+
+```bash
+# If scoutly.json sets depth to 10, this command will use depth 15
+scoutly https://example.com --depth 15
+```
+
+This allows you to set sensible defaults in your config file while still being able to override them when needed.
+
 ### Command Line Options
 
 ```
@@ -92,15 +179,19 @@ Arguments:
   <URL>  The URL to start crawling from
 
 Options:
-  -d, --depth <DEPTH>          Maximum crawl depth (default: 5)
-  -m, --max-pages <MAX_PAGES>  Maximum number of pages to crawl (default: 200)
-  -o, --output <OUTPUT>        Output format: text or json [default: text]
-  -s, --save <SAVE>            Save report to file
-  -e, --external               Follow external links
-  -v, --verbose                Verbose output
-      --ignore-redirects       Ignore redirect issues in the report
-      --keep-fragments         Treat URLs with fragment identifiers (#) as unique links
-  -h, --help                   Print help
+  -d, --depth <DEPTH>              Maximum crawl depth (default: 5)
+  -m, --max-pages <MAX_PAGES>      Maximum number of pages to crawl (default: 200)
+  -o, --output <OUTPUT>            Output format: text or json [default: text]
+  -s, --save <SAVE>                Save report to file
+  -e, --external                   Follow external links
+  -v, --verbose                    Verbose output
+      --ignore-redirects           Ignore redirect issues in the report
+      --keep-fragments             Treat URLs with fragment identifiers (#) as unique links
+  -r, --rate-limit <RATE_LIMIT>    Rate limit for requests per second
+  -c, --concurrency <CONCURRENCY>  Number of concurrent requests (default: 5)
+      --respect-robots-txt         Respect robots.txt rules (default: true)
+      --config <CONFIG>            Path to configuration file (JSON, TOML, or YAML)
+  -h, --help                       Print help
 ```
 
 ## Example Output
