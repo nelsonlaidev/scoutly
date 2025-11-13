@@ -3,7 +3,8 @@ pre-commit:
   jobs:
     - name: Format
       glob: "*.rs"
-      run: cargo fmt -- {staged_files} && git add {staged_files}
+      stage_fixed: true
+      run: cargo fmt -- {staged_files}
 
     - name: Lint
       glob: "*.rs"
