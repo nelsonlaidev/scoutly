@@ -88,19 +88,19 @@ async fn test_seo_analyzer() {
         TestCase {
             file: "og-missing.html",
             issue_type: IssueType::MissingOgTitle,
-            severity: IssueSeverity::Warning,
+            severity: IssueSeverity::Info,
             description: "missing og:title",
         },
         TestCase {
             file: "og-missing.html",
             issue_type: IssueType::MissingOgDescription,
-            severity: IssueSeverity::Warning,
+            severity: IssueSeverity::Info,
             description: "missing og:description",
         },
         TestCase {
             file: "og-missing.html",
             issue_type: IssueType::MissingOgImage,
-            severity: IssueSeverity::Warning,
+            severity: IssueSeverity::Info,
             description: "missing og:image",
         },
         TestCase {

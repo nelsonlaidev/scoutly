@@ -114,7 +114,7 @@ impl SeoAnalyzer {
         // Check Open Graph tags
         if page.open_graph.og_title.is_none() || page.open_graph.og_title.as_ref().unwrap().is_empty() {
             page.issues.push(SeoIssue {
-                severity: IssueSeverity::Warning,
+                severity: IssueSeverity::Info,
                 issue_type: IssueType::MissingOgTitle,
                 message: "Page is missing og:title tag".to_string(),
             });
@@ -122,7 +122,7 @@ impl SeoAnalyzer {
 
         if page.open_graph.og_description.is_none() || page.open_graph.og_description.as_ref().unwrap().is_empty() {
             page.issues.push(SeoIssue {
-                severity: IssueSeverity::Warning,
+                severity: IssueSeverity::Info,
                 issue_type: IssueType::MissingOgDescription,
                 message: "Page is missing og:description tag".to_string(),
             });
@@ -130,7 +130,7 @@ impl SeoAnalyzer {
 
         if page.open_graph.og_image.is_none() || page.open_graph.og_image.as_ref().unwrap().is_empty() {
             page.issues.push(SeoIssue {
-                severity: IssueSeverity::Warning,
+                severity: IssueSeverity::Info,
                 issue_type: IssueType::MissingOgImage,
                 message: "Page is missing og:image tag".to_string(),
             });
