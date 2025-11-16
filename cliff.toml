@@ -14,7 +14,7 @@ https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
 {%- endmacro -%}
 
 {%- macro print_commit(commit) -%}
-- {% if commit.scope %}*({{ commit.scope }})* {% endif %}{% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message | upper_first }} - ([{{ commit.id | truncate(length=7, end="") }}]({{ self::remote_url() }}/commit/{{ commit.id }}))
+- {% if commit.scope %}_({{ commit.scope }})_ {% endif %}{% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message | upper_first }} - ([{{ commit.id | truncate(length=7, end="") }}]({{ self::remote_url() }}/commit/{{ commit.id }}))
 {%- endmacro -%}
 
 {%- if version %}\
@@ -39,7 +39,7 @@ https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
         ## New Contributors\n
     {% endif %}\
     {% for contributor in github.contributors | filter(attribute="is_first_time", value=true) %}\
-    * @{{ contributor.username }} made their first contribution{% if contributor.pr_number %} in [#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }}){% endif %}\
+    - @{{ contributor.username }} made their first contribution{% if contributor.pr_number %} in [#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }}){% endif %}\
     {% endfor %}\
 {% endif -%}
 """
