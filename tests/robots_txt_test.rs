@@ -308,3 +308,31 @@ async fn test_robots_txt_cache() {
     // Verify rules are still working (cache was used)
     assert!(!robots.is_allowed(&test_url, "scoutly"));
 }
+
+#[tokio::test]
+async fn test_robots_txt_connection_failure() {
+    use scoutly::http_client::build_http_client;
+    use scoutly::robots::RobotsTxt;
+
+    // Use a URL that will fail to connect (port unlikely to be in use)
+    let bad_url = "http://localhost:65535";
+    let parsed_url = url::Url::parse(bad_url).expect("Failed to parse URL");
+
+    let client = build_http_client(1).expect("Failed to build client");
+    let mut robots = RobotsTxt::new();
+
+    // Fetch should succeed despite connection failure
+    // (it treats connection errors as "no robots.txt, allow all")
+    let result = robots.fetch(&client, &parsed_url).await;
+    assert!(
+        result.is_ok(),
+        "Fetch should succeed even when connection fails"
+    );
+
+    // Should allow all URLs when robots.txt fetch fails
+    let test_url = url::Url::parse(&format!("{}/admin", bad_url)).unwrap();
+    assert!(
+        robots.is_allowed(&test_url, "scoutly"),
+        "Should allow all URLs when robots.txt cannot be fetched"
+    );
+}

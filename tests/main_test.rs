@@ -516,3 +516,134 @@ fn test_binary_with_valid_url() {
         "Should not fail URL validation for valid URL"
     );
 }
+
+#[tokio::test]
+async fn test_crawl_with_config_file_verbose() {
+    use tempfile::tempdir;
+
+    start_link_test_server().await;
+    let base_url = get_test_server_url().await;
+
+    let dir = tempdir().unwrap();
+    let config_path = dir.path().join("test_config.json");
+
+    let json_content = r#"{
+        "depth": 1,
+        "max_pages": 3,
+        "verbose": true
+    }"#;
+
+    fs::write(&config_path, json_content).unwrap();
+
+    let args = Cli {
+        url: base_url,
+        depth: 1,
+        max_pages: 3,
+        output: "text".to_string(),
+        save: None,
+        external: false,
+        verbose: true,
+        ignore_redirects: false,
+        keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
+        respect_robots_txt: false,
+        config: Some(config_path.to_str().unwrap().to_string()),
+    };
+
+    let result = run(args).await;
+    assert!(
+        result.is_ok(),
+        "Should successfully crawl with config file and verbose flag"
+    );
+}
+
+#[tokio::test]
+async fn test_config_merge_with_cli() {
+    use tempfile::tempdir;
+
+    start_link_test_server().await;
+    let base_url = get_test_server_url().await;
+
+    let dir = tempdir().unwrap();
+    let config_path = dir.path().join("test_config.json");
+
+    // Config file sets depth to 5, but CLI will override it
+    let json_content = r#"{
+        "depth": 5,
+        "max_pages": 10,
+        "verbose": false
+    }"#;
+
+    fs::write(&config_path, json_content).unwrap();
+
+    let args = Cli {
+        url: base_url,
+        depth: 1,     // This should override config's depth of 5
+        max_pages: 3, // This should override config's max_pages of 10
+        output: "text".to_string(),
+        save: None,
+        external: false,
+        verbose: false,
+        ignore_redirects: false,
+        keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
+        respect_robots_txt: false,
+        config: Some(config_path.to_str().unwrap().to_string()),
+    };
+
+    let result = run(args).await;
+    assert!(
+        result.is_ok(),
+        "Should successfully merge config with CLI args"
+    );
+}
+
+#[tokio::test]
+#[serial_test::serial]
+async fn test_load_default_config_with_verbose() {
+    use std::env;
+    use tempfile::tempdir;
+
+    start_link_test_server().await;
+    let base_url = get_test_server_url().await;
+
+    // Create a temporary directory and set it as current directory
+    let temp_dir = tempdir().unwrap();
+    let original_dir = env::current_dir().unwrap();
+    env::set_current_dir(&temp_dir).unwrap();
+
+    // Create a default config file (scoutly.json)
+    let config_path = temp_dir.path().join("scoutly.json");
+    let json_content = r#"{
+        "depth": 1,
+        "max_pages": 3
+    }"#;
+    fs::write(&config_path, json_content).unwrap();
+
+    let args = Cli {
+        url: base_url,
+        depth: 5,       // Default value
+        max_pages: 200, // Default value
+        output: "text".to_string(),
+        save: None,
+        external: false,
+        verbose: true, // Enable verbose to trigger the println
+        ignore_redirects: false,
+        keep_fragments: false,
+        rate_limit: None,
+        concurrency: 5,
+        respect_robots_txt: false,
+        config: None, // No config specified, should load from default path
+    };
+
+    let result = run(args).await;
+    assert!(
+        result.is_ok(),
+        "Should successfully load default config with verbose"
+    );
+
+    // Restore original directory
+    env::set_current_dir(&original_dir).ok();
+}

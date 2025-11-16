@@ -106,4 +106,25 @@ pub async fn start_link_test_server() {
         // Give the server time to start
         std::thread::sleep(std::time::Duration::from_millis(100));
     });
+
+    // ALWAYS wait and verify server is ready (not just on first call)
+    // This ensures all tests have a ready server, even when call_once has already run
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Verify server is responding by attempting a connection
+    for _ in 0..20 {
+        match reqwest::get("http://127.0.0.1:3000/ok").await {
+            Ok(response) if response.status().is_success() => {
+                // Server is ready and responding correctly
+                return;
+            }
+            _ => {
+                // Server not ready yet, wait and retry
+                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            }
+        }
+    }
+
+    // If we get here, server didn't start in time - panic to fail the test clearly
+    panic!("Test server on port 3000 failed to start after 1 second");
 }
