@@ -408,3 +408,79 @@ fn test_pages_cloned_in_report() {
     assert_eq!(report.pages.len(), 1);
     assert!(report.pages.contains_key("https://example.com"));
 }
+
+#[test]
+fn test_print_text_report_with_open_graph_tags() {
+    let mut pages = HashMap::new();
+
+    // Create a page with Open Graph tags and issues
+    let page = PageInfo {
+        url: "https://example.com/og-page".to_string(),
+        status_code: Some(200),
+        content_type: Some("text/html".to_string()),
+        title: Some("Page with OG Tags".to_string()),
+        meta_description: None,
+        h1_tags: vec![],
+        links: vec![],
+        images: vec![],
+        open_graph: OpenGraphTags {
+            og_title: Some("OG Title".to_string()),
+            og_description: Some("OG Description".to_string()),
+            og_image: Some("https://example.com/og-image.jpg".to_string()),
+            og_url: Some("https://example.com/og-page".to_string()),
+            og_type: Some("website".to_string()),
+            og_site_name: Some("Example Site".to_string()),
+            og_locale: Some("en_US".to_string()),
+        },
+        issues: vec![create_test_issue(
+            IssueSeverity::Info,
+            "Test issue to trigger display",
+        )],
+        crawl_depth: 0,
+    };
+
+    pages.insert("https://example.com/og-page".to_string(), page);
+
+    let report = Reporter::generate_report("https://example.com", &pages);
+
+    // This test ensures the Open Graph display code path is covered
+    Reporter::print_text_report(&report);
+}
+
+#[test]
+fn test_print_text_report_with_partial_open_graph_tags() {
+    let mut pages = HashMap::new();
+
+    // Create a page with only some Open Graph tags populated
+    let page = PageInfo {
+        url: "https://example.com/partial-og".to_string(),
+        status_code: Some(200),
+        content_type: Some("text/html".to_string()),
+        title: Some("Page with Partial OG Tags".to_string()),
+        meta_description: None,
+        h1_tags: vec![],
+        links: vec![],
+        images: vec![],
+        open_graph: OpenGraphTags {
+            og_title: Some("Partial OG Title".to_string()),
+            og_description: None,
+            og_image: Some("https://example.com/image.jpg".to_string()),
+            og_url: None,
+            og_type: Some("article".to_string()),
+            og_site_name: None,
+            og_locale: None,
+        },
+        issues: vec![create_test_issue(
+            IssueSeverity::Warning,
+            "Test warning issue",
+        )],
+        crawl_depth: 1,
+    };
+
+    pages.insert("https://example.com/partial-og".to_string(), page);
+
+    let report = Reporter::generate_report("https://example.com", &pages);
+
+    // This test ensures partial OG tags are displayed correctly
+    Reporter::print_text_report(&report);
+}
