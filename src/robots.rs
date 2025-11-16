@@ -447,4 +447,53 @@ Allow: /private/public
         let url4 = Url::parse("https://example.com:443/path").unwrap();
         assert_eq!(robots.get_domain_key(&url4), "https://example.com");
     }
+
+    #[test]
+    fn test_parse_robots_txt_with_invalid_lines() {
+        // Test parsing with lines that don't have colons
+        let content = r#"
+User-agent: *
+Disallow: /admin
+This line has no colon
+Another invalid line
+Allow: /public/
+
+User-agent: googlebot
+Sitemap: https://example.com/sitemap.xml
+Crawl-delay: 10
+Disallow: /secret
+"#;
+
+        let mut robots = RobotsTxt::new();
+        robots.parse("http://example.com", content);
+
+        // Check that parsing continued despite invalid lines
+        let wildcard_rules = robots.rules.get("http://example.com:*").unwrap();
+        assert_eq!(wildcard_rules.len(), 2); // Disallow /admin and Allow /public
+
+        // Check that googlebot rules were parsed (ignoring Sitemap and Crawl-delay)
+        let google_rules = robots.rules.get("http://example.com:googlebot").unwrap();
+        assert_eq!(google_rules.len(), 1); // Only Disallow /secret
+    }
+
+    #[test]
+    fn test_path_matches_wildcard_failure() {
+        // Test wildcard pattern that should fail to match
+        assert!(!RobotsTxt::path_matches("/admin/*.php", "/admin/test.html"));
+        assert!(!RobotsTxt::path_matches("/test*end", "/test-middle-different"));
+
+        // Test pattern with wildcard that matches
+        assert!(RobotsTxt::path_matches("/admin/*.php", "/admin/test.php"));
+    }
+
+    #[test]
+    fn test_path_matches_end_marker_with_pattern_consumed() {
+        // Test cases where pattern is consumed and must_end is true
+        assert!(RobotsTxt::path_matches("/api/v1$", "/api/v1"));
+        assert!(!RobotsTxt::path_matches("/api/v1$", "/api/v1/extra"));
+
+        // Test cases where pattern is consumed and must_end is false
+        assert!(RobotsTxt::path_matches("/api/v1", "/api/v1"));
+        assert!(RobotsTxt::path_matches("/api/v1", "/api/v1/extra"));
+    }
 }
