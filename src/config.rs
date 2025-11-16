@@ -520,6 +520,7 @@ concurrency: 12
 
     #[test]
     #[serial]
+    #[cfg(unix)]
     fn test_default_paths_with_xdg_config_home() {
         use std::env;
 
@@ -546,6 +547,7 @@ concurrency: 12
 
     #[test]
     #[serial]
+    #[cfg(unix)]
     fn test_default_paths_with_empty_xdg_config_home() {
         use std::env;
 
@@ -574,6 +576,7 @@ concurrency: 12
 
     #[test]
     #[serial]
+    #[cfg(unix)]
     fn test_default_paths_without_xdg_config_home() {
         use std::env;
 
