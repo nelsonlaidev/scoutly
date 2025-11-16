@@ -40,6 +40,7 @@ governor = "0.6"
 toml = "0.8"
 serde_yaml = "0.9"
 dirs = "5.0"
+indicatif = "0.17"
 
 [dev-dependencies]
 actix-files = "0.6.8"

@@ -2,10 +2,12 @@ use crate::http_client::build_http_client;
 use crate::models::{IssueSeverity, IssueType, PageInfo, SeoIssue};
 use anyhow::Result;
 use futures::future::join_all;
+use indicatif::{ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 
 pub struct LinkChecker {
     client: reqwest::Client,
+    progress_bar: Option<ProgressBar>,
 }
 
 impl Default for LinkChecker {
@@ -18,7 +20,21 @@ impl LinkChecker {
     pub fn new() -> Self {
         Self {
             client: build_http_client(10).expect("Failed to build HTTP client"),
+            progress_bar: None,
         }
+    }
+
+    /// Enable progress bar for link checking
+    pub fn enable_progress_bar(&mut self, total_links: usize) {
+        let pb = ProgressBar::new(total_links as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} links ({eta})")
+                .expect("Progress bar template should be valid")
+                .progress_chars("=>-"),
+        );
+        pb.set_message("Checking links");
+        self.progress_bar = Some(pb);
     }
 
     pub async fn check_all_links(
@@ -48,8 +64,15 @@ impl LinkChecker {
 
         let results = join_all(futures).await;
 
+        // Initialize progress bar if enabled
+        if let Some(ref pb) = self.progress_bar {
+            pb.set_position(0);
+        }
+
         // Update page info with link status codes and redirects
-        for (url, (status_code, redirected_url)) in link_urls.iter().zip(results.iter()) {
+        for (idx, (url, (status_code, redirected_url))) in
+            link_urls.iter().zip(results.iter()).enumerate()
+        {
             if let Some(locations) = all_links.get(url) {
                 for (page_url, link_idx) in locations {
                     if let Some(page) = pages.get_mut(page_url)
@@ -83,6 +106,16 @@ impl LinkChecker {
                     }
                 }
             }
+
+            // Update progress bar
+            if let Some(ref pb) = self.progress_bar {
+                pb.set_position((idx + 1) as u64);
+            }
+        }
+
+        // Finish progress bar
+        if let Some(ref pb) = self.progress_bar {
+            pb.finish_with_message(format!("Checked {} links", link_urls.len()));
         }
 
         Ok(())

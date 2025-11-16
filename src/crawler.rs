@@ -6,6 +6,7 @@ use futures::stream::{self, StreamExt};
 use governor::{
     Quota, RateLimiter, clock::DefaultClock, state::InMemoryState, state::direct::NotKeyed,
 };
+use indicatif::{ProgressBar, ProgressStyle};
 use once_cell::sync::Lazy;
 use scraper::{Html, Selector};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -56,6 +57,7 @@ pub struct Crawler {
     concurrent_requests: usize,
     respect_robots_txt: bool,
     robots_txt: RobotsTxt,
+    progress_bar: Option<ProgressBar>,
 }
 
 impl Crawler {
@@ -96,7 +98,19 @@ impl Crawler {
             concurrent_requests: config.concurrent_requests,
             respect_robots_txt: config.respect_robots_txt,
             robots_txt: RobotsTxt::new(),
+            progress_bar: None,
         })
+    }
+
+    /// Enable progress bar for crawling
+    pub fn enable_progress_bar(&mut self) {
+        let pb = ProgressBar::new_spinner();
+        pb.set_style(
+            ProgressStyle::default_spinner()
+                .template("[{elapsed_precise}] {spinner:.cyan} Crawling: {pos} pages")
+                .expect("Progress bar template should be valid"),
+        );
+        self.progress_bar = Some(pb);
     }
 
     /// Normalizes a URL by optionally removing fragment identifiers
@@ -124,6 +138,11 @@ impl Crawler {
             && let Err(e) = self.robots_txt.fetch(&self.client, &self.base_url).await
         {
             tracing::warn!(error = %e, "Failed to fetch robots.txt, continuing anyway");
+        }
+
+        // Initialize progress bar if enabled
+        if let Some(ref pb) = self.progress_bar {
+            pb.set_position(0);
         }
 
         while !self.to_visit.is_empty() && self.visited.len() < self.max_pages {
@@ -214,6 +233,16 @@ impl Crawler {
                     }
                 }
             }
+
+            // Update progress bar
+            if let Some(ref pb) = self.progress_bar {
+                pb.set_position(self.pages.len() as u64);
+            }
+        }
+
+        // Finish progress bar
+        if let Some(ref pb) = self.progress_bar {
+            pb.finish_with_message(format!("Crawled {} pages", self.pages.len()));
         }
 
         Ok(())
