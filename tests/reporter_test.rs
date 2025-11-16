@@ -1,4 +1,6 @@
-use scoutly::models::{CrawlReport, IssueSeverity, IssueType, Link, OpenGraphTags, PageInfo, SeoIssue};
+use scoutly::models::{
+    CrawlReport, IssueSeverity, IssueType, Link, OpenGraphTags, PageInfo, SeoIssue,
+};
 use scoutly::reporter::Reporter;
 use std::collections::HashMap;
 use std::fs;

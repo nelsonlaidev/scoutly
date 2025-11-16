@@ -112,7 +112,9 @@ impl SeoAnalyzer {
         }
 
         // Check Open Graph tags
-        if page.open_graph.og_title.is_none() || page.open_graph.og_title.as_ref().unwrap().is_empty() {
+        if page.open_graph.og_title.is_none()
+            || page.open_graph.og_title.as_ref().unwrap().is_empty()
+        {
             page.issues.push(SeoIssue {
                 severity: IssueSeverity::Info,
                 issue_type: IssueType::MissingOgTitle,
@@ -120,7 +122,9 @@ impl SeoAnalyzer {
             });
         }
 
-        if page.open_graph.og_description.is_none() || page.open_graph.og_description.as_ref().unwrap().is_empty() {
+        if page.open_graph.og_description.is_none()
+            || page.open_graph.og_description.as_ref().unwrap().is_empty()
+        {
             page.issues.push(SeoIssue {
                 severity: IssueSeverity::Info,
                 issue_type: IssueType::MissingOgDescription,
@@ -128,7 +132,9 @@ impl SeoAnalyzer {
             });
         }
 
-        if page.open_graph.og_image.is_none() || page.open_graph.og_image.as_ref().unwrap().is_empty() {
+        if page.open_graph.og_image.is_none()
+            || page.open_graph.og_image.as_ref().unwrap().is_empty()
+        {
             page.issues.push(SeoIssue {
                 severity: IssueSeverity::Info,
                 issue_type: IssueType::MissingOgImage,
@@ -144,7 +150,8 @@ impl SeoAnalyzer {
             });
         }
 
-        if page.open_graph.og_type.is_none() || page.open_graph.og_type.as_ref().unwrap().is_empty() {
+        if page.open_graph.og_type.is_none() || page.open_graph.og_type.as_ref().unwrap().is_empty()
+        {
             page.issues.push(SeoIssue {
                 severity: IssueSeverity::Info,
                 issue_type: IssueType::MissingOgType,

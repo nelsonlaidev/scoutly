@@ -52,8 +52,7 @@ static OG_TYPE_SELECTOR: Lazy<Selector> = Lazy::new(|| {
     Selector::parse("meta[property='og:type']").expect("og:type selector should be valid")
 });
 static OG_SITE_NAME_SELECTOR: Lazy<Selector> = Lazy::new(|| {
-    Selector::parse("meta[property='og:site_name']")
-        .expect("og:site_name selector should be valid")
+    Selector::parse("meta[property='og:site_name']").expect("og:site_name selector should be valid")
 });
 static OG_LOCALE_SELECTOR: Lazy<Selector> = Lazy::new(|| {
     Selector::parse("meta[property='og:locale']").expect("og:locale selector should be valid")
