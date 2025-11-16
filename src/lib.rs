@@ -1,4 +1,5 @@
 pub mod cli;
+pub mod config;
 pub mod crawler;
 pub mod http_client;
 pub mod link_checker;
@@ -10,12 +11,43 @@ pub mod seo_analyzer;
 use anyhow::Result;
 use cli::Cli;
 use colored::*;
+use config::Config;
 use crawler::{Crawler, CrawlerConfig};
 use link_checker::LinkChecker;
 use reporter::Reporter;
 use seo_analyzer::SeoAnalyzer;
+use std::path::PathBuf;
 
-pub async fn run(args: Cli) -> Result<()> {
+pub async fn run(mut args: Cli) -> Result<()> {
+    // Load configuration from file if specified or from default paths
+    let config = if let Some(config_path) = &args.config {
+        // Load from specified path
+        let path = PathBuf::from(config_path);
+        if args.verbose {
+            println!(
+                "{} {}",
+                "Loading config from:".bright_white().bold(),
+                path.display()
+            );
+        }
+        Some(Config::from_file(&path)?)
+    } else {
+        // Try loading from default paths
+        if let Some(config) = Config::from_default_paths()? {
+            if args.verbose {
+                println!("{}", "Using default config file".bright_white().bold());
+            }
+            Some(config)
+        } else {
+            None
+        }
+    };
+
+    // Merge config with CLI args (CLI args take precedence)
+    if let Some(config) = config {
+        args = config.merge_with_cli(&args);
+    }
+
     println!(
         "{}",
         "Scoutly - Website Crawler & SEO Analyzer"
