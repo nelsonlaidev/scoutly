@@ -11,8 +11,20 @@ pub struct PageInfo {
     pub h1_tags: Vec<String>,
     pub links: Vec<Link>,
     pub images: Vec<Image>,
+    pub open_graph: OpenGraphTags,
     pub issues: Vec<SeoIssue>,
     pub crawl_depth: usize,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct OpenGraphTags {
+    pub og_title: Option<String>,
+    pub og_description: Option<String>,
+    pub og_image: Option<String>,
+    pub og_url: Option<String>,
+    pub og_type: Option<String>,
+    pub og_site_name: Option<String>,
+    pub og_locale: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +70,11 @@ pub enum IssueType {
     ThinContent,
     BrokenLink,
     Redirect,
+    MissingOgTitle,
+    MissingOgDescription,
+    MissingOgImage,
+    MissingOgUrl,
+    MissingOgType,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -85,6 +85,36 @@ async fn test_seo_analyzer() {
             severity: IssueSeverity::Warning,
             description: "thin content",
         },
+        TestCase {
+            file: "og-missing.html",
+            issue_type: IssueType::MissingOgTitle,
+            severity: IssueSeverity::Info,
+            description: "missing og:title",
+        },
+        TestCase {
+            file: "og-missing.html",
+            issue_type: IssueType::MissingOgDescription,
+            severity: IssueSeverity::Info,
+            description: "missing og:description",
+        },
+        TestCase {
+            file: "og-missing.html",
+            issue_type: IssueType::MissingOgImage,
+            severity: IssueSeverity::Info,
+            description: "missing og:image",
+        },
+        TestCase {
+            file: "og-missing.html",
+            issue_type: IssueType::MissingOgUrl,
+            severity: IssueSeverity::Info,
+            description: "missing og:url",
+        },
+        TestCase {
+            file: "og-missing.html",
+            issue_type: IssueType::MissingOgType,
+            severity: IssueSeverity::Info,
+            description: "missing og:type",
+        },
     ];
 
     for case in test_cases {
@@ -120,4 +150,103 @@ struct TestCase {
     issue_type: IssueType,
     severity: IssueSeverity,
     description: &'static str,
+}
+
+#[tokio::test]
+async fn test_open_graph_extraction() {
+    let base_url = get_test_server_url().await;
+
+    let config = CrawlerConfig {
+        max_depth: 2,
+        max_pages: 50,
+        follow_external: false,
+        keep_fragments: false,
+        requests_per_second: None,
+        concurrent_requests: 1,
+        respect_robots_txt: false,
+    };
+    let mut crawler = Crawler::new(&base_url, config).expect("Failed to create crawler");
+
+    crawler.crawl().await.expect("Crawl failed");
+
+    // Test complete OG tags page
+    let url_complete = format!("{}/og-complete.html", base_url);
+    let page_complete = crawler
+        .pages
+        .get(&url_complete)
+        .expect("og-complete.html not found");
+
+    // Verify all OG tags are extracted
+    assert_eq!(
+        page_complete.open_graph.og_title.as_ref().unwrap(),
+        "Complete OG Test Page",
+        "og:title should be extracted"
+    );
+    assert_eq!(
+        page_complete.open_graph.og_description.as_ref().unwrap(),
+        "This page has all the essential Open Graph meta tags for social media sharing.",
+        "og:description should be extracted"
+    );
+    assert_eq!(
+        page_complete.open_graph.og_image.as_ref().unwrap(),
+        "https://example.com/images/og-image.jpg",
+        "og:image should be extracted"
+    );
+    assert_eq!(
+        page_complete.open_graph.og_url.as_ref().unwrap(),
+        "https://example.com/og-complete.html",
+        "og:url should be extracted"
+    );
+    assert_eq!(
+        page_complete.open_graph.og_type.as_ref().unwrap(),
+        "website",
+        "og:type should be extracted"
+    );
+    assert_eq!(
+        page_complete.open_graph.og_site_name.as_ref().unwrap(),
+        "Scoutly Test Site",
+        "og:site_name should be extracted"
+    );
+    assert_eq!(
+        page_complete.open_graph.og_locale.as_ref().unwrap(),
+        "en_US",
+        "og:locale should be extracted"
+    );
+
+    // Test missing OG tags page
+    let url_missing = format!("{}/og-missing.html", base_url);
+    let page_missing = crawler
+        .pages
+        .get(&url_missing)
+        .expect("og-missing.html not found");
+
+    // Verify all OG tags are None
+    assert!(
+        page_missing.open_graph.og_title.is_none(),
+        "og:title should be None when not present"
+    );
+    assert!(
+        page_missing.open_graph.og_description.is_none(),
+        "og:description should be None when not present"
+    );
+    assert!(
+        page_missing.open_graph.og_image.is_none(),
+        "og:image should be None when not present"
+    );
+    assert!(
+        page_missing.open_graph.og_url.is_none(),
+        "og:url should be None when not present"
+    );
+    assert!(
+        page_missing.open_graph.og_type.is_none(),
+        "og:type should be None when not present"
+    );
+    assert!(
+        page_missing.open_graph.og_site_name.is_none(),
+        "og:site_name should be None when not present"
+    );
+    assert!(
+        page_missing.open_graph.og_locale.is_none(),
+        "og:locale should be None when not present"
+    );
 }
