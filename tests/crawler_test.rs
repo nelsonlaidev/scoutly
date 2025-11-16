@@ -979,10 +979,7 @@ async fn test_crawler() {
             },
         );
 
-        assert!(
-            result.is_err(),
-            "Should reject file:// URL scheme"
-        );
+        assert!(result.is_err(), "Should reject file:// URL scheme");
     }
 }
 
@@ -1003,8 +1000,8 @@ async fn test_robots_txt_fetch_failure_warning() {
     };
 
     // Use a URL that will fail to connect (port unlikely to be in use)
-    let mut crawler = Crawler::new("http://localhost:65535", config)
-        .expect("Failed to create crawler");
+    let mut crawler =
+        Crawler::new("http://localhost:65535", config).expect("Failed to create crawler");
 
     // The crawl should continue despite robots.txt fetch failure
     let result = crawler.crawl().await;

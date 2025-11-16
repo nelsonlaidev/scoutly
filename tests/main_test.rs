@@ -579,7 +579,7 @@ async fn test_config_merge_with_cli() {
 
     let args = Cli {
         url: base_url,
-        depth: 1, // This should override config's depth of 5
+        depth: 1,     // This should override config's depth of 5
         max_pages: 3, // This should override config's max_pages of 10
         output: "text".to_string(),
         save: None,
@@ -624,7 +624,7 @@ async fn test_load_default_config_with_verbose() {
 
     let args = Cli {
         url: base_url,
-        depth: 5,      // Default value
+        depth: 5,       // Default value
         max_pages: 200, // Default value
         output: "text".to_string(),
         save: None,

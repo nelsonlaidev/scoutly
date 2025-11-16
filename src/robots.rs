@@ -480,7 +480,10 @@ Disallow: /secret
     fn test_path_matches_wildcard_failure() {
         // Test wildcard pattern that should fail to match
         assert!(!RobotsTxt::path_matches("/admin/*.php", "/admin/test.html"));
-        assert!(!RobotsTxt::path_matches("/test*end", "/test-middle-different"));
+        assert!(!RobotsTxt::path_matches(
+            "/test*end",
+            "/test-middle-different"
+        ));
 
         // Test pattern with wildcard that matches
         assert!(RobotsTxt::path_matches("/admin/*.php", "/admin/test.php"));
