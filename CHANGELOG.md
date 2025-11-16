@@ -14,6 +14,8 @@ All notable changes to this project will be documented in this file.
 - Concurrent crawling - ([39209ab](https://github.com/nelsonlaidev/scoutly/commit/39209abb19c7a5458c7caf7fee692a076217d0ee))
 - Expose more CLI options - ([600d10a](https://github.com/nelsonlaidev/scoutly/commit/600d10a1728d2e1eaef89c697ec0e92208c69d5c))
 - Add robots.txt support to web crawler (#3) - ([e334454](https://github.com/nelsonlaidev/scoutly/commit/e334454799e190b47677056349f64608ded4b315))
+- Add progress bar (#4) - ([ccf810d](https://github.com/nelsonlaidev/scoutly/commit/ccf810d3f7a02ee0a68a7c79c28c8ca70bfac24d))
+- Build cross-platform config file parser (#5) - ([72a30f6](https://github.com/nelsonlaidev/scoutly/commit/72a30f6fc049df338457864fc7c128ed7b88d031))
 
 ### Bug Fixes
 
@@ -23,7 +25,8 @@ All notable changes to this project will be documented in this file.
 ### Chores
 
 - New deps - ([13cdb8e](https://github.com/nelsonlaidev/scoutly/commit/13cdb8e3974e30f2aa941a05be70c71878bd0ba8))
-- Try to build for aarch64-pc-windows-msvc - ([8aa4dbc](https://github.com/nelsonlaidev/scoutly/commit/8aa4dbcaf05d4d229eac8783a45bec038c7e8f73))
+- Try to build for aarch64-pc-windows-msvc - ([171e51d](https://github.com/nelsonlaidev/scoutly/commit/171e51d99afed8306d17a4358ed9a2b19ffb24de))
+- Update cliff config - ([fd44a79](https://github.com/nelsonlaidev/scoutly/commit/fd44a79e8c7863adb8e40dbae095e792ac8b1f60))
 
 ### Performance
 
@@ -103,7 +106,3 @@ All notable changes to this project will be documented in this file.
 
 - Coverage (#1) - ([979e6eb](https://github.com/nelsonlaidev/scoutly/commit/979e6eb0dba070dd7a7b85f73d38a92f0873bf88))
 - More coverage (#2) - ([3290f46](https://github.com/nelsonlaidev/scoutly/commit/3290f465ffc706eada1c44a34b073a11daf6960b))
-
-## New Contributors
-
-- @nelsonlaidev made their first contribution
