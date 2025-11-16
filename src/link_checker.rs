@@ -70,7 +70,9 @@ impl LinkChecker {
         }
 
         // Update page info with link status codes and redirects
-        for (idx, (url, (status_code, redirected_url))) in link_urls.iter().zip(results.iter()).enumerate() {
+        for (idx, (url, (status_code, redirected_url))) in
+            link_urls.iter().zip(results.iter()).enumerate()
+        {
             if let Some(locations) = all_links.get(url) {
                 for (page_url, link_idx) in locations {
                     if let Some(page) = pages.get_mut(page_url)
