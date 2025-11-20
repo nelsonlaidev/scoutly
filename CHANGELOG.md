@@ -29,6 +29,7 @@ All notable changes to this project will be documented in this file.
 - Try to build for aarch64-pc-windows-msvc - ([171e51d](https://github.com/nelsonlaidev/scoutly/commit/171e51d99afed8306d17a4358ed9a2b19ffb24de))
 - Update cliff config - ([fd44a79](https://github.com/nelsonlaidev/scoutly/commit/fd44a79e8c7863adb8e40dbae095e792ac8b1f60))
 - Update cliff config - ([672921a](https://github.com/nelsonlaidev/scoutly/commit/672921a3dd50cc3815f590328a7093979fa053c2))
+- Don't build for aarch64-pc-windows-msvc - ([c2a4d51](https://github.com/nelsonlaidev/scoutly/commit/c2a4d51018964a54292abfdb985cea04d499d9b9))
 
 ### Performance
 
