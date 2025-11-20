@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [0.2.0](https://github.com/nelsonlaidev/scoutly/compare/v0.1.1..v0.2.0) - 2025-11-20
 
 ### Features
 
@@ -109,3 +109,5 @@ All notable changes to this project will be documented in this file.
 
 - Coverage (#1) - ([979e6eb](https://github.com/nelsonlaidev/scoutly/commit/979e6eb0dba070dd7a7b85f73d38a92f0873bf88))
 - More coverage (#2) - ([3290f46](https://github.com/nelsonlaidev/scoutly/commit/3290f465ffc706eada1c44a34b073a11daf6960b))
+
+
