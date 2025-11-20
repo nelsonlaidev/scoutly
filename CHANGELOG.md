@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Add robots.txt support to web crawler (#3) - ([e334454](https://github.com/nelsonlaidev/scoutly/commit/e334454799e190b47677056349f64608ded4b315))
 - Add progress bar (#4) - ([ccf810d](https://github.com/nelsonlaidev/scoutly/commit/ccf810d3f7a02ee0a68a7c79c28c8ca70bfac24d))
 - Build cross-platform config file parser (#5) - ([72a30f6](https://github.com/nelsonlaidev/scoutly/commit/72a30f6fc049df338457864fc7c128ed7b88d031))
+- Add open graph meta tag validation (#6) - ([06721b5](https://github.com/nelsonlaidev/scoutly/commit/06721b5acb92950fdca4d04015f5c73ce93a2038))
 
 ### Bug Fixes
 
@@ -27,6 +28,7 @@ All notable changes to this project will be documented in this file.
 - New deps - ([13cdb8e](https://github.com/nelsonlaidev/scoutly/commit/13cdb8e3974e30f2aa941a05be70c71878bd0ba8))
 - Try to build for aarch64-pc-windows-msvc - ([171e51d](https://github.com/nelsonlaidev/scoutly/commit/171e51d99afed8306d17a4358ed9a2b19ffb24de))
 - Update cliff config - ([fd44a79](https://github.com/nelsonlaidev/scoutly/commit/fd44a79e8c7863adb8e40dbae095e792ac8b1f60))
+- Update cliff config - ([672921a](https://github.com/nelsonlaidev/scoutly/commit/672921a3dd50cc3815f590328a7093979fa053c2))
 
 ### Performance
 
@@ -40,6 +42,7 @@ All notable changes to this project will be documented in this file.
 ### Testing
 
 - Add tests for content-type validation, rate limiting, concurrency - ([acef227](https://github.com/nelsonlaidev/scoutly/commit/acef227a50cb60e5feb2a220c6110d07c9d84b67))
+- Increase test coverage (#7) - ([6cc3594](https://github.com/nelsonlaidev/scoutly/commit/6cc3594bbfb3320415261112e83f3c47728859eb))
 
 ## [0.1.1](https://github.com/nelsonlaidev/scoutly/compare/v0.1.0..v0.1.1) - 2025-11-09
 
