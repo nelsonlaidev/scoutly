@@ -49,6 +49,18 @@ fn create_test_link(url: &str, status_code: Option<u16>) -> Link {
         is_external: false,
         status_code,
         redirected_url: None,
+        check_error: None,
+    }
+}
+
+fn create_transport_error_link(url: &str, error: &str) -> Link {
+    Link {
+        url: url.to_string(),
+        text: "Link Text".to_string(),
+        is_external: false,
+        status_code: None,
+        redirected_url: None,
+        check_error: Some(error.to_string()),
     }
 }
 
@@ -210,6 +222,24 @@ fn test_generate_report_links_without_status_code() {
 
     assert_eq!(report.summary.total_links, 3);
     assert_eq!(report.summary.broken_links, 1); // Only the 404
+}
+
+#[test]
+fn test_generate_report_transport_failures_count_as_broken_links() {
+    let mut pages = HashMap::new();
+
+    let links = vec![
+        create_transport_error_link("https://example.com/down", "connection failed"),
+        create_test_link("https://example.com/ok", Some(200)),
+    ];
+
+    let page = create_test_page("https://example.com", Some(200), None, vec![], links, 0);
+    pages.insert("https://example.com".to_string(), page);
+
+    let report = Reporter::generate_report("https://example.com", &pages);
+
+    assert_eq!(report.summary.total_links, 2);
+    assert_eq!(report.summary.broken_links, 1);
 }
 
 #[test]

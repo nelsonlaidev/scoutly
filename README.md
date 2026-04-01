@@ -5,7 +5,7 @@ A fast, lightweight CLI website crawler and SEO analyzer built with Rust. Scoutl
 ## Features
 
 - **Website Crawling**: Recursively crawl websites with configurable depth limits
-- **Link Checking**: Validate all internal and external links, detect broken links (404s, 500s)
+- **Link Checking**: Validate all internal and external links, detect broken links (404s, 500s), and record transport failures explicitly
 - **SEO Analysis**:
   - Check for missing or poorly optimized title tags
   - Validate meta descriptions
@@ -13,7 +13,7 @@ A fast, lightweight CLI website crawler and SEO analyzer built with Rust. Scoutl
   - Find images without alt text
   - Identify thin content
 - **Configuration Files**: Support for JSON, TOML, and YAML configuration files with automatic detection
-- **Flexible Reporting**: Output results in human-readable text or JSON format
+- **Flexible Reporting**: Output results in human-readable text or JSON format, with JSON mode keeping stdout machine-parseable
 - **Fast & Concurrent**: Built with Tokio for async I/O and parallel link checking
 - **robots.txt Support**: Respects robots.txt rules by default
 
@@ -181,7 +181,7 @@ Arguments:
 Options:
   -d, --depth <DEPTH>              Maximum crawl depth (default: 5)
   -m, --max-pages <MAX_PAGES>      Maximum number of pages to crawl (default: 200)
-  -o, --output <OUTPUT>            Output format: text or json [default: text]
+  -o, --output <OUTPUT>            Output format: text or json (defaults to text when omitted)
   -s, --save <SAVE>                Save report to file
   -e, --external                   Follow external links
   -v, --verbose                    Verbose output
@@ -189,7 +189,8 @@ Options:
       --keep-fragments             Treat URLs with fragment identifiers (#) as unique links
   -r, --rate-limit <RATE_LIMIT>    Rate limit for requests per second
   -c, --concurrency <CONCURRENCY>  Number of concurrent requests (default: 5)
-      --respect-robots-txt         Respect robots.txt rules (default: true)
+      --respect-robots-txt <RESPECT_ROBOTS_TXT>
+                                   Respect robots.txt rules (default: true)
       --config <CONFIG>            Path to configuration file (JSON, TOML, or YAML)
   -h, --help                       Print help
 ```
@@ -234,7 +235,7 @@ Pages with Issues
 
 ### JSON Report
 
-Use `--output json` to get machine-readable output suitable for integration with other tools or CI/CD pipelines.
+Use `--output json` to get machine-readable output suitable for integration with other tools or CI/CD pipelines. In JSON mode, Scoutly writes the report JSON to stdout and keeps human-oriented progress/status messages off stdout so the output stays parseable. Link objects also include an optional `check_error` field when a link fails due to a transport-level error instead of an HTTP response.
 
 ## How It Works
 

@@ -1,9 +1,14 @@
 use actix_files::Files;
 use actix_web::{App, HttpResponse, HttpServer, web};
+use std::io::ErrorKind;
 use std::sync::Once;
 
 #[allow(dead_code)]
 static INIT: Once = Once::new();
+
+const LINK_TEST_SERVER_HOST: &str = "127.0.0.1";
+const LINK_TEST_SERVER_PORT: u16 = 3000;
+const LINK_TEST_SERVER_BASE_URL: &str = "http://127.0.0.1:3000";
 
 #[allow(dead_code)]
 pub async fn get_test_server_url() -> String {
@@ -38,73 +43,87 @@ pub async fn get_test_server_url() -> String {
 #[allow(dead_code)]
 pub async fn start_link_test_server() {
     INIT.call_once(|| {
-        tokio::spawn(async {
-            let server = HttpServer::new(|| {
-                App::new()
-                    .route(
-                        "/ok",
-                        web::get().to(|| async { HttpResponse::Ok().body("OK") }),
-                    )
-                    .route(
-                        "/not-found",
-                        web::get().to(|| async { HttpResponse::NotFound().body("Not Found") }),
-                    )
-                    .route(
-                        "/redirect",
-                        web::get().to(|| async {
-                            HttpResponse::MovedPermanently()
-                                .append_header(("Location", "http://127.0.0.1:3000/ok"))
-                                .finish()
-                        }),
-                    )
-                    .route(
-                        "/redirect-temp",
-                        web::get().to(|| async {
-                            HttpResponse::Found()
-                                .append_header(("Location", "http://127.0.0.1:3000/ok"))
-                                .finish()
-                        }),
-                    )
-                    .route(
-                        "/server-error",
-                        web::get()
-                            .to(|| async { HttpResponse::InternalServerError().body("Error") }),
-                    )
-                    .route(
-                        "/json-response",
-                        web::get().to(|| async {
-                            HttpResponse::Ok()
-                                .content_type("application/json")
-                                .body(r#"{"message": "This is JSON"}"#)
-                        }),
-                    )
-                    .route(
-                        "/image-response",
-                        web::get().to(|| async {
-                            HttpResponse::Ok()
-                                .content_type("image/png")
-                                .body(vec![0u8; 100]) // Fake image data
-                        }),
-                    )
-                    .route(
-                        "/pdf-response",
-                        web::get().to(|| async {
-                            HttpResponse::Ok()
-                                .content_type("application/pdf")
-                                .body(vec![0u8; 100]) // Fake PDF data
-                        }),
-                    )
-            })
-            .bind(("127.0.0.1", 3000))
-            .expect("Failed to bind link test server on port 3000");
-
-            if let Err(e) = server.run().await {
-                eprintln!("Link test server error: {}", e);
+        match HttpServer::new(|| {
+            App::new()
+                .route(
+                    "/ok",
+                    web::get().to(|| async { HttpResponse::Ok().body("OK") }),
+                )
+                .route(
+                    "/not-found",
+                    web::get().to(|| async { HttpResponse::NotFound().body("Not Found") }),
+                )
+                .route(
+                    "/redirect",
+                    web::get().to(|| async {
+                        HttpResponse::MovedPermanently()
+                            .append_header((
+                                "Location",
+                                format!("{}/ok", LINK_TEST_SERVER_BASE_URL),
+                            ))
+                            .finish()
+                    }),
+                )
+                .route(
+                    "/redirect-temp",
+                    web::get().to(|| async {
+                        HttpResponse::Found()
+                            .append_header((
+                                "Location",
+                                format!("{}/ok", LINK_TEST_SERVER_BASE_URL),
+                            ))
+                            .finish()
+                    }),
+                )
+                .route(
+                    "/server-error",
+                    web::get().to(|| async { HttpResponse::InternalServerError().body("Error") }),
+                )
+                .route(
+                    "/json-response",
+                    web::get().to(|| async {
+                        HttpResponse::Ok()
+                            .content_type("application/json")
+                            .body(r#"{"message": "This is JSON"}"#)
+                    }),
+                )
+                .route(
+                    "/image-response",
+                    web::get().to(|| async {
+                        HttpResponse::Ok()
+                            .content_type("image/png")
+                            .body(vec![0u8; 100]) // Fake image data
+                    }),
+                )
+                .route(
+                    "/pdf-response",
+                    web::get().to(|| async {
+                        HttpResponse::Ok()
+                            .content_type("application/pdf")
+                            .body(vec![0u8; 100]) // Fake PDF data
+                    }),
+                )
+        })
+        .bind((LINK_TEST_SERVER_HOST, LINK_TEST_SERVER_PORT))
+        {
+            Ok(server) => {
+                let server = server.run();
+                tokio::spawn(async move {
+                    if let Err(e) = server.await {
+                        eprintln!("Link test server error: {}", e);
+                    }
+                });
             }
-        });
-
-        // Give the server time to start
-        std::thread::sleep(std::time::Duration::from_millis(100));
+            Err(err) if err.kind() == ErrorKind::AddrInUse => {
+                // Another test binary already started the shared server; reuse it.
+            }
+            Err(err) => {
+                panic!(
+                    "Failed to bind link test server on port {}: {}",
+                    LINK_TEST_SERVER_PORT, err
+                );
+            }
+        }
     });
 
     // ALWAYS wait and verify server is ready (not just on first call)
@@ -113,7 +132,7 @@ pub async fn start_link_test_server() {
 
     // Verify server is responding by attempting a connection
     for _ in 0..20 {
-        match reqwest::get("http://127.0.0.1:3000/ok").await {
+        match reqwest::get(format!("{}/ok", LINK_TEST_SERVER_BASE_URL)).await {
             Ok(response) if response.status().is_success() => {
                 // Server is ready and responding correctly
                 return;
@@ -126,5 +145,8 @@ pub async fn start_link_test_server() {
     }
 
     // If we get here, server didn't start in time - panic to fail the test clearly
-    panic!("Test server on port 3000 failed to start after 1 second");
+    panic!(
+        "Test server on port {} failed to start after 1 second",
+        LINK_TEST_SERVER_PORT
+    );
 }

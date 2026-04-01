@@ -10,17 +10,17 @@ use std::process::Command;
 async fn test_invalid_url_no_protocol() {
     let args = Cli {
         url: "example.com".to_string(),
-        depth: 2,
-        max_pages: 10,
-        output: "text".to_string(),
+        depth: Some(2),
+        max_pages: Some(10),
+        output: Some("text".to_string()),
         save: None,
         external: false,
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -42,17 +42,17 @@ async fn test_invalid_url_no_protocol() {
 async fn test_invalid_url_missing_https() {
     let args = Cli {
         url: "ftp://example.com".to_string(),
-        depth: 2,
-        max_pages: 10,
-        output: "text".to_string(),
+        depth: Some(2),
+        max_pages: Some(10),
+        output: Some("text".to_string()),
         save: None,
         external: false,
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -70,17 +70,17 @@ async fn test_valid_http_url() {
 
     let args = Cli {
         url: base_url,
-        depth: 1,
-        max_pages: 5,
-        output: "text".to_string(),
+        depth: Some(1),
+        max_pages: Some(5),
+        output: Some("text".to_string()),
         save: None,
         external: false,
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -92,17 +92,17 @@ async fn test_valid_http_url() {
 async fn test_valid_https_url() {
     let args = Cli {
         url: "https://example.com".to_string(),
-        depth: 1,
-        max_pages: 1,
-        output: "text".to_string(),
+        depth: Some(1),
+        max_pages: Some(1),
+        output: Some("text".to_string()),
         save: None,
         external: false,
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -123,17 +123,17 @@ async fn test_full_crawl_with_text_output() {
 
     let args = Cli {
         url: base_url,
-        depth: 2,
-        max_pages: 10,
-        output: "text".to_string(),
+        depth: Some(2),
+        max_pages: Some(10),
+        output: Some("text".to_string()),
         save: None,
         external: false,
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -148,17 +148,17 @@ async fn test_full_crawl_with_json_output() {
 
     let args = Cli {
         url: base_url,
-        depth: 2,
-        max_pages: 10,
-        output: "json".to_string(),
+        depth: Some(2),
+        max_pages: Some(10),
+        output: Some("json".to_string()),
         save: None,
         external: false,
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -176,17 +176,17 @@ async fn test_crawl_with_save_file() {
 
     let args = Cli {
         url: base_url,
-        depth: 1,
-        max_pages: 5,
-        output: "text".to_string(),
+        depth: Some(1),
+        max_pages: Some(5),
+        output: Some("text".to_string()),
         save: Some(test_filename.to_string()),
         external: false,
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -212,17 +212,17 @@ async fn test_crawl_with_verbose_flag() {
 
     let args = Cli {
         url: base_url,
-        depth: 1,
-        max_pages: 3,
-        output: "text".to_string(),
+        depth: Some(1),
+        max_pages: Some(3),
+        output: Some("text".to_string()),
         save: None,
         external: false,
         verbose: true,
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -240,17 +240,17 @@ async fn test_crawl_with_external_flag() {
 
     let args = Cli {
         url: base_url,
-        depth: 1,
-        max_pages: 5,
-        output: "text".to_string(),
+        depth: Some(1),
+        max_pages: Some(5),
+        output: Some("text".to_string()),
         save: None,
         external: true,
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -268,17 +268,17 @@ async fn test_crawl_with_ignore_redirects_flag() {
 
     let args = Cli {
         url: base_url,
-        depth: 1,
-        max_pages: 5,
-        output: "text".to_string(),
+        depth: Some(1),
+        max_pages: Some(5),
+        output: Some("text".to_string()),
         save: None,
         external: false,
         verbose: false,
         ignore_redirects: true,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -296,17 +296,17 @@ async fn test_crawl_with_keep_fragments_flag() {
 
     let args = Cli {
         url: base_url,
-        depth: 1,
-        max_pages: 5,
-        output: "text".to_string(),
+        depth: Some(1),
+        max_pages: Some(5),
+        output: Some("text".to_string()),
         save: None,
         external: false,
         verbose: false,
         ignore_redirects: false,
         keep_fragments: true,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -324,17 +324,17 @@ async fn test_crawl_with_custom_depth_and_max_pages() {
 
     let args = Cli {
         url: base_url,
-        depth: 3,
-        max_pages: 15,
-        output: "text".to_string(),
+        depth: Some(3),
+        max_pages: Some(15),
+        output: Some("text".to_string()),
         save: None,
         external: false,
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -355,17 +355,17 @@ async fn test_crawl_with_all_flags_combined() {
 
     let args = Cli {
         url: base_url,
-        depth: 2,
-        max_pages: 8,
-        output: "json".to_string(),
+        depth: Some(2),
+        max_pages: Some(8),
+        output: Some("json".to_string()),
         save: Some(test_filename.to_string()),
         external: true,
         verbose: true,
         ignore_redirects: true,
         keep_fragments: true,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -390,17 +390,17 @@ async fn test_crawl_with_default_text_output() {
 
     let args = Cli {
         url: base_url,
-        depth: 1,
-        max_pages: 3,
-        output: "anything_else".to_string(),
+        depth: Some(1),
+        max_pages: Some(3),
+        output: Some("anything_else".to_string()),
         save: None,
         external: false,
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -421,17 +421,17 @@ async fn test_crawl_with_save_and_json_output() {
 
     let args = Cli {
         url: base_url,
-        depth: 1,
-        max_pages: 5,
-        output: "json".to_string(),
+        depth: Some(1),
+        max_pages: Some(5),
+        output: Some("json".to_string()),
         save: Some(test_filename.to_string()),
         external: false,
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -459,17 +459,17 @@ async fn test_crawl_with_verbose_and_json_output() {
 
     let args = Cli {
         url: base_url,
-        depth: 1,
-        max_pages: 3,
-        output: "json".to_string(),
+        depth: Some(1),
+        max_pages: Some(3),
+        output: Some("json".to_string()),
         save: None,
         external: false,
         verbose: true,
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None,
     };
 
@@ -518,6 +518,43 @@ fn test_binary_with_valid_url() {
 }
 
 #[tokio::test]
+async fn test_binary_json_output_is_valid_json() {
+    start_link_test_server().await;
+    let base_url = get_test_server_url().await;
+
+    let output = tokio::task::spawn_blocking(move || {
+        Command::new("cargo")
+            .args([
+                "run",
+                "--",
+                base_url.as_str(),
+                "--depth",
+                "1",
+                "--max-pages",
+                "1",
+                "--output",
+                "json",
+            ])
+            .output()
+            .expect("Failed to run binary")
+    })
+    .await
+    .expect("Binary execution task should complete");
+
+    assert!(
+        output.status.success(),
+        "JSON mode should exit successfully"
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json_result: Result<serde_json::Value, _> = serde_json::from_str(&stdout);
+    assert!(
+        json_result.is_ok(),
+        "stdout should contain valid JSON only, got: {stdout}"
+    );
+}
+
+#[tokio::test]
 async fn test_crawl_with_config_file_verbose() {
     use tempfile::tempdir;
 
@@ -537,17 +574,17 @@ async fn test_crawl_with_config_file_verbose() {
 
     let args = Cli {
         url: base_url,
-        depth: 1,
-        max_pages: 3,
-        output: "text".to_string(),
+        depth: Some(1),
+        max_pages: Some(3),
+        output: Some("text".to_string()),
         save: None,
         external: false,
         verbose: true,
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: Some(config_path.to_str().unwrap().to_string()),
     };
 
@@ -579,17 +616,17 @@ async fn test_config_merge_with_cli() {
 
     let args = Cli {
         url: base_url,
-        depth: 1,     // This should override config's depth of 5
-        max_pages: 3, // This should override config's max_pages of 10
-        output: "text".to_string(),
+        depth: Some(1),     // This should override config's depth of 5
+        max_pages: Some(3), // This should override config's max_pages of 10
+        output: Some("text".to_string()),
         save: None,
         external: false,
         verbose: false,
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: Some(config_path.to_str().unwrap().to_string()),
     };
 
@@ -624,17 +661,17 @@ async fn test_load_default_config_with_verbose() {
 
     let args = Cli {
         url: base_url,
-        depth: 5,       // Default value
-        max_pages: 200, // Default value
-        output: "text".to_string(),
+        depth: None,     // Allow default-path config to supply the value
+        max_pages: None, // Allow default-path config to supply the value
+        output: Some("text".to_string()),
         save: None,
         external: false,
         verbose: true, // Enable verbose to trigger the println
         ignore_redirects: false,
         keep_fragments: false,
         rate_limit: None,
-        concurrency: 5,
-        respect_robots_txt: false,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
         config: None, // No config specified, should load from default path
     };
 

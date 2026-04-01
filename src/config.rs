@@ -3,15 +3,15 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::cli::Cli;
+use crate::cli::{
+    Cli, DEFAULT_CONCURRENCY, DEFAULT_DEPTH, DEFAULT_MAX_PAGES, DEFAULT_OUTPUT,
+    DEFAULT_RESPECT_ROBOTS_TXT,
+};
 
 /// Configuration file structure that mirrors CLI arguments
 /// All fields are optional to allow partial configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
-    /// The URL to start crawling from
-    pub url: Option<String>,
-
     /// Maximum crawl depth
     pub depth: Option<usize>,
 
@@ -44,6 +44,23 @@ pub struct Config {
 
     /// Respect robots.txt rules
     pub respect_robots_txt: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RuntimeOptions {
+    pub url: String,
+    pub depth: usize,
+    pub max_pages: usize,
+    pub output: String,
+    pub save: Option<String>,
+    pub external: bool,
+    pub verbose: bool,
+    pub ignore_redirects: bool,
+    pub keep_fragments: bool,
+    pub rate_limit: Option<f64>,
+    pub concurrency: usize,
+    pub respect_robots_txt: bool,
+    pub config: Option<String>,
 }
 
 /// Configuration file format based on file extension
@@ -146,59 +163,45 @@ impl Config {
         Ok(None)
     }
 
-    /// Merge this configuration with CLI arguments
-    /// CLI arguments take precedence over config file values
-    pub fn merge_with_cli(&self, cli: &Cli) -> Cli {
-        Cli {
+    /// Resolve raw CLI inputs and config values into the effective runtime options.
+    /// Explicit CLI values take precedence; otherwise config values are used, then defaults.
+    pub fn resolve_runtime_options(&self, cli: &Cli) -> RuntimeOptions {
+        RuntimeOptions {
             url: cli.url.clone(),
-            depth: if cli.depth != 5 {
-                cli.depth
-            } else {
-                self.depth.unwrap_or(cli.depth)
-            },
-            max_pages: if cli.max_pages != 200 {
-                cli.max_pages
-            } else {
-                self.max_pages.unwrap_or(cli.max_pages)
-            },
-            output: if cli.output != "text" {
-                cli.output.clone()
-            } else {
-                self.output.clone().unwrap_or_else(|| cli.output.clone())
-            },
+            depth: cli.depth.or(self.depth).unwrap_or(DEFAULT_DEPTH),
+            max_pages: cli
+                .max_pages
+                .or(self.max_pages)
+                .unwrap_or(DEFAULT_MAX_PAGES),
+            output: cli
+                .output
+                .clone()
+                .or_else(|| self.output.clone())
+                .unwrap_or_else(|| DEFAULT_OUTPUT.to_string()),
             save: cli.save.clone().or_else(|| self.save.clone()),
-            external: if cli.external {
-                cli.external
-            } else {
-                self.external.unwrap_or(cli.external)
-            },
-            verbose: if cli.verbose {
-                cli.verbose
-            } else {
-                self.verbose.unwrap_or(cli.verbose)
-            },
-            ignore_redirects: if cli.ignore_redirects {
-                cli.ignore_redirects
-            } else {
-                self.ignore_redirects.unwrap_or(cli.ignore_redirects)
-            },
-            keep_fragments: if cli.keep_fragments {
-                cli.keep_fragments
-            } else {
-                self.keep_fragments.unwrap_or(cli.keep_fragments)
-            },
+            external: cli.external || self.external.unwrap_or(false),
+            verbose: cli.verbose || self.verbose.unwrap_or(false),
+            ignore_redirects: cli.ignore_redirects || self.ignore_redirects.unwrap_or(false),
+            keep_fragments: cli.keep_fragments || self.keep_fragments.unwrap_or(false),
             rate_limit: cli.rate_limit.or(self.rate_limit),
-            concurrency: if cli.concurrency != 5 {
-                cli.concurrency
-            } else {
-                self.concurrency.unwrap_or(cli.concurrency)
-            },
-            respect_robots_txt: if !cli.respect_robots_txt {
-                cli.respect_robots_txt
-            } else {
-                self.respect_robots_txt.unwrap_or(cli.respect_robots_txt)
-            },
+            concurrency: cli
+                .concurrency
+                .or(self.concurrency)
+                .unwrap_or(DEFAULT_CONCURRENCY),
+            respect_robots_txt: cli
+                .respect_robots_txt
+                .or(self.respect_robots_txt)
+                .unwrap_or(DEFAULT_RESPECT_ROBOTS_TXT),
             config: cli.config.clone(),
+        }
+    }
+}
+
+impl RuntimeOptions {
+    pub fn from_cli_and_config(cli: &Cli, config: Option<&Config>) -> Self {
+        match config {
+            Some(config) => config.resolve_runtime_options(cli),
+            None => Config::default().resolve_runtime_options(cli),
         }
     }
 }
@@ -208,6 +211,24 @@ mod tests {
     use super::*;
     use serial_test::serial;
     use tempfile::NamedTempFile;
+
+    fn cli(url: &str) -> Cli {
+        Cli {
+            url: url.to_string(),
+            depth: None,
+            max_pages: None,
+            output: None,
+            save: None,
+            external: false,
+            verbose: false,
+            ignore_redirects: false,
+            keep_fragments: false,
+            rate_limit: None,
+            concurrency: None,
+            respect_robots_txt: None,
+            config: None,
+        }
+    }
 
     #[test]
     fn test_config_format_from_path() {
@@ -234,7 +255,6 @@ mod tests {
     fn test_load_json_config() {
         let json_content = r#"
 {
-    "url": "https://example.com",
     "depth": 10,
     "max_pages": 500,
     "output": "json",
@@ -249,7 +269,6 @@ mod tests {
         fs::write(&temp_path, json_content).unwrap();
 
         let config = Config::from_file(&temp_path).unwrap();
-        assert_eq!(config.url, Some("https://example.com".to_string()));
         assert_eq!(config.depth, Some(10));
         assert_eq!(config.max_pages, Some(500));
         assert_eq!(config.output, Some("json".to_string()));
@@ -263,7 +282,6 @@ mod tests {
     #[test]
     fn test_load_toml_config() {
         let toml_content = r#"
-url = "https://example.com"
 depth = 10
 max_pages = 500
 output = "json"
@@ -277,7 +295,6 @@ concurrency = 10
         fs::write(&temp_path, toml_content).unwrap();
 
         let config = Config::from_file(&temp_path).unwrap();
-        assert_eq!(config.url, Some("https://example.com".to_string()));
         assert_eq!(config.depth, Some(10));
         assert_eq!(config.max_pages, Some(500));
         assert_eq!(config.output, Some("json".to_string()));
@@ -291,7 +308,6 @@ concurrency = 10
     #[test]
     fn test_load_yaml_config() {
         let yaml_content = r#"
-url: "https://example.com"
 depth: 10
 max_pages: 500
 output: "json"
@@ -305,7 +321,6 @@ concurrency: 10
         fs::write(&temp_path, yaml_content).unwrap();
 
         let config = Config::from_file(&temp_path).unwrap();
-        assert_eq!(config.url, Some("https://example.com".to_string()));
         assert_eq!(config.depth, Some(10));
         assert_eq!(config.max_pages, Some(500));
         assert_eq!(config.output, Some("json".to_string()));
@@ -330,7 +345,6 @@ concurrency: 10
         fs::write(&temp_path, json_content).unwrap();
 
         let config = Config::from_file(&temp_path).unwrap();
-        assert_eq!(config.url, None);
         assert_eq!(config.depth, Some(15));
         assert_eq!(config.max_pages, None);
         assert_eq!(config.concurrency, Some(20));
@@ -396,7 +410,7 @@ url: "test
     }
 
     #[test]
-    fn test_merge_with_cli_defaults() {
+    fn test_resolve_runtime_options_uses_config_when_cli_is_unset() {
         let config = Config {
             depth: Some(15),
             max_pages: Some(300),
@@ -405,32 +419,18 @@ url: "test
             ..Default::default()
         };
 
-        let cli = Cli {
-            url: "https://example.com".to_string(),
-            depth: 5,
-            max_pages: 200,
-            output: "text".to_string(),
-            save: None,
-            external: false,
-            verbose: false,
-            ignore_redirects: false,
-            keep_fragments: false,
-            rate_limit: None,
-            concurrency: 5,
-            respect_robots_txt: true,
-            config: None,
-        };
+        let cli = cli("https://example.com");
 
-        let merged = config.merge_with_cli(&cli);
-        assert_eq!(merged.url, "https://example.com");
-        assert_eq!(merged.depth, 15); // from config
-        assert_eq!(merged.max_pages, 300); // from config
-        assert_eq!(merged.output, "json"); // from config
-        assert_eq!(merged.concurrency, 10); // from config
+        let resolved = config.resolve_runtime_options(&cli);
+        assert_eq!(resolved.url, "https://example.com");
+        assert_eq!(resolved.depth, 15);
+        assert_eq!(resolved.max_pages, 300);
+        assert_eq!(resolved.output, "json");
+        assert_eq!(resolved.concurrency, 10);
     }
 
     #[test]
-    fn test_merge_with_cli_overrides() {
+    fn test_resolve_runtime_options_prefers_explicit_cli_values() {
         let config = Config {
             depth: Some(15),
             max_pages: Some(300),
@@ -442,31 +442,66 @@ url: "test
 
         let cli = Cli {
             url: "https://example.com".to_string(),
-            depth: 20,
-            max_pages: 400,
-            output: "xml".to_string(),
+            depth: Some(20),
+            max_pages: Some(400),
+            output: Some("xml".to_string()),
             save: Some("report.txt".to_string()),
             external: true,
             verbose: true,
             ignore_redirects: true,
             keep_fragments: false,
             rate_limit: Some(2.0),
-            concurrency: 15,
-            respect_robots_txt: false,
+            concurrency: Some(15),
+            respect_robots_txt: Some(false),
             config: None,
         };
 
-        let merged = config.merge_with_cli(&cli);
-        assert_eq!(merged.url, "https://example.com");
-        assert_eq!(merged.depth, 20); // CLI override
-        assert_eq!(merged.max_pages, 400); // CLI override
-        assert_eq!(merged.output, "xml"); // CLI override
-        assert_eq!(merged.concurrency, 15); // CLI override
-        assert_eq!(merged.save, Some("report.txt".to_string())); // CLI value
-        assert!(merged.verbose); // CLI value
-        assert!(merged.ignore_redirects); // CLI value
-        assert_eq!(merged.rate_limit, Some(2.0)); // CLI value
-        assert!(!merged.respect_robots_txt); // CLI override
+        let resolved = config.resolve_runtime_options(&cli);
+        assert_eq!(resolved.url, "https://example.com");
+        assert_eq!(resolved.depth, 20);
+        assert_eq!(resolved.max_pages, 400);
+        assert_eq!(resolved.output, "xml");
+        assert_eq!(resolved.concurrency, 15);
+        assert_eq!(resolved.save, Some("report.txt".to_string()));
+        assert!(resolved.verbose);
+        assert!(resolved.ignore_redirects);
+        assert_eq!(resolved.rate_limit, Some(2.0));
+        assert!(!resolved.respect_robots_txt);
+    }
+
+    #[test]
+    fn test_runtime_options_from_cli_and_config_without_config_uses_defaults() {
+        let resolved = RuntimeOptions::from_cli_and_config(&cli("https://example.com"), None);
+
+        assert_eq!(resolved.depth, DEFAULT_DEPTH);
+        assert_eq!(resolved.max_pages, DEFAULT_MAX_PAGES);
+        assert_eq!(resolved.output, DEFAULT_OUTPUT);
+        assert_eq!(resolved.concurrency, DEFAULT_CONCURRENCY);
+        assert_eq!(resolved.respect_robots_txt, DEFAULT_RESPECT_ROBOTS_TXT);
+    }
+
+    #[test]
+    fn test_resolve_runtime_options_uses_config_for_save_and_robots_when_cli_is_unset() {
+        let config = Config {
+            save: Some("report.json".to_string()),
+            respect_robots_txt: Some(false),
+            ..Default::default()
+        };
+
+        let resolved = config.resolve_runtime_options(&cli("https://example.com"));
+
+        assert_eq!(resolved.save, Some("report.json".to_string()));
+        assert!(!resolved.respect_robots_txt);
+    }
+
+    #[test]
+    fn test_runtime_options_without_config_honors_explicit_cli_respect_robots_value() {
+        let mut cli = cli("https://example.com");
+        cli.respect_robots_txt = Some(false);
+
+        let resolved = RuntimeOptions::from_cli_and_config(&cli, None);
+
+        assert!(!resolved.respect_robots_txt);
     }
 
     #[test]

@@ -1077,28 +1077,40 @@ async fn test_content_type_validation() {
         let mut crawler = Crawler::new("http://127.0.0.1:3000/json-response", config)
             .expect("Failed to create crawler");
 
-        // Crawl may succeed or fail depending on how non-HTML is handled
-        let result = crawler.crawl().await;
+        crawler.crawl().await.expect("JSON crawl should succeed");
 
-        // If crawl succeeded, check the page
-        if result.is_ok() && !crawler.pages.is_empty() {
-            let page = crawler
-                .pages
-                .get("http://127.0.0.1:3000/json-response")
-                .expect("json-response page should exist");
+        let page = crawler
+            .pages
+            .get("http://127.0.0.1:3000/json-response")
+            .expect("json-response page should exist");
 
-            // Content type should be captured
-            if let Some(content_type) = &page.content_type {
-                assert!(
-                    content_type.contains("application/json"),
-                    "Should have application/json content-type, got: {}",
-                    content_type
-                );
-            }
-
-            // Status code should be captured
-            assert!(page.status_code.is_some(), "Should have status code");
-        }
+        assert_eq!(
+            page.content_type.as_deref(),
+            Some("application/json"),
+            "JSON page should preserve its content type"
+        );
+        assert_eq!(
+            page.status_code,
+            Some(200),
+            "JSON page should preserve status"
+        );
+        assert!(
+            page.title.is_none(),
+            "JSON page should not extract an HTML title"
+        );
+        assert!(
+            page.meta_description.is_none(),
+            "JSON page should not extract HTML metadata"
+        );
+        assert!(
+            page.h1_tags.is_empty(),
+            "JSON page should not extract H1 tags"
+        );
+        assert!(page.links.is_empty(), "JSON page should not extract links");
+        assert!(
+            page.images.is_empty(),
+            "JSON page should not extract images"
+        );
     }
 
     // Test that we can detect content-type for the test server's /ok endpoint
@@ -1125,5 +1137,21 @@ async fn test_content_type_validation() {
         // The /ok endpoint returns plain text, should have a content-type
         assert!(page.status_code.is_some(), "Should have status code");
         assert_eq!(page.status_code.unwrap(), 200, "Should have 200 status");
+        assert!(
+            page.title.is_none(),
+            "Plain-text endpoint should not parse title"
+        );
+        assert!(
+            page.h1_tags.is_empty(),
+            "Plain-text endpoint should not parse H1 tags"
+        );
+        assert!(
+            page.links.is_empty(),
+            "Plain-text endpoint should not parse links"
+        );
+        assert!(
+            page.images.is_empty(),
+            "Plain-text endpoint should not parse images"
+        );
     }
 }

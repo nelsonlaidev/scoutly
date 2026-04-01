@@ -97,15 +97,12 @@ impl RobotsTxt {
 
             match field.as_str() {
                 "user-agent" => {
-                    // Save previous rules before starting new user-agent section
-                    if !current_agents.is_empty() && !current_rules.is_empty() {
-                        for agent in &current_agents {
-                            let key = format!("{}:{}", domain_key, agent.to_lowercase());
-                            self.rules.insert(key, current_rules.clone());
-                        }
+                    if current_rules.is_empty() {
+                        current_agents.push(value.to_string());
+                        continue;
                     }
 
-                    // Start new user-agent section
+                    self.save_rules(domain_key, &current_agents, &current_rules);
                     current_agents = vec![value.to_string()];
                     current_rules = Vec::new();
                 }
@@ -131,13 +128,7 @@ impl RobotsTxt {
             }
         }
 
-        // Save last section
-        if !current_agents.is_empty() && !current_rules.is_empty() {
-            for agent in &current_agents {
-                let key = format!("{}:{}", domain_key, agent.to_lowercase());
-                self.rules.insert(key, current_rules.clone());
-            }
-        }
+        self.save_rules(domain_key, &current_agents, &current_rules);
     }
 
     /// Checks if a URL is allowed to be crawled
@@ -267,6 +258,17 @@ impl RobotsTxt {
             url.port().map(|p| format!(":{}", p)).unwrap_or_default()
         )
     }
+
+    fn save_rules(&mut self, domain_key: &str, agents: &[String], rules: &[Rule]) {
+        if agents.is_empty() || rules.is_empty() {
+            return;
+        }
+
+        for agent in agents {
+            let key = format!("{}:{}", domain_key, agent.to_lowercase());
+            self.rules.insert(key, rules.to_vec());
+        }
+    }
 }
 
 #[cfg(test)]
@@ -339,6 +341,24 @@ Disallow: /secret
 
         // Check googlebot-specific rules
         let google_rules = robots.rules.get("http://example.com:googlebot").unwrap();
+        assert_eq!(google_rules.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_robots_txt_with_multiple_user_agents_in_same_group() {
+        let content = r#"
+User-agent: scoutly
+User-agent: googlebot
+Disallow: /private
+"#;
+
+        let mut robots = RobotsTxt::new();
+        robots.parse("http://example.com", content);
+
+        let scoutly_rules = robots.rules.get("http://example.com:scoutly").unwrap();
+        let google_rules = robots.rules.get("http://example.com:googlebot").unwrap();
+
+        assert_eq!(scoutly_rules.len(), 1);
         assert_eq!(google_rules.len(), 1);
     }
 

@@ -289,16 +289,28 @@ impl Crawler {
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
 
-        // Validate content type before attempting to parse as HTML
-        if let Some(ref ct) = content_type {
-            let ct_lower = ct.to_lowercase();
-            if !ct_lower.contains("text/html") && !ct_lower.contains("application/xhtml") {
-                tracing::warn!(
+        if !Self::is_html_content_type(content_type.as_deref()) {
+            if let Some(ref ct) = content_type {
+                tracing::info!(
                     url = %url,
                     content_type = %ct,
-                    "Non-HTML content type detected, parsing may fail"
+                    "Skipping HTML extraction for non-HTML response"
                 );
             }
+
+            return Ok(PageInfo {
+                url: url.to_string(),
+                status_code: Some(status_code),
+                content_type,
+                title: None,
+                meta_description: None,
+                h1_tags: vec![],
+                links: vec![],
+                images: vec![],
+                open_graph: OpenGraphTags::default(),
+                issues: vec![],
+                crawl_depth: depth,
+            });
         }
 
         let html_content = response.text().await?;
@@ -446,6 +458,7 @@ impl Crawler {
                     is_external,
                     status_code: None,
                     redirected_url: None,
+                    check_error: None,
                 });
             }
         }
@@ -469,5 +482,12 @@ impl Crawler {
         }
 
         Ok(images)
+    }
+
+    fn is_html_content_type(content_type: Option<&str>) -> bool {
+        content_type.is_none_or(|ct| {
+            let ct_lower = ct.to_lowercase();
+            ct_lower.contains("text/html") || ct_lower.contains("application/xhtml")
+        })
     }
 }

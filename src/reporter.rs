@@ -41,7 +41,9 @@ impl Reporter {
             broken_links += page
                 .links
                 .iter()
-                .filter(|link| link.status_code.is_some_and(|code| code >= 400))
+                .filter(|link| {
+                    link.status_code.is_some_and(|code| code >= 400) || link.check_error.is_some()
+                })
                 .count();
         }
 
@@ -197,7 +199,6 @@ impl Reporter {
         let json = serde_json::to_string_pretty(report)?;
         let mut file = File::create(filename)?;
         file.write_all(json.as_bytes())?;
-        println!("Report saved to: {}", filename.bright_green());
         Ok(())
     }
 }

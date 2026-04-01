@@ -347,6 +347,12 @@ async fn test_link_checker() {
             "Unreachable link should have None as redirected URL"
         );
 
+        assert_eq!(
+            unreachable_link.check_error.as_deref(),
+            Some("connection failed"),
+            "Unreachable link should record a stable transport failure"
+        );
+
         let issues: Vec<_> = page
             .issues
             .iter()
@@ -357,8 +363,12 @@ async fn test_link_checker() {
             .collect();
 
         assert!(
-            issues.is_empty(),
-            "Connection failure should not generate broken link issue (only HTTP errors do)"
+            !issues.is_empty(),
+            "Connection failure should generate an explicit broken link issue"
+        );
+        assert!(
+            issues[0].message.contains("connection failed"),
+            "Broken link issue should describe the transport failure"
         );
     }
 

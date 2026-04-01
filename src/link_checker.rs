@@ -1,13 +1,27 @@
 use crate::http_client::build_http_client;
-use crate::models::{IssueSeverity, IssueType, PageInfo, SeoIssue};
+use crate::models::{IssueSeverity, IssueType, Link, PageInfo, SeoIssue};
 use anyhow::Result;
-use futures::future::join_all;
+use futures::stream::{self, StreamExt};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::collections::HashMap;
+
+const DEFAULT_CONCURRENT_CHECKS: usize = 20;
+
+#[derive(Clone)]
+enum LinkCheckOutcome {
+    Reachable {
+        status_code: u16,
+        redirected_url: Option<String>,
+    },
+    TransportFailure {
+        error: String,
+    },
+}
 
 pub struct LinkChecker {
     client: reqwest::Client,
     progress_bar: Option<ProgressBar>,
+    concurrent_checks: usize,
 }
 
 impl Default for LinkChecker {
@@ -18,9 +32,14 @@ impl Default for LinkChecker {
 
 impl LinkChecker {
     pub fn new() -> Self {
+        Self::with_concurrency(DEFAULT_CONCURRENT_CHECKS)
+    }
+
+    pub fn with_concurrency(concurrent_checks: usize) -> Self {
         Self {
             client: build_http_client(10).expect("Failed to build HTTP client"),
             progress_bar: None,
+            concurrent_checks: concurrent_checks.max(1),
         }
     }
 
@@ -54,54 +73,35 @@ impl LinkChecker {
             }
         }
 
-        // Check links in batches
         let link_urls: Vec<String> = all_links.keys().cloned().collect();
-        let mut futures = Vec::new();
-
-        for url in &link_urls {
-            futures.push(self.check_link(url));
-        }
-
-        let results = join_all(futures).await;
+        let results: HashMap<String, LinkCheckOutcome> = stream::iter(link_urls.iter().cloned())
+            .map(|url| async move {
+                let outcome = self.check_link(&url).await;
+                (url, outcome)
+            })
+            .buffer_unordered(self.concurrent_checks)
+            .collect()
+            .await;
 
         // Initialize progress bar if enabled
         if let Some(ref pb) = self.progress_bar {
             pb.set_position(0);
         }
 
-        // Update page info with link status codes and redirects
-        for (idx, (url, (status_code, redirected_url))) in
-            link_urls.iter().zip(results.iter()).enumerate()
-        {
+        for (idx, url) in link_urls.iter().enumerate() {
             if let Some(locations) = all_links.get(url) {
                 for (page_url, link_idx) in locations {
                     if let Some(page) = pages.get_mut(page_url)
-                        && let Some(link) = page.links.get_mut(*link_idx)
+                        && let Some(outcome) = results.get(url)
                     {
-                        link.status_code = *status_code;
-                        link.redirected_url = redirected_url.clone();
+                        let issues = if let Some(link) = page.links.get_mut(*link_idx) {
+                            Self::apply_outcome(link, outcome, ignore_redirects)
+                        } else {
+                            Vec::new()
+                        };
 
-                        // Add redirect issue if applicable (unless ignored)
-                        if !ignore_redirects && let Some(redirect_to) = redirected_url {
-                            page.issues.push(SeoIssue {
-                                severity: IssueSeverity::Info,
-                                issue_type: IssueType::Redirect,
-                                message: format!(
-                                    "Link redirected: {} -> {}",
-                                    link.url, redirect_to
-                                ),
-                            });
-                        }
-
-                        // Add broken link issue if applicable
-                        if let Some(code) = status_code
-                            && *code >= 400
-                        {
-                            page.issues.push(SeoIssue {
-                                severity: IssueSeverity::Error,
-                                issue_type: IssueType::BrokenLink,
-                                message: format!("Broken link: {} (HTTP {})", link.url, code),
-                            });
+                        if !issues.is_empty() {
+                            page.issues.extend(issues);
                         }
                     }
                 }
@@ -121,8 +121,55 @@ impl LinkChecker {
         Ok(())
     }
 
-    async fn check_link(&self, url: &str) -> (Option<u16>, Option<String>) {
-        // Use GET with full browser-like headers (many sites block HEAD requests)
+    fn apply_outcome(
+        link: &mut Link,
+        outcome: &LinkCheckOutcome,
+        ignore_redirects: bool,
+    ) -> Vec<SeoIssue> {
+        let mut issues = Vec::new();
+
+        match outcome {
+            LinkCheckOutcome::Reachable {
+                status_code,
+                redirected_url,
+            } => {
+                link.status_code = Some(*status_code);
+                link.redirected_url = redirected_url.clone();
+                link.check_error = None;
+
+                if !ignore_redirects && let Some(redirect_to) = redirected_url {
+                    issues.push(SeoIssue {
+                        severity: IssueSeverity::Info,
+                        issue_type: IssueType::Redirect,
+                        message: format!("Link redirected: {} -> {}", link.url, redirect_to),
+                    });
+                }
+
+                if *status_code >= 400 {
+                    issues.push(SeoIssue {
+                        severity: IssueSeverity::Error,
+                        issue_type: IssueType::BrokenLink,
+                        message: format!("Broken link: {} (HTTP {})", link.url, status_code),
+                    });
+                }
+            }
+            LinkCheckOutcome::TransportFailure { error } => {
+                link.status_code = None;
+                link.redirected_url = None;
+                link.check_error = Some(error.clone());
+
+                issues.push(SeoIssue {
+                    severity: IssueSeverity::Error,
+                    issue_type: IssueType::BrokenLink,
+                    message: format!("Link check failed: {} ({})", link.url, error),
+                });
+            }
+        }
+
+        issues
+    }
+
+    async fn check_link(&self, url: &str) -> LinkCheckOutcome {
         match self.client.get(url).send().await {
             Ok(response) => {
                 let status = response.status().as_u16();
@@ -138,9 +185,26 @@ impl LinkChecker {
                     None
                 };
 
-                (Some(status), redirected_url)
+                LinkCheckOutcome::Reachable {
+                    status_code: status,
+                    redirected_url,
+                }
             }
-            Err(_) => (None, None),
+            Err(error) => LinkCheckOutcome::TransportFailure {
+                error: Self::classify_request_error(&error),
+            },
+        }
+    }
+
+    fn classify_request_error(error: &reqwest::Error) -> String {
+        if error.is_timeout() {
+            "request timed out".to_string()
+        } else if error.is_connect() {
+            "connection failed".to_string()
+        } else if error.is_request() {
+            "request failed".to_string()
+        } else {
+            "unexpected request error".to_string()
         }
     }
 }

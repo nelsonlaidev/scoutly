@@ -34,6 +34,7 @@ pub struct Link {
     pub is_external: bool,
     pub status_code: Option<u16>,
     pub redirected_url: Option<String>,
+    pub check_error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

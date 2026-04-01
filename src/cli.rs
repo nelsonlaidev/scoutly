@@ -1,5 +1,11 @@
 use clap::Parser;
 
+pub const DEFAULT_DEPTH: usize = 5;
+pub const DEFAULT_MAX_PAGES: usize = 200;
+pub const DEFAULT_OUTPUT: &str = "text";
+pub const DEFAULT_CONCURRENCY: usize = 5;
+pub const DEFAULT_RESPECT_ROBOTS_TXT: bool = true;
+
 #[derive(Parser, Debug)]
 #[command(name = "scoutly")]
 #[command(about = "A CLI website crawler and SEO analyzer", long_about = None)]
@@ -9,16 +15,16 @@ pub struct Cli {
     pub url: String,
 
     /// Maximum crawl depth (default: 5)
-    #[arg(short, long, default_value_t = 5)]
-    pub depth: usize,
+    #[arg(short, long)]
+    pub depth: Option<usize>,
 
     /// Maximum number of pages to crawl (default: 200)
-    #[arg(short, long, default_value_t = 200)]
-    pub max_pages: usize,
+    #[arg(short, long)]
+    pub max_pages: Option<usize>,
 
     /// Output format: text or json
-    #[arg(short, long, default_value = "text")]
-    pub output: String,
+    #[arg(short, long)]
+    pub output: Option<String>,
 
     /// Save report to file
     #[arg(short, long)]
@@ -45,12 +51,12 @@ pub struct Cli {
     pub rate_limit: Option<f64>,
 
     /// Number of concurrent requests (default: 5)
-    #[arg(short = 'c', long, default_value_t = 5)]
-    pub concurrency: usize,
+    #[arg(short = 'c', long)]
+    pub concurrency: Option<usize>,
 
     /// Respect robots.txt rules (default: true)
-    #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
-    pub respect_robots_txt: bool,
+    #[arg(long, action = clap::ArgAction::Set)]
+    pub respect_robots_txt: Option<bool>,
 
     /// Path to configuration file (JSON, TOML, or YAML)
     #[arg(long)]
