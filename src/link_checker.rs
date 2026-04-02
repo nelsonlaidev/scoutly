@@ -1,5 +1,7 @@
 use crate::http_client::build_http_client;
 use crate::models::{IssueSeverity, IssueType, Link, PageInfo, SeoIssue};
+use crate::reporter::Reporter;
+use crate::runtime::{ProgressSnapshot, RunEvent, RunEventSender, RunStage};
 use anyhow::Result;
 use futures::stream::{self, StreamExt};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -22,6 +24,7 @@ pub struct LinkChecker {
     client: reqwest::Client,
     progress_bar: Option<ProgressBar>,
     concurrent_checks: usize,
+    progress_sender: Option<RunEventSender>,
 }
 
 impl Default for LinkChecker {
@@ -40,6 +43,7 @@ impl LinkChecker {
             client: build_http_client(10).expect("Failed to build HTTP client"),
             progress_bar: None,
             concurrent_checks: concurrent_checks.max(1),
+            progress_sender: None,
         }
     }
 
@@ -54,6 +58,10 @@ impl LinkChecker {
         );
         pb.set_message("Checking links");
         self.progress_bar = Some(pb);
+    }
+
+    pub fn set_progress_sender(&mut self, sender: RunEventSender) {
+        self.progress_sender = Some(sender);
     }
 
     pub async fn check_all_links(
@@ -110,6 +118,20 @@ impl LinkChecker {
             // Update progress bar
             if let Some(ref pb) = self.progress_bar {
                 pb.set_position((idx + 1) as u64);
+            }
+
+            if let Some(sender) = &self.progress_sender {
+                let mut snapshot = ProgressSnapshot::new(
+                    RunStage::CheckingLinks,
+                    format!("Checked {}/{} unique link(s)", idx + 1, link_urls.len()),
+                );
+                snapshot.pages_crawled = pages.len();
+                snapshot.links_discovered = link_urls.len();
+                snapshot.links_checked = idx + 1;
+                snapshot.total_links = link_urls.len();
+                snapshot.summary = Reporter::summarize_pages(pages);
+
+                let _ = sender.send(RunEvent::Progress(snapshot));
             }
         }
 

@@ -9,7 +9,7 @@ pub struct Reporter;
 
 impl Reporter {
     pub fn generate_report(start_url: &str, pages: &HashMap<String, PageInfo>) -> CrawlReport {
-        let summary = Self::calculate_summary(pages);
+        let summary = Self::summarize_pages(pages);
         let timestamp = chrono::Utc::now().to_rfc3339();
 
         CrawlReport {
@@ -20,7 +20,7 @@ impl Reporter {
         }
     }
 
-    fn calculate_summary(pages: &HashMap<String, PageInfo>) -> CrawlSummary {
+    pub fn summarize_pages(pages: &HashMap<String, PageInfo>) -> CrawlSummary {
         let mut errors = 0;
         let mut warnings = 0;
         let mut infos = 0;

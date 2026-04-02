@@ -4,8 +4,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::cli::{
-    Cli, DEFAULT_CONCURRENCY, DEFAULT_DEPTH, DEFAULT_MAX_PAGES, DEFAULT_OUTPUT,
-    DEFAULT_RESPECT_ROBOTS_TXT,
+    Cli, DEFAULT_CONCURRENCY, DEFAULT_DEPTH, DEFAULT_MAX_PAGES, DEFAULT_RESPECT_ROBOTS_TXT,
+    OutputFormat,
 };
 
 /// Configuration file structure that mirrors CLI arguments
@@ -18,8 +18,11 @@ pub struct Config {
     /// Maximum number of pages to crawl
     pub max_pages: Option<usize>,
 
-    /// Output format: text or json
-    pub output: Option<String>,
+    /// Classic CLI output format
+    pub output: Option<OutputFormat>,
+
+    /// Prefer the classic CLI renderer instead of the default TUI
+    pub cli: Option<bool>,
 
     /// Save report to file
     pub save: Option<String>,
@@ -48,11 +51,12 @@ pub struct Config {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RuntimeOptions {
-    pub url: String,
+    pub url: Option<String>,
     pub depth: usize,
     pub max_pages: usize,
-    pub output: String,
+    pub output: Option<OutputFormat>,
     pub save: Option<String>,
+    pub cli: bool,
     pub external: bool,
     pub verbose: bool,
     pub ignore_redirects: bool,
@@ -60,6 +64,7 @@ pub struct RuntimeOptions {
     pub rate_limit: Option<f64>,
     pub concurrency: usize,
     pub respect_robots_txt: bool,
+    pub tui: bool,
     pub config: Option<String>,
 }
 
@@ -173,12 +178,9 @@ impl Config {
                 .max_pages
                 .or(self.max_pages)
                 .unwrap_or(DEFAULT_MAX_PAGES),
-            output: cli
-                .output
-                .clone()
-                .or_else(|| self.output.clone())
-                .unwrap_or_else(|| DEFAULT_OUTPUT.to_string()),
+            output: cli.output.or(self.output),
             save: cli.save.clone().or_else(|| self.save.clone()),
+            cli: cli.cli || self.cli.unwrap_or(false),
             external: cli.external || self.external.unwrap_or(false),
             verbose: cli.verbose || self.verbose.unwrap_or(false),
             ignore_redirects: cli.ignore_redirects || self.ignore_redirects.unwrap_or(false),
@@ -192,6 +194,7 @@ impl Config {
                 .respect_robots_txt
                 .or(self.respect_robots_txt)
                 .unwrap_or(DEFAULT_RESPECT_ROBOTS_TXT),
+            tui: cli.tui,
             config: cli.config.clone(),
         }
     }
@@ -214,10 +217,12 @@ mod tests {
 
     fn cli(url: &str) -> Cli {
         Cli {
-            url: url.to_string(),
+            url: Some(url.to_string()),
             depth: None,
             max_pages: None,
             output: None,
+            cli: false,
+            tui: false,
             save: None,
             external: false,
             verbose: false,
@@ -271,7 +276,7 @@ mod tests {
         let config = Config::from_file(&temp_path).unwrap();
         assert_eq!(config.depth, Some(10));
         assert_eq!(config.max_pages, Some(500));
-        assert_eq!(config.output, Some("json".to_string()));
+        assert_eq!(config.output, Some(OutputFormat::Json));
         assert_eq!(config.external, Some(true));
         assert_eq!(config.verbose, Some(true));
         assert_eq!(config.concurrency, Some(10));
@@ -297,7 +302,7 @@ concurrency = 10
         let config = Config::from_file(&temp_path).unwrap();
         assert_eq!(config.depth, Some(10));
         assert_eq!(config.max_pages, Some(500));
-        assert_eq!(config.output, Some("json".to_string()));
+        assert_eq!(config.output, Some(OutputFormat::Json));
         assert_eq!(config.external, Some(true));
         assert_eq!(config.verbose, Some(true));
         assert_eq!(config.concurrency, Some(10));
@@ -323,7 +328,7 @@ concurrency: 10
         let config = Config::from_file(&temp_path).unwrap();
         assert_eq!(config.depth, Some(10));
         assert_eq!(config.max_pages, Some(500));
-        assert_eq!(config.output, Some("json".to_string()));
+        assert_eq!(config.output, Some(OutputFormat::Json));
         assert_eq!(config.external, Some(true));
         assert_eq!(config.verbose, Some(true));
         assert_eq!(config.concurrency, Some(10));
@@ -414,7 +419,7 @@ url: "test
         let config = Config {
             depth: Some(15),
             max_pages: Some(300),
-            output: Some("json".to_string()),
+            output: Some(OutputFormat::Json),
             concurrency: Some(10),
             ..Default::default()
         };
@@ -422,10 +427,10 @@ url: "test
         let cli = cli("https://example.com");
 
         let resolved = config.resolve_runtime_options(&cli);
-        assert_eq!(resolved.url, "https://example.com");
+        assert_eq!(resolved.url, Some("https://example.com".to_string()));
         assert_eq!(resolved.depth, 15);
         assert_eq!(resolved.max_pages, 300);
-        assert_eq!(resolved.output, "json");
+        assert_eq!(resolved.output, Some(OutputFormat::Json));
         assert_eq!(resolved.concurrency, 10);
     }
 
@@ -434,17 +439,19 @@ url: "test
         let config = Config {
             depth: Some(15),
             max_pages: Some(300),
-            output: Some("json".to_string()),
+            output: Some(OutputFormat::Json),
             concurrency: Some(10),
             external: Some(true),
             ..Default::default()
         };
 
         let cli = Cli {
-            url: "https://example.com".to_string(),
+            url: Some("https://example.com".to_string()),
             depth: Some(20),
             max_pages: Some(400),
-            output: Some("xml".to_string()),
+            output: Some(OutputFormat::Text),
+            cli: false,
+            tui: false,
             save: Some("report.txt".to_string()),
             external: true,
             verbose: true,
@@ -457,10 +464,10 @@ url: "test
         };
 
         let resolved = config.resolve_runtime_options(&cli);
-        assert_eq!(resolved.url, "https://example.com");
+        assert_eq!(resolved.url, Some("https://example.com".to_string()));
         assert_eq!(resolved.depth, 20);
         assert_eq!(resolved.max_pages, 400);
-        assert_eq!(resolved.output, "xml");
+        assert_eq!(resolved.output, Some(OutputFormat::Text));
         assert_eq!(resolved.concurrency, 15);
         assert_eq!(resolved.save, Some("report.txt".to_string()));
         assert!(resolved.verbose);
@@ -475,7 +482,7 @@ url: "test
 
         assert_eq!(resolved.depth, DEFAULT_DEPTH);
         assert_eq!(resolved.max_pages, DEFAULT_MAX_PAGES);
-        assert_eq!(resolved.output, DEFAULT_OUTPUT);
+        assert_eq!(resolved.output, None);
         assert_eq!(resolved.concurrency, DEFAULT_CONCURRENCY);
         assert_eq!(resolved.respect_robots_txt, DEFAULT_RESPECT_ROBOTS_TXT);
     }
@@ -484,6 +491,7 @@ url: "test
     fn test_resolve_runtime_options_uses_config_for_save_and_robots_when_cli_is_unset() {
         let config = Config {
             save: Some("report.json".to_string()),
+            cli: Some(true),
             respect_robots_txt: Some(false),
             ..Default::default()
         };
@@ -491,6 +499,7 @@ url: "test
         let resolved = config.resolve_runtime_options(&cli("https://example.com"));
 
         assert_eq!(resolved.save, Some("report.json".to_string()));
+        assert!(resolved.cli);
         assert!(!resolved.respect_robots_txt);
     }
 

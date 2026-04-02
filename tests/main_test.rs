@@ -1,6 +1,6 @@
 mod server;
 
-use scoutly::cli::Cli;
+use scoutly::cli::{Cli, OutputFormat};
 use scoutly::run;
 use server::{get_test_server_url, start_link_test_server};
 use std::fs;
@@ -9,10 +9,12 @@ use std::process::Command;
 #[tokio::test]
 async fn test_invalid_url_no_protocol() {
     let args = Cli {
-        url: "example.com".to_string(),
+        url: Some("example.com".to_string()),
         depth: Some(2),
         max_pages: Some(10),
-        output: Some("text".to_string()),
+        output: Some(OutputFormat::Text),
+        cli: false,
+        tui: false,
         save: None,
         external: false,
         verbose: false,
@@ -41,10 +43,12 @@ async fn test_invalid_url_no_protocol() {
 #[tokio::test]
 async fn test_invalid_url_missing_https() {
     let args = Cli {
-        url: "ftp://example.com".to_string(),
+        url: Some("ftp://example.com".to_string()),
         depth: Some(2),
         max_pages: Some(10),
-        output: Some("text".to_string()),
+        output: Some(OutputFormat::Text),
+        cli: false,
+        tui: false,
         save: None,
         external: false,
         verbose: false,
@@ -69,10 +73,12 @@ async fn test_valid_http_url() {
     let base_url = get_test_server_url().await;
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: Some(1),
         max_pages: Some(5),
-        output: Some("text".to_string()),
+        output: Some(OutputFormat::Text),
+        cli: false,
+        tui: false,
         save: None,
         external: false,
         verbose: false,
@@ -91,10 +97,12 @@ async fn test_valid_http_url() {
 #[tokio::test]
 async fn test_valid_https_url() {
     let args = Cli {
-        url: "https://example.com".to_string(),
+        url: Some("https://example.com".to_string()),
         depth: Some(1),
         max_pages: Some(1),
-        output: Some("text".to_string()),
+        output: Some(OutputFormat::Text),
+        cli: false,
+        tui: false,
         save: None,
         external: false,
         verbose: false,
@@ -122,10 +130,12 @@ async fn test_full_crawl_with_text_output() {
     let base_url = get_test_server_url().await;
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: Some(2),
         max_pages: Some(10),
-        output: Some("text".to_string()),
+        output: Some(OutputFormat::Text),
+        cli: false,
+        tui: false,
         save: None,
         external: false,
         verbose: false,
@@ -147,10 +157,12 @@ async fn test_full_crawl_with_json_output() {
     let base_url = get_test_server_url().await;
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: Some(2),
         max_pages: Some(10),
-        output: Some("json".to_string()),
+        output: Some(OutputFormat::Json),
+        cli: false,
+        tui: false,
         save: None,
         external: false,
         verbose: false,
@@ -175,10 +187,12 @@ async fn test_crawl_with_save_file() {
     let _ = fs::remove_file(test_filename);
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: Some(1),
         max_pages: Some(5),
-        output: Some("text".to_string()),
+        output: Some(OutputFormat::Text),
+        cli: false,
+        tui: false,
         save: Some(test_filename.to_string()),
         external: false,
         verbose: false,
@@ -211,10 +225,12 @@ async fn test_crawl_with_verbose_flag() {
     let base_url = get_test_server_url().await;
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: Some(1),
         max_pages: Some(3),
-        output: Some("text".to_string()),
+        output: Some(OutputFormat::Text),
+        cli: false,
+        tui: false,
         save: None,
         external: false,
         verbose: true,
@@ -239,10 +255,12 @@ async fn test_crawl_with_external_flag() {
     let base_url = get_test_server_url().await;
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: Some(1),
         max_pages: Some(5),
-        output: Some("text".to_string()),
+        output: Some(OutputFormat::Text),
+        cli: false,
+        tui: false,
         save: None,
         external: true,
         verbose: false,
@@ -267,10 +285,12 @@ async fn test_crawl_with_ignore_redirects_flag() {
     let base_url = get_test_server_url().await;
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: Some(1),
         max_pages: Some(5),
-        output: Some("text".to_string()),
+        output: Some(OutputFormat::Text),
+        cli: false,
+        tui: false,
         save: None,
         external: false,
         verbose: false,
@@ -295,10 +315,12 @@ async fn test_crawl_with_keep_fragments_flag() {
     let base_url = get_test_server_url().await;
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: Some(1),
         max_pages: Some(5),
-        output: Some("text".to_string()),
+        output: Some(OutputFormat::Text),
+        cli: false,
+        tui: false,
         save: None,
         external: false,
         verbose: false,
@@ -323,10 +345,12 @@ async fn test_crawl_with_custom_depth_and_max_pages() {
     let base_url = get_test_server_url().await;
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: Some(3),
         max_pages: Some(15),
-        output: Some("text".to_string()),
+        output: Some(OutputFormat::Text),
+        cli: false,
+        tui: false,
         save: None,
         external: false,
         verbose: false,
@@ -354,10 +378,12 @@ async fn test_crawl_with_all_flags_combined() {
     let _ = fs::remove_file(test_filename);
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: Some(2),
         max_pages: Some(8),
-        output: Some("json".to_string()),
+        output: Some(OutputFormat::Json),
+        cli: false,
+        tui: false,
         save: Some(test_filename.to_string()),
         external: true,
         verbose: true,
@@ -389,10 +415,12 @@ async fn test_crawl_with_default_text_output() {
     let base_url = get_test_server_url().await;
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: Some(1),
         max_pages: Some(3),
-        output: Some("anything_else".to_string()),
+        output: None,
+        cli: false,
+        tui: false,
         save: None,
         external: false,
         verbose: false,
@@ -407,8 +435,90 @@ async fn test_crawl_with_default_text_output() {
     let result = run(args).await;
     assert!(
         result.is_ok(),
-        "Should successfully crawl with non-json output (defaults to text)"
+        "Should successfully fall back to classic text output in a non-interactive test context"
     );
+}
+
+#[tokio::test]
+async fn test_crawl_with_cli_flag() {
+    start_link_test_server().await;
+    let base_url = get_test_server_url().await;
+
+    let args = Cli {
+        url: Some(base_url),
+        depth: Some(1),
+        max_pages: Some(3),
+        output: None,
+        cli: true,
+        tui: false,
+        save: None,
+        external: false,
+        verbose: false,
+        ignore_redirects: false,
+        keep_fragments: false,
+        rate_limit: None,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
+        config: None,
+    };
+
+    let result = run(args).await;
+    assert!(
+        result.is_ok(),
+        "Should successfully run in classic CLI mode"
+    );
+}
+
+#[tokio::test]
+async fn test_explicit_tui_requires_interactive_terminal() {
+    let args = Cli {
+        url: None,
+        depth: Some(1),
+        max_pages: Some(1),
+        output: None,
+        cli: false,
+        tui: true,
+        save: None,
+        external: false,
+        verbose: false,
+        ignore_redirects: false,
+        keep_fragments: false,
+        rate_limit: None,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
+        config: None,
+    };
+
+    let error = run(args)
+        .await
+        .expect_err("TUI should fail in non-interactive tests");
+    assert!(error.to_string().contains("interactive terminal"));
+}
+
+#[tokio::test]
+async fn test_classic_mode_without_url_errors() {
+    let args = Cli {
+        url: None,
+        depth: Some(1),
+        max_pages: Some(1),
+        output: None,
+        cli: true,
+        tui: false,
+        save: None,
+        external: false,
+        verbose: false,
+        ignore_redirects: false,
+        keep_fragments: false,
+        rate_limit: None,
+        concurrency: Some(5),
+        respect_robots_txt: Some(false),
+        config: None,
+    };
+
+    let error = run(args)
+        .await
+        .expect_err("Classic CLI mode should require a URL");
+    assert!(error.to_string().contains("URL is required"));
 }
 
 #[tokio::test]
@@ -420,10 +530,12 @@ async fn test_crawl_with_save_and_json_output() {
     let _ = fs::remove_file(test_filename);
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: Some(1),
         max_pages: Some(5),
-        output: Some("json".to_string()),
+        output: Some(OutputFormat::Json),
+        cli: false,
+        tui: false,
         save: Some(test_filename.to_string()),
         external: false,
         verbose: false,
@@ -458,10 +570,12 @@ async fn test_crawl_with_verbose_and_json_output() {
     let base_url = get_test_server_url().await;
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: Some(1),
         max_pages: Some(3),
-        output: Some("json".to_string()),
+        output: Some(OutputFormat::Json),
+        cli: false,
+        tui: false,
         save: None,
         external: false,
         verbose: true,
@@ -573,10 +687,12 @@ async fn test_crawl_with_config_file_verbose() {
     fs::write(&config_path, json_content).unwrap();
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: Some(1),
         max_pages: Some(3),
-        output: Some("text".to_string()),
+        output: Some(OutputFormat::Text),
+        cli: false,
+        tui: false,
         save: None,
         external: false,
         verbose: true,
@@ -615,10 +731,12 @@ async fn test_config_merge_with_cli() {
     fs::write(&config_path, json_content).unwrap();
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: Some(1),     // This should override config's depth of 5
         max_pages: Some(3), // This should override config's max_pages of 10
-        output: Some("text".to_string()),
+        output: Some(OutputFormat::Text),
+        cli: false,
+        tui: false,
         save: None,
         external: false,
         verbose: false,
@@ -660,10 +778,12 @@ async fn test_load_default_config_with_verbose() {
     fs::write(&config_path, json_content).unwrap();
 
     let args = Cli {
-        url: base_url,
+        url: Some(base_url),
         depth: None,     // Allow default-path config to supply the value
         max_pages: None, // Allow default-path config to supply the value
-        output: Some("text".to_string()),
+        output: Some(OutputFormat::Text),
+        cli: false,
+        tui: false,
         save: None,
         external: false,
         verbose: true, // Enable verbose to trigger the println

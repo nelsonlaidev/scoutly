@@ -13,7 +13,7 @@ A fast, lightweight CLI website crawler and SEO analyzer built with Rust. Scoutl
   - Find images without alt text
   - Identify thin content
 - **Configuration Files**: Support for JSON, TOML, and YAML configuration files with automatic detection
-- **Flexible Reporting**: Output results in human-readable text or JSON format, with JSON mode keeping stdout machine-parseable
+- **Default TUI + Classic CLI**: Launch an interactive terminal UI by default, or force the classic text/JSON CLI when needed
 - **Fast & Concurrent**: Built with Tokio for async I/O and parallel link checking
 - **robots.txt Support**: Respects robots.txt rules by default
 
@@ -50,20 +50,36 @@ cargo build --release
 
 ## Usage
 
-### Basic Usage
+### Default TUI
 
 ```bash
-# Crawl a website with default settings (depth: 5, max pages: 200)
+# Launch the interactive TUI (default in an interactive terminal)
+scoutly
+
+# Launch the TUI with a pre-filled URL and start immediately
 scoutly https://example.com
 
 # Specify custom depth and page limits
 scoutly https://example.com --depth 3 --max-pages 100
 
-# Enable verbose output to see progress
-scoutly https://example.com --verbose
+# Force the TUI explicitly
+scoutly https://example.com --tui
 ```
 
-### Advanced Options
+### Classic CLI and JSON Modes
+
+```bash
+# Force the classic text report instead of the TUI
+scoutly https://example.com --cli
+
+# Output machine-readable JSON instead of launching the TUI
+scoutly https://example.com --output json
+
+# Save the final report to a file
+scoutly https://example.com --cli --save report.json
+```
+
+### More Options
 
 ```bash
 # Follow external links (by default, only internal links are followed)
@@ -75,14 +91,24 @@ scoutly https://example.com --ignore-redirects
 # Treat URLs with fragment identifiers (#) as unique links
 scoutly https://example.com --keep-fragments
 
-# Output results in JSON format
-scoutly https://example.com --output json
-
-# Save report to a file
-scoutly https://example.com --save report.json
-
 # Combine options
-scoutly https://example.com --depth 4 --max-pages 200 --verbose --ignore-redirects --save report.json
+scoutly https://example.com --cli --depth 4 --max-pages 200 --verbose --ignore-redirects --save report.json
+```
+
+### TUI Key Bindings
+
+The default TUI is keyboard-first and intentionally close to tools like `llmfit`. If you launch `scoutly` without a URL, the TUI opens a URL input first:
+
+| Key | Action |
+| --- | --- |
+| `j` / `k` or `Up` / `Down` | Move between pages |
+| `/` | Enter search mode |
+| `f` | Cycle severity filter |
+| `s` | Cycle sort mode |
+| `Enter` | Toggle the detail pane |
+| `q` / `Esc` | Quit |
+
+When Scoutly is not attached to an interactive terminal, it automatically falls back to the classic CLI unless you explicitly pass `--tui`.
 ```
 
 ### Configuration Files
@@ -112,6 +138,7 @@ All configuration fields are optional. You can provide only the fields you want 
 {
   "depth": 10,
   "max_pages": 500,
+  "cli": true,
   "output": "json",
   "external": true,
   "verbose": true,
@@ -127,6 +154,7 @@ All configuration fields are optional. You can provide only the fields you want 
 ```toml
 depth = 10
 max_pages = 500
+cli = true
 output = "json"
 external = true
 verbose = true
@@ -141,6 +169,7 @@ respect_robots_txt = true
 ```yaml
 depth: 10
 max_pages: 500
+cli: true
 output: json
 external: true
 verbose: true
@@ -173,15 +202,17 @@ This allows you to set sensible defaults in your config file while still being a
 ### Command Line Options
 
 ```
-Usage: scoutly [OPTIONS] <URL>
+Usage: scoutly [OPTIONS] [URL]
 
 Arguments:
-  <URL>  The URL to start crawling from
+  [URL]  The URL to start crawling from (optional in TUI mode)
 
 Options:
   -d, --depth <DEPTH>              Maximum crawl depth (default: 5)
   -m, --max-pages <MAX_PAGES>      Maximum number of pages to crawl (default: 200)
-  -o, --output <OUTPUT>            Output format: text or json (defaults to text when omitted)
+  -o, --output <OUTPUT>            Classic CLI output format: text or json
+      --cli                        Force classic CLI mode instead of launching the TUI
+      --tui                        Force the interactive TUI
   -s, --save <SAVE>                Save report to file
   -e, --external                   Follow external links
   -v, --verbose                    Verbose output
@@ -196,6 +227,15 @@ Options:
 ```
 
 ## Example Output
+
+### Default TUI
+
+Running `scoutly https://example.com` in an interactive terminal opens the Ratatui dashboard with:
+- a live status/header bar
+- pages / links / error / warning counters
+- a searchable, sortable pages table
+- a detail pane for the selected page
+- a footer showing the active mode and available keys
 
 ### Text Report
 
@@ -233,7 +273,7 @@ Pages with Issues
       [ERROR] Broken link: https://example.com/old-page (HTTP 404)
 ```
 
-### JSON Report
+### Classic JSON Report
 
 Use `--output json` to get machine-readable output suitable for integration with other tools or CI/CD pipelines. In JSON mode, Scoutly writes the report JSON to stdout and keeps human-oriented progress/status messages off stdout so the output stays parseable. Link objects also include an optional `check_error` field when a link fails due to a transport-level error instead of an HTTP response.
 
@@ -307,7 +347,7 @@ Scoutly extracts links from multiple HTML elements:
 - Sitemap generation (XML)
 - Authentication support
 - More advanced SEO checks (keyword density, structured data)
-- Progress bar for long-running crawls
+- Additional TUI views and filters
 - HTML validation
 - Accessibility checks (WCAG compliance)
 - PDF and document crawling

@@ -1,18 +1,31 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
+use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_DEPTH: usize = 5;
 pub const DEFAULT_MAX_PAGES: usize = 200;
-pub const DEFAULT_OUTPUT: &str = "text";
 pub const DEFAULT_CONCURRENCY: usize = 5;
 pub const DEFAULT_RESPECT_ROBOTS_TXT: bool = true;
 
-#[derive(Parser, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum OutputFormat {
+    Text,
+    Json,
+}
+
+impl OutputFormat {
+    pub const fn is_json(self) -> bool {
+        matches!(self, Self::Json)
+    }
+}
+
+#[derive(Parser, Debug, Clone)]
 #[command(name = "scoutly")]
 #[command(about = "A CLI website crawler and SEO analyzer", long_about = None)]
 pub struct Cli {
-    /// The URL to start crawling from
+    /// The URL to start crawling from (optional in TUI mode)
     #[arg(value_name = "URL")]
-    pub url: String,
+    pub url: Option<String>,
 
     /// Maximum crawl depth (default: 5)
     #[arg(short, long)]
@@ -22,9 +35,17 @@ pub struct Cli {
     #[arg(short, long)]
     pub max_pages: Option<usize>,
 
-    /// Output format: text or json
-    #[arg(short, long)]
-    pub output: Option<String>,
+    /// Classic CLI output format: text or json
+    #[arg(short, long, value_enum, conflicts_with = "tui")]
+    pub output: Option<OutputFormat>,
+
+    /// Force classic CLI mode instead of launching the TUI
+    #[arg(long, conflicts_with = "tui")]
+    pub cli: bool,
+
+    /// Force the interactive TUI (errors if no interactive terminal is available)
+    #[arg(long, conflicts_with = "cli")]
+    pub tui: bool,
 
     /// Save report to file
     #[arg(short, long)]

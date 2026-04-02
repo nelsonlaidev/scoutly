@@ -1,6 +1,8 @@
 use crate::http_client::build_http_client;
 use crate::models::{Image, Link, OpenGraphTags, PageInfo};
+use crate::reporter::Reporter;
 use crate::robots::RobotsTxt;
+use crate::runtime::{ProgressSnapshot, RunEvent, RunEventSender, RunStage};
 use anyhow::{Context, Result, anyhow};
 use futures::stream::{self, StreamExt};
 use governor::{
@@ -82,6 +84,7 @@ pub struct Crawler {
     respect_robots_txt: bool,
     robots_txt: RobotsTxt,
     progress_bar: Option<ProgressBar>,
+    progress_sender: Option<RunEventSender>,
 }
 
 impl Crawler {
@@ -123,6 +126,7 @@ impl Crawler {
             respect_robots_txt: config.respect_robots_txt,
             robots_txt: RobotsTxt::new(),
             progress_bar: None,
+            progress_sender: None,
         })
     }
 
@@ -135,6 +139,27 @@ impl Crawler {
                 .expect("Progress bar template should be valid"),
         );
         self.progress_bar = Some(pb);
+    }
+
+    pub fn set_progress_sender(&mut self, sender: RunEventSender) {
+        self.progress_sender = Some(sender);
+    }
+
+    fn emit_progress(&self) {
+        let Some(sender) = &self.progress_sender else {
+            return;
+        };
+
+        let mut snapshot = ProgressSnapshot::new(
+            RunStage::Crawling,
+            format!("Crawled {} page(s)", self.pages.len()),
+        );
+        snapshot.pages_crawled = self.pages.len();
+        snapshot.links_discovered = self.pages.values().map(|page| page.links.len()).sum();
+        snapshot.total_links = snapshot.links_discovered;
+        snapshot.summary = Reporter::summarize_pages(&self.pages);
+
+        let _ = sender.send(RunEvent::Progress(snapshot));
     }
 
     /// Normalizes a URL by optionally removing fragment identifiers
@@ -263,6 +288,8 @@ impl Crawler {
             if let Some(ref pb) = self.progress_bar {
                 pb.set_position(self.pages.len() as u64);
             }
+
+            self.emit_progress();
         }
 
         // Finish progress bar

@@ -8,9 +8,9 @@ async fn test_cli_help() {
 
     // On Windows, the binary name in help might be "scoutly.exe"
     let expected_pattern = if cfg!(windows) {
-        "scoutly.exe [OPTIONS] <URL>"
+        "scoutly.exe [OPTIONS] [URL]"
     } else {
-        "scoutly [OPTIONS] <URL>"
+        "scoutly [OPTIONS] [URL]"
     };
 
     assert
