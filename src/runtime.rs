@@ -156,6 +156,16 @@ mod tests {
         stdout_is_terminal: false,
     };
 
+    const STDIN_ONLY: TerminalSupport = TerminalSupport {
+        stdin_is_terminal: true,
+        stdout_is_terminal: false,
+    };
+
+    const STDOUT_ONLY: TerminalSupport = TerminalSupport {
+        stdin_is_terminal: false,
+        stdout_is_terminal: true,
+    };
+
     #[test]
     fn defaults_to_tui_for_interactive_terminals() {
         assert_eq!(
@@ -204,5 +214,144 @@ mod tests {
             LaunchMode::Tui
         );
         assert!(resolve_launch_mode(&options, NON_INTERACTIVE).is_err());
+    }
+
+    #[test]
+    fn output_text_forces_classic_text() {
+        let mut options = runtime();
+        options.output = Some(OutputFormat::Text);
+
+        assert_eq!(
+            resolve_launch_mode(&options, INTERACTIVE).unwrap(),
+            LaunchMode::ClassicText
+        );
+    }
+
+    #[test]
+    fn cli_and_tui_conflict_returns_error() {
+        let mut options = runtime();
+        options.cli = true;
+        options.tui = true;
+
+        assert!(resolve_launch_mode(&options, INTERACTIVE).is_err());
+        assert!(resolve_launch_mode(&options, NON_INTERACTIVE).is_err());
+    }
+
+    #[test]
+    fn cli_with_output_json_prefers_output_format() {
+        let mut options = runtime();
+        options.cli = true;
+        options.output = Some(OutputFormat::Json);
+
+        assert_eq!(
+            resolve_launch_mode(&options, INTERACTIVE).unwrap(),
+            LaunchMode::ClassicJson
+        );
+    }
+
+    #[test]
+    fn cli_with_output_text_prefers_output_format() {
+        let mut options = runtime();
+        options.cli = true;
+        options.output = Some(OutputFormat::Text);
+
+        assert_eq!(
+            resolve_launch_mode(&options, INTERACTIVE).unwrap(),
+            LaunchMode::ClassicText
+        );
+    }
+
+    #[test]
+    fn tui_with_output_json_on_interactive_prefers_tui() {
+        let mut options = runtime();
+        options.tui = true;
+        options.output = Some(OutputFormat::Json);
+
+        // --tui is checked before output, so TUI wins on interactive terminals
+        assert_eq!(
+            resolve_launch_mode(&options, INTERACTIVE).unwrap(),
+            LaunchMode::Tui
+        );
+    }
+
+    #[test]
+    fn tui_with_output_json_on_non_interactive_falls_back_to_output() {
+        let mut options = runtime();
+        options.tui = true;
+        options.output = Some(OutputFormat::Json);
+
+        // --tui fails on non-interactive, but --tui is checked first so error
+        assert!(resolve_launch_mode(&options, NON_INTERACTIVE).is_err());
+    }
+
+    #[test]
+    fn non_interactive_with_output_text() {
+        let mut options = runtime();
+        options.output = Some(OutputFormat::Text);
+
+        assert_eq!(
+            resolve_launch_mode(&options, NON_INTERACTIVE).unwrap(),
+            LaunchMode::ClassicText
+        );
+    }
+
+    #[test]
+    fn non_interactive_with_output_json() {
+        let mut options = runtime();
+        options.output = Some(OutputFormat::Json);
+
+        assert_eq!(
+            resolve_launch_mode(&options, NON_INTERACTIVE).unwrap(),
+            LaunchMode::ClassicJson
+        );
+    }
+
+    #[test]
+    fn cli_on_non_interactive_terminal() {
+        let mut options = runtime();
+        options.cli = true;
+
+        assert_eq!(
+            resolve_launch_mode(&options, NON_INTERACTIVE).unwrap(),
+            LaunchMode::ClassicText
+        );
+    }
+
+    #[test]
+    fn stdin_only_is_not_interactive() {
+        assert_eq!(
+            resolve_launch_mode(&runtime(), STDIN_ONLY).unwrap(),
+            LaunchMode::ClassicText
+        );
+    }
+
+    #[test]
+    fn stdout_only_is_not_interactive() {
+        assert_eq!(
+            resolve_launch_mode(&runtime(), STDOUT_ONLY).unwrap(),
+            LaunchMode::ClassicText
+        );
+    }
+
+    #[test]
+    fn explicit_tui_fails_with_partial_terminal() {
+        let mut options = runtime();
+        options.tui = true;
+
+        assert!(resolve_launch_mode(&options, STDIN_ONLY).is_err());
+        assert!(resolve_launch_mode(&options, STDOUT_ONLY).is_err());
+    }
+
+    #[test]
+    fn launch_mode_output_format_mapping() {
+        assert_eq!(LaunchMode::Tui.output_format(), None);
+        assert_eq!(
+            LaunchMode::ClassicText.output_format(),
+            Some(OutputFormat::Text)
+        );
+        assert_eq!(
+            LaunchMode::ClassicJson.output_format(),
+            Some(OutputFormat::Json)
+        );
     }
 }

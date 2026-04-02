@@ -4,7 +4,6 @@ use scoutly::models::{
 use scoutly::reporter::Reporter;
 use std::collections::HashMap;
 
-
 fn create_test_page(
     url: &str,
     status_code: Option<u16>,

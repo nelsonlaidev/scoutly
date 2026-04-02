@@ -26,7 +26,14 @@ async fn test_invalid_url_no_protocol() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(
         result.is_err(),
         "Should return error for URL without protocol"
@@ -60,7 +67,14 @@ async fn test_invalid_url_missing_https() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(
         result.is_err(),
         "Should return error for non-HTTP(S) protocol"
@@ -90,7 +104,14 @@ async fn test_valid_http_url() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(result.is_ok(), "Should accept http:// URLs");
 }
 
@@ -114,7 +135,14 @@ async fn test_valid_https_url() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     if let Err(e) = result {
         let error_msg = e.to_string();
         assert!(
@@ -147,7 +175,14 @@ async fn test_full_crawl_with_text_output() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(result.is_ok(), "Should successfully crawl with text output");
 }
 
@@ -174,7 +209,14 @@ async fn test_full_crawl_with_json_output() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(result.is_ok(), "Should successfully crawl with JSON output");
 }
 
@@ -206,13 +248,17 @@ async fn test_crawl_with_save_file() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(result.is_ok(), "Should successfully crawl and save file");
 
-    assert!(
-        test_filename.exists(),
-        "Report file should be created"
-    );
+    assert!(test_filename.exists(), "Report file should be created");
 
     let file_content = fs::read_to_string(&test_filename).expect("Failed to read test file");
     let json_result: Result<serde_json::Value, _> = serde_json::from_str(&file_content);
@@ -242,7 +288,14 @@ async fn test_crawl_with_verbose_flag() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with verbose output"
@@ -272,7 +325,14 @@ async fn test_crawl_with_external_flag() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with external links enabled"
@@ -302,7 +362,14 @@ async fn test_crawl_with_ignore_redirects_flag() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with ignore_redirects enabled"
@@ -332,7 +399,14 @@ async fn test_crawl_with_keep_fragments_flag() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with keep_fragments enabled"
@@ -362,7 +436,14 @@ async fn test_crawl_with_custom_depth_and_max_pages() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with custom depth and max_pages"
@@ -397,7 +478,14 @@ async fn test_crawl_with_all_flags_combined() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with all flags enabled"
@@ -432,7 +520,14 @@ async fn test_crawl_with_default_text_output() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(
         result.is_ok(),
         "Should successfully fall back to classic text output in a non-interactive test context"
@@ -462,7 +557,14 @@ async fn test_crawl_with_cli_flag() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(
         result.is_ok(),
         "Should successfully run in classic CLI mode"
@@ -489,9 +591,15 @@ async fn test_explicit_tui_requires_interactive_terminal() {
         config: None,
     };
 
-    let error = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false })
-        .await
-        .expect_err("TUI should fail in non-interactive tests");
+    let error = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await
+    .expect_err("TUI should fail in non-interactive tests");
     assert!(error.to_string().contains("interactive terminal"));
 }
 
@@ -515,9 +623,15 @@ async fn test_classic_mode_without_url_errors() {
         config: None,
     };
 
-    let error = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false })
-        .await
-        .expect_err("Classic CLI mode should require a URL");
+    let error = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await
+    .expect_err("Classic CLI mode should require a URL");
     assert!(error.to_string().contains("URL is required"));
 }
 
@@ -549,16 +663,20 @@ async fn test_crawl_with_save_and_json_output() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with both JSON output and file save"
     );
 
-    assert!(
-        test_filename.exists(),
-        "Report file should be created"
-    );
+    assert!(test_filename.exists(), "Report file should be created");
     let file_content = fs::read_to_string(&test_filename).expect("Failed to read test file");
     let json_result: Result<serde_json::Value, _> = serde_json::from_str(&file_content);
     assert!(json_result.is_ok(), "Saved file should contain valid JSON");
@@ -587,7 +705,14 @@ async fn test_crawl_with_verbose_and_json_output() {
         config: None,
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with verbose and JSON output"
@@ -612,13 +737,7 @@ fn test_binary_with_invalid_url() {
 #[test]
 fn test_binary_with_valid_url() {
     let output = Command::new(env!("CARGO_BIN_EXE_scoutly"))
-        .args([
-            "https://example.com",
-            "--depth",
-            "1",
-            "--max-pages",
-            "1",
-        ])
+        .args(["https://example.com", "--depth", "1", "--max-pages", "1"])
         .output()
         .expect("Failed to run binary");
 
@@ -700,7 +819,14 @@ async fn test_crawl_with_config_file_verbose() {
         config: Some(config_path.to_str().unwrap().to_string()),
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with config file and verbose flag"
@@ -744,7 +870,14 @@ async fn test_config_merge_with_cli() {
         config: Some(config_path.to_str().unwrap().to_string()),
     };
 
-    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
+    let result = run_with_terminal(
+        args,
+        scoutly::runtime::TerminalSupport {
+            stdin_is_terminal: false,
+            stdout_is_terminal: false,
+        },
+    )
+    .await;
     assert!(
         result.is_ok(),
         "Should successfully merge config with CLI args"
@@ -773,7 +906,7 @@ async fn test_load_default_config_with_verbose() {
             .current_dir(temp_dir.path())
             .args([
                 base_url.as_str(),
-                "--verbose" // Enable verbose
+                "--verbose", // Enable verbose
             ])
             .output()
             .expect("Failed to run binary")
