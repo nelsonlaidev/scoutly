@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 use crate::config::RuntimeOptions;
 use crate::models::{CrawlReport, IssueSeverity, PageInfo};
 use crate::runtime::{ProgressSnapshot, RunEvent, RunStage};
+use crate::update::UpdateNotice;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UiMode {
@@ -101,6 +102,7 @@ pub struct App {
     pub selected_index: usize,
     pub show_details: bool,
     pub error: Option<String>,
+    pub update_notice: Option<UpdateNotice>,
     pub should_quit: bool,
     pub scan_in_progress: bool,
     pub scan_started_at: Option<Instant>,
@@ -136,6 +138,7 @@ impl App {
             selected_index: 0,
             show_details: true,
             error: None,
+            update_notice: None,
             should_quit: false,
             scan_in_progress: has_initial_url,
             scan_started_at: has_initial_url.then(Instant::now),
@@ -166,6 +169,9 @@ impl App {
                 self.mode = UiMode::Normal;
                 self.error = None;
                 self.clamp_selection();
+            }
+            RunEvent::UpdateAvailable(notice) => {
+                self.update_notice = Some(notice);
             }
             RunEvent::Error(error) => {
                 self.scan_in_progress = false;
@@ -691,6 +697,17 @@ mod tests {
     fn run_events_update_report_and_failure_state() {
         let mut app = app_with_report();
         let report = app.report.clone().unwrap();
+
+        app.apply_run_event(RunEvent::UpdateAvailable(UpdateNotice {
+            latest_version: "0.4.0".to_string(),
+            release_url: "https://github.com/nelsonlaidev/scoutly/releases/tag/v0.4.0".to_string(),
+        }));
+        assert_eq!(
+            app.update_notice
+                .as_ref()
+                .map(|notice| notice.latest_version.as_str()),
+            Some("0.4.0")
+        );
 
         app.apply_run_event(RunEvent::Error("boom".to_string()));
         assert_eq!(app.status_label(), "FAILED");

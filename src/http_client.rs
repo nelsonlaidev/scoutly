@@ -10,8 +10,17 @@ const CONNECTION: &str = "keep-alive";
 
 /// Creates a reqwest client with standard browser-like headers and configuration
 pub fn build_http_client(timeout_secs: u64) -> Result<Client> {
+    build_client(timeout_secs, ACCEPT)
+}
+
+/// Creates a reqwest client for API requests with a JSON-friendly Accept header.
+pub fn build_api_client(timeout_secs: u64) -> Result<Client> {
+    build_client(timeout_secs, "application/vnd.github+json")
+}
+
+fn build_client(timeout_secs: u64, accept: &str) -> Result<Client> {
     let mut headers = header::HeaderMap::new();
-    headers.insert(header::ACCEPT, ACCEPT.parse().unwrap());
+    headers.insert(header::ACCEPT, accept.parse().unwrap());
     headers.insert(header::ACCEPT_LANGUAGE, ACCEPT_LANGUAGE.parse().unwrap());
     headers.insert(header::CONNECTION, CONNECTION.parse().unwrap());
 

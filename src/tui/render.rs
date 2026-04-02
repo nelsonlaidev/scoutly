@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use super::app::{App, UiMode};
 use crate::models::{IssueSeverity, PageInfo, SeoIssue};
+use crate::update::format_tui_update_message;
 
 pub fn render(frame: &mut Frame, app: &App) {
     let [header_area, metrics_area, main_area, footer_area] = Layout::vertical([
@@ -312,7 +313,7 @@ fn render_detail_pane(frame: &mut Frame, app: &App, pages: &[&PageInfo], area: R
 }
 
 fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
-    let help = if matches!(app.mode, UiMode::UrlInput) {
+    let mut help = if matches!(app.mode, UiMode::UrlInput) {
         "mode=URL · type a target URL · Enter start crawl · Ctrl-U clear · Esc quit/back"
             .to_string()
     } else if app.has_active_scan() {
@@ -332,6 +333,11 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             app.mode.label()
         )
     };
+
+    if let Some(notice) = &app.update_notice {
+        help.push_str(" · ");
+        help.push_str(&format_tui_update_message(notice));
+    }
 
     let footer = Paragraph::new(help)
         .block(Block::bordered().title("Keys"))
@@ -623,5 +629,44 @@ mod tests {
         assert!(content.contains("Crawling pages"));
         assert!(content.contains("Scoutly is actively scanning the site."));
         assert!(content.contains("Elapsed:"));
+    }
+
+    #[test]
+    fn render_footer_shows_update_notice_when_available() {
+        let runtime = crate::config::RuntimeOptions {
+            url: None,
+            depth: 2,
+            max_pages: 10,
+            output: None,
+            save: None,
+            cli: false,
+            external: false,
+            verbose: false,
+            ignore_redirects: false,
+            keep_fragments: false,
+            rate_limit: None,
+            concurrency: 5,
+            respect_robots_txt: true,
+            tui: false,
+            config: None,
+        };
+        let mut app = App::new(runtime);
+        app.update_notice = Some(crate::update::UpdateNotice {
+            latest_version: "0.4.0".to_string(),
+            release_url: "https://github.com/nelsonlaidev/scoutly/releases/tag/v0.4.0".to_string(),
+        });
+
+        let backend = TestBackend::new(140, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(frame, &app)).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(content.contains("update v0.4.0 available"));
     }
 }

@@ -9,6 +9,7 @@ pub mod robots;
 pub mod runtime;
 pub mod seo_analyzer;
 pub mod tui;
+pub mod update;
 
 use anyhow::Result;
 use cli::{Cli, OutputFormat};
@@ -25,6 +26,7 @@ use runtime::{
 use seo_analyzer::SeoAnalyzer;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::time::Duration;
 
 pub async fn run(args: Cli) -> Result<()> {
     run_with_terminal(args, TerminalSupport::current()).await
@@ -153,6 +155,7 @@ async fn run_classic(
     loaded_config: LoadedConfig,
     output_format: OutputFormat,
 ) -> Result<()> {
+    maybe_emit_update_notice(output_format).await;
     print_config_source(&loaded_config, runtime.verbose, output_format);
     print_run_intro(&runtime, output_format);
 
@@ -161,6 +164,18 @@ async fn run_classic(
     save_report(&report, &runtime, output_format)?;
 
     Ok(())
+}
+
+async fn maybe_emit_update_notice(output_format: OutputFormat) {
+    let notice = tokio::time::timeout(Duration::from_millis(500), update::check_for_update())
+        .await
+        .ok()
+        .flatten();
+
+    if let Some(notice) = notice {
+        emit_status_line(output_format, update::format_cli_update_message(&notice));
+        emit_blank_line(output_format);
+    }
 }
 
 enum LoadedConfig {

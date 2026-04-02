@@ -1,6 +1,7 @@
 pub mod app;
 pub mod render;
 
+use std::future::Future;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -12,6 +13,7 @@ use tokio::task::LocalSet;
 use crate::config::RuntimeOptions;
 use crate::execute_scan;
 use crate::runtime::RunEvent;
+use crate::update;
 
 use self::app::{App, AppAction};
 
@@ -23,6 +25,7 @@ pub async fn run(runtime: RuntimeOptions) -> Result<()> {
             let scan_template = runtime.clone();
             let initial_url = scan_template.url.clone();
             let event_sender_for_scans = event_sender.clone();
+            spawn_update_check(event_sender.clone());
 
             let scan_handle = tokio::task::spawn_local(async move {
                 if let Some(url) = initial_url {
@@ -114,6 +117,57 @@ fn run_app(
                 Event::Resize(_, _) => {}
                 _ => {}
             }
+        }
+    }
+}
+
+fn spawn_update_check(event_sender: UnboundedSender<RunEvent>) {
+    tokio::task::spawn_local(async move {
+        dispatch_update_check(event_sender, update::check_for_update).await;
+    });
+}
+
+async fn dispatch_update_check<F, Fut>(event_sender: UnboundedSender<RunEvent>, update_check: F)
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Option<crate::update::UpdateNotice>>,
+{
+    if let Some(notice) = update_check().await {
+        let _ = event_sender.send(RunEvent::UpdateAvailable(notice));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+
+    #[tokio::test(flavor = "current_thread")]
+    #[serial]
+    async fn startup_update_check_sends_event_without_initial_url() {
+        let local = tokio::task::LocalSet::new();
+        let (sender, mut receiver) = unbounded_channel();
+        let event = local
+            .run_until(async move {
+                dispatch_update_check(sender, || async {
+                    Some(crate::update::UpdateNotice {
+                        latest_version: "9.9.9".to_string(),
+                        release_url: "https://example.com/releases/v9.9.9".to_string(),
+                    })
+                })
+                .await;
+                tokio::time::timeout(Duration::from_secs(2), receiver.recv())
+                    .await
+                    .expect("update event should arrive")
+                    .expect("sender should stay alive")
+            })
+            .await;
+
+        match event {
+            RunEvent::UpdateAvailable(notice) => {
+                assert_eq!(notice.latest_version, "9.9.9");
+            }
+            other => panic!("expected update event, got {other:?}"),
         }
     }
 }

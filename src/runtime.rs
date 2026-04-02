@@ -5,6 +5,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::cli::OutputFormat;
 use crate::config::RuntimeOptions;
 use crate::models::{CrawlReport, CrawlSummary};
+use crate::update::UpdateNotice;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LaunchMode {
@@ -70,6 +71,7 @@ impl ProgressSnapshot {
 pub enum RunEvent {
     Progress(ProgressSnapshot),
     ReportReady(CrawlReport),
+    UpdateAvailable(UpdateNotice),
     Error(String),
 }
 
