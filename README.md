@@ -287,6 +287,22 @@ Use `--output json` to get machine-readable output suitable for integration with
 
 ## How It Works
 
+```mermaid
+graph TD
+    A([Start URL]) --> B[Crawler]
+    B -->|Fetch HTML| C{Parse Page}
+    C -->|Extract Links| D[Link Queue]
+    C -->|Extract Metadata| E[Page Data]
+    D -->|Under Depth Limit?| B
+    D --> F[Link Checker]
+    F -->|Concurrent Requests| G[Link Status]
+    E --> H[SEO Analyzer]
+    H -->|Check Rules| I[SEO Issues]
+    G --> J[Report Generator]
+    I --> J
+    J --> K([TUI / CLI / JSON Output])
+```
+
 1. **Crawling**: Starting from the provided URL, Scoutly fetches each page and extracts all links from various HTML elements (anchor tags, iframes, media elements, embeds, etc.)
 2. **Link Discovery**: Internal links (same domain) are queued for crawling based on depth limits
 3. **Link Validation**: All discovered links are checked asynchronously for HTTP status codes
