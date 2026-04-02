@@ -1,13 +1,12 @@
 mod server;
 
 use scoutly::cli::{Cli, OutputFormat};
-use scoutly::run;
+use scoutly::run_with_terminal;
 use server::{get_test_server_url, start_link_test_server};
 use std::fs;
 use std::process::Command;
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_invalid_url_no_protocol() {
     let args = Cli {
         url: Some("example.com".to_string()),
@@ -27,7 +26,7 @@ async fn test_invalid_url_no_protocol() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(
         result.is_err(),
         "Should return error for URL without protocol"
@@ -42,7 +41,6 @@ async fn test_invalid_url_no_protocol() {
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_invalid_url_missing_https() {
     let args = Cli {
         url: Some("ftp://example.com".to_string()),
@@ -62,7 +60,7 @@ async fn test_invalid_url_missing_https() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(
         result.is_err(),
         "Should return error for non-HTTP(S) protocol"
@@ -70,7 +68,6 @@ async fn test_invalid_url_missing_https() {
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_valid_http_url() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -93,12 +90,11 @@ async fn test_valid_http_url() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(result.is_ok(), "Should accept http:// URLs");
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_valid_https_url() {
     let args = Cli {
         url: Some("https://example.com".to_string()),
@@ -118,7 +114,7 @@ async fn test_valid_https_url() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     if let Err(e) = result {
         let error_msg = e.to_string();
         assert!(
@@ -129,7 +125,6 @@ async fn test_valid_https_url() {
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_full_crawl_with_text_output() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -152,12 +147,11 @@ async fn test_full_crawl_with_text_output() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(result.is_ok(), "Should successfully crawl with text output");
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_full_crawl_with_json_output() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -180,18 +174,19 @@ async fn test_full_crawl_with_json_output() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(result.is_ok(), "Should successfully crawl with JSON output");
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_crawl_with_save_file() {
+    use tempfile::tempdir;
+
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
-    let test_filename = "test_report.json";
 
-    let _ = fs::remove_file(test_filename);
+    let dir = tempdir().unwrap();
+    let test_filename = dir.path().join("test_report.json");
 
     let args = Cli {
         url: Some(base_url),
@@ -200,7 +195,7 @@ async fn test_crawl_with_save_file() {
         output: Some(OutputFormat::Text),
         cli: false,
         tui: false,
-        save: Some(test_filename.to_string()),
+        save: Some(test_filename.to_string_lossy().to_string()),
         external: false,
         verbose: false,
         ignore_redirects: false,
@@ -211,23 +206,20 @@ async fn test_crawl_with_save_file() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(result.is_ok(), "Should successfully crawl and save file");
 
     assert!(
-        fs::metadata(test_filename).is_ok(),
+        test_filename.exists(),
         "Report file should be created"
     );
 
-    let file_content = fs::read_to_string(test_filename).expect("Failed to read test file");
+    let file_content = fs::read_to_string(&test_filename).expect("Failed to read test file");
     let json_result: Result<serde_json::Value, _> = serde_json::from_str(&file_content);
     assert!(json_result.is_ok(), "Saved file should contain valid JSON");
-
-    let _ = fs::remove_file(test_filename);
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_crawl_with_verbose_flag() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -250,7 +242,7 @@ async fn test_crawl_with_verbose_flag() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with verbose output"
@@ -258,7 +250,6 @@ async fn test_crawl_with_verbose_flag() {
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_crawl_with_external_flag() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -281,7 +272,7 @@ async fn test_crawl_with_external_flag() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with external links enabled"
@@ -289,7 +280,6 @@ async fn test_crawl_with_external_flag() {
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_crawl_with_ignore_redirects_flag() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -312,7 +302,7 @@ async fn test_crawl_with_ignore_redirects_flag() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with ignore_redirects enabled"
@@ -320,7 +310,6 @@ async fn test_crawl_with_ignore_redirects_flag() {
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_crawl_with_keep_fragments_flag() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -343,7 +332,7 @@ async fn test_crawl_with_keep_fragments_flag() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with keep_fragments enabled"
@@ -351,7 +340,6 @@ async fn test_crawl_with_keep_fragments_flag() {
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_crawl_with_custom_depth_and_max_pages() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -374,7 +362,7 @@ async fn test_crawl_with_custom_depth_and_max_pages() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with custom depth and max_pages"
@@ -382,13 +370,14 @@ async fn test_crawl_with_custom_depth_and_max_pages() {
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_crawl_with_all_flags_combined() {
+    use tempfile::tempdir;
+
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
-    let test_filename = "test_report_combined.json";
 
-    let _ = fs::remove_file(test_filename);
+    let dir = tempdir().unwrap();
+    let test_filename = dir.path().join("test_report_combined.json");
 
     let args = Cli {
         url: Some(base_url),
@@ -397,7 +386,7 @@ async fn test_crawl_with_all_flags_combined() {
         output: Some(OutputFormat::Json),
         cli: false,
         tui: false,
-        save: Some(test_filename.to_string()),
+        save: Some(test_filename.to_string_lossy().to_string()),
         external: true,
         verbose: true,
         ignore_redirects: true,
@@ -408,22 +397,19 @@ async fn test_crawl_with_all_flags_combined() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with all flags enabled"
     );
 
     assert!(
-        fs::metadata(test_filename).is_ok(),
+        test_filename.exists(),
         "Report file should be created with combined flags"
     );
-
-    let _ = fs::remove_file(test_filename);
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_crawl_with_default_text_output() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -446,7 +432,7 @@ async fn test_crawl_with_default_text_output() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(
         result.is_ok(),
         "Should successfully fall back to classic text output in a non-interactive test context"
@@ -454,7 +440,6 @@ async fn test_crawl_with_default_text_output() {
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_crawl_with_cli_flag() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -477,7 +462,7 @@ async fn test_crawl_with_cli_flag() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(
         result.is_ok(),
         "Should successfully run in classic CLI mode"
@@ -485,7 +470,6 @@ async fn test_crawl_with_cli_flag() {
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_explicit_tui_requires_interactive_terminal() {
     let args = Cli {
         url: None,
@@ -505,14 +489,13 @@ async fn test_explicit_tui_requires_interactive_terminal() {
         config: None,
     };
 
-    let error = run(args)
+    let error = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false })
         .await
         .expect_err("TUI should fail in non-interactive tests");
     assert!(error.to_string().contains("interactive terminal"));
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_classic_mode_without_url_errors() {
     let args = Cli {
         url: None,
@@ -532,20 +515,21 @@ async fn test_classic_mode_without_url_errors() {
         config: None,
     };
 
-    let error = run(args)
+    let error = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false })
         .await
         .expect_err("Classic CLI mode should require a URL");
     assert!(error.to_string().contains("URL is required"));
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_crawl_with_save_and_json_output() {
+    use tempfile::tempdir;
+
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
-    let test_filename = "test_report_json_save.json";
 
-    let _ = fs::remove_file(test_filename);
+    let dir = tempdir().unwrap();
+    let test_filename = dir.path().join("test_report_json_save.json");
 
     let args = Cli {
         url: Some(base_url),
@@ -554,7 +538,7 @@ async fn test_crawl_with_save_and_json_output() {
         output: Some(OutputFormat::Json),
         cli: false,
         tui: false,
-        save: Some(test_filename.to_string()),
+        save: Some(test_filename.to_string_lossy().to_string()),
         external: false,
         verbose: false,
         ignore_redirects: false,
@@ -565,25 +549,22 @@ async fn test_crawl_with_save_and_json_output() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with both JSON output and file save"
     );
 
     assert!(
-        fs::metadata(test_filename).is_ok(),
+        test_filename.exists(),
         "Report file should be created"
     );
-    let file_content = fs::read_to_string(test_filename).expect("Failed to read test file");
+    let file_content = fs::read_to_string(&test_filename).expect("Failed to read test file");
     let json_result: Result<serde_json::Value, _> = serde_json::from_str(&file_content);
     assert!(json_result.is_ok(), "Saved file should contain valid JSON");
-
-    let _ = fs::remove_file(test_filename);
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_crawl_with_verbose_and_json_output() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -606,7 +587,7 @@ async fn test_crawl_with_verbose_and_json_output() {
         config: None,
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with verbose and JSON output"
@@ -614,10 +595,9 @@ async fn test_crawl_with_verbose_and_json_output() {
 }
 
 #[test]
-#[serial_test::serial]
 fn test_binary_with_invalid_url() {
-    let output = Command::new("cargo")
-        .args(["run", "--", "example.com"])
+    let output = Command::new(env!("CARGO_BIN_EXE_scoutly"))
+        .args(["example.com"])
         .output()
         .expect("Failed to run binary");
 
@@ -630,12 +610,9 @@ fn test_binary_with_invalid_url() {
 }
 
 #[test]
-#[serial_test::serial]
 fn test_binary_with_valid_url() {
-    let output = Command::new("cargo")
+    let output = Command::new(env!("CARGO_BIN_EXE_scoutly"))
         .args([
-            "run",
-            "--",
             "https://example.com",
             "--depth",
             "1",
@@ -653,16 +630,13 @@ fn test_binary_with_valid_url() {
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_binary_json_output_is_valid_json() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
 
     let output = tokio::task::spawn_blocking(move || {
-        Command::new("cargo")
+        Command::new(env!("CARGO_BIN_EXE_scoutly"))
             .args([
-                "run",
-                "--",
                 base_url.as_str(),
                 "--depth",
                 "1",
@@ -691,7 +665,6 @@ async fn test_binary_json_output_is_valid_json() {
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_crawl_with_config_file_verbose() {
     use tempfile::tempdir;
 
@@ -727,7 +700,7 @@ async fn test_crawl_with_config_file_verbose() {
         config: Some(config_path.to_str().unwrap().to_string()),
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(
         result.is_ok(),
         "Should successfully crawl with config file and verbose flag"
@@ -735,7 +708,6 @@ async fn test_crawl_with_config_file_verbose() {
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_config_merge_with_cli() {
     use tempfile::tempdir;
 
@@ -772,7 +744,7 @@ async fn test_config_merge_with_cli() {
         config: Some(config_path.to_str().unwrap().to_string()),
     };
 
-    let result = run(args).await;
+    let result = run_with_terminal(args, scoutly::runtime::TerminalSupport { stdin_is_terminal: false, stdout_is_terminal: false }).await;
     assert!(
         result.is_ok(),
         "Should successfully merge config with CLI args"
@@ -780,18 +752,13 @@ async fn test_config_merge_with_cli() {
 }
 
 #[tokio::test]
-#[serial_test::serial]
 async fn test_load_default_config_with_verbose() {
-    use std::env;
     use tempfile::tempdir;
 
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
 
-    // Create a temporary directory and set it as current directory
     let temp_dir = tempdir().unwrap();
-    let original_dir = env::current_dir().unwrap();
-    env::set_current_dir(&temp_dir).unwrap();
 
     // Create a default config file (scoutly.json)
     let config_path = temp_dir.path().join("scoutly.json");
@@ -801,30 +768,21 @@ async fn test_load_default_config_with_verbose() {
     }"#;
     fs::write(&config_path, json_content).unwrap();
 
-    let args = Cli {
-        url: Some(base_url),
-        depth: None,     // Allow default-path config to supply the value
-        max_pages: None, // Allow default-path config to supply the value
-        output: Some(OutputFormat::Text),
-        cli: false,
-        tui: false,
-        save: None,
-        external: false,
-        verbose: true, // Enable verbose to trigger the println
-        ignore_redirects: false,
-        keep_fragments: false,
-        rate_limit: None,
-        concurrency: Some(5),
-        respect_robots_txt: Some(false),
-        config: None, // No config specified, should load from default path
-    };
+    let output = tokio::task::spawn_blocking(move || {
+        Command::new(env!("CARGO_BIN_EXE_scoutly"))
+            .current_dir(temp_dir.path())
+            .args([
+                base_url.as_str(),
+                "--verbose" // Enable verbose
+            ])
+            .output()
+            .expect("Failed to run binary")
+    })
+    .await
+    .expect("Binary execution task should complete");
 
-    let result = run(args).await;
     assert!(
-        result.is_ok(),
-        "Should successfully load default config with verbose"
+        output.status.success(),
+        "Should successfully run with default config and verbose"
     );
-
-    // Restore original directory
-    env::set_current_dir(&original_dir).ok();
 }

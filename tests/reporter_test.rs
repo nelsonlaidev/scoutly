@@ -3,7 +3,7 @@ use scoutly::models::{
 };
 use scoutly::reporter::Reporter;
 use std::collections::HashMap;
-use std::fs;
+
 
 fn create_test_page(
     url: &str,
@@ -399,14 +399,16 @@ fn test_save_json_report() {
 
     let report = Reporter::generate_report("https://example.com", &pages);
 
-    let filename = "test_report.json";
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file_path = temp_dir.path().join("test_report.json");
+    let filename = file_path.to_str().unwrap();
 
     // Save the report
     let result = Reporter::save_json_report(&report, filename);
     assert!(result.is_ok());
 
     // Verify the file exists and can be read
-    let json_content = fs::read_to_string(filename).expect("Failed to read file");
+    let json_content = std::fs::read_to_string(filename).expect("Failed to read file");
     assert!(!json_content.is_empty());
 
     // Verify it can be deserialized back to a CrawlReport
@@ -415,9 +417,6 @@ fn test_save_json_report() {
     assert_eq!(deserialized.start_url, "https://example.com");
     assert_eq!(deserialized.summary.total_pages, 1);
     assert_eq!(deserialized.summary.errors, 1);
-
-    // Clean up
-    fs::remove_file(filename).expect("Failed to remove test file");
 }
 
 #[test]

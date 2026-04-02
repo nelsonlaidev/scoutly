@@ -27,10 +27,15 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 pub async fn run(args: Cli) -> Result<()> {
+    run_with_terminal(args, TerminalSupport::current()).await
+}
+
+#[doc(hidden)]
+pub async fn run_with_terminal(args: Cli, terminal: TerminalSupport) -> Result<()> {
     let loaded_config = load_config(&args)?;
     let runtime = RuntimeOptions::from_cli_and_config(&args, loaded_config.config());
 
-    let launch_mode = resolve_launch_mode(&runtime, TerminalSupport::current())?;
+    let launch_mode = resolve_launch_mode(&runtime, terminal)?;
 
     match launch_mode {
         LaunchMode::Tui => {

@@ -78,19 +78,9 @@ pub async fn get_test_server_url() -> String {
         .expect("Fixture test server should be started before use")
         .to_string();
 
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    tokio::task::yield_now().await;
 
-    for _ in 0..20 {
-        match reqwest::get(&base_url).await {
-            Ok(response) if response.status().is_success() => return base_url,
-            _ => tokio::time::sleep(tokio::time::Duration::from_millis(50)).await,
-        }
-    }
-
-    panic!(
-        "Fixture test server at {} failed to start after 1 second",
-        base_url
-    );
+    base_url
 }
 
 #[allow(dead_code)]
@@ -177,21 +167,7 @@ pub async fn start_link_test_server() -> String {
 
     let base_url = link_test_server_url().to_string();
 
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    tokio::task::yield_now().await;
 
-    for _ in 0..20 {
-        match reqwest::get(format!("{}/ok", base_url)).await {
-            Ok(response) if response.status().is_success() => {
-                return base_url;
-            }
-            _ => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-            }
-        }
-    }
-
-    panic!(
-        "Link test server at {} failed to start after 1 second",
-        base_url
-    );
+    base_url
 }
