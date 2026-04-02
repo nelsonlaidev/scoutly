@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 use super::app::{App, UiMode};
-use crate::models::{IssueSeverity, PageInfo};
+use crate::models::{IssueSeverity, PageInfo, SeoIssue};
 
 pub fn render(frame: &mut Frame, app: &App) {
     let [header_area, metrics_area, main_area, footer_area] = Layout::vertical([
@@ -255,7 +255,7 @@ fn render_detail_pane(frame: &mut Frame, app: &App, pages: &[&PageInfo], area: R
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         ));
-        for issue in &page.issues {
+        for issue in ordered_issues(page) {
             lines.push(Line::from(vec![
                 severity_span(issue.severity),
                 Span::raw(" "),
@@ -328,6 +328,20 @@ fn severity_span(severity: IssueSeverity) -> Span<'static> {
     )
 }
 
+fn ordered_issues(page: &PageInfo) -> Vec<&SeoIssue> {
+    let mut issues = page.issues.iter().collect::<Vec<_>>();
+    issues.sort_by_key(|issue| issue_severity_rank(issue.severity));
+    issues
+}
+
+fn issue_severity_rank(severity: IssueSeverity) -> u8 {
+    match severity {
+        IssueSeverity::Error => 0,
+        IssueSeverity::Warning => 1,
+        IssueSeverity::Info => 2,
+    }
+}
+
 fn issue_summary(page: &PageInfo) -> String {
     let errors = page
         .issues
@@ -387,6 +401,48 @@ mod tests {
             }],
             crawl_depth: 1,
         }
+    }
+
+    #[test]
+    fn ordered_issues_prioritize_errors_then_warnings_then_infos() {
+        let mut page = sample_page();
+        page.issues = vec![
+            SeoIssue {
+                severity: IssueSeverity::Info,
+                issue_type: IssueType::Redirect,
+                message: "redirected".to_string(),
+            },
+            SeoIssue {
+                severity: IssueSeverity::Warning,
+                issue_type: IssueType::MissingMetaDescription,
+                message: "missing description".to_string(),
+            },
+            SeoIssue {
+                severity: IssueSeverity::Error,
+                issue_type: IssueType::BrokenLink,
+                message: "broken link".to_string(),
+            },
+            SeoIssue {
+                severity: IssueSeverity::Info,
+                issue_type: IssueType::Redirect,
+                message: "another redirect".to_string(),
+            },
+        ];
+
+        let severities = ordered_issues(&page)
+            .into_iter()
+            .map(|issue| issue.severity)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            severities,
+            vec![
+                IssueSeverity::Error,
+                IssueSeverity::Warning,
+                IssueSeverity::Info,
+                IssueSeverity::Info,
+            ]
+        );
     }
 
     #[test]
