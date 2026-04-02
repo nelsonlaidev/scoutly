@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0](https://github.com/nelsonlaidev/scoutly/compare/v0.2.0..v0.3.0) - 2026-04-02
+
+### Features
+
+- Reduce friction for interactive Scoutly scans - ([0b3d42a](https://github.com/nelsonlaidev/scoutly/commit/0b3d42a500ca401fd5ecf21604a7440fd4e4e355))
+
+### Bug Fixes
+
+- Surface the most severe issues first in the TUI details panel - ([3e024da](https://github.com/nelsonlaidev/scoutly/commit/3e024dac7668d49067c02b01d395ddec4e26512c))
+- Prevent silent waits during crawl feedback - ([54abb49](https://github.com/nelsonlaidev/scoutly/commit/54abb496fe335260a3c9ff0301d5acaa06dad829))
+
+### Refactor
+
+- Harden Scoutly runtime config and crawl result handling - ([194720e](https://github.com/nelsonlaidev/scoutly/commit/194720e197f222c216063267644f53293652bac6))
+
+### Chores
+
+- Add AGENTS.md - ([a9cabab](https://github.com/nelsonlaidev/scoutly/commit/a9cababbb60a62f339be1047fb4f02f473ca17e6))
+- Update comment in .gitignore for clarity - ([49cc975](https://github.com/nelsonlaidev/scoutly/commit/49cc975b679a497a812d82800f861fe9b661e211))
+
 ## [0.2.0](https://github.com/nelsonlaidev/scoutly/compare/v0.1.1..v0.2.0) - 2025-11-20
 
 ### Features
@@ -110,5 +130,4 @@ All notable changes to this project will be documented in this file.
 
 - Coverage (#1) - ([979e6eb](https://github.com/nelsonlaidev/scoutly/commit/979e6eb0dba070dd7a7b85f73d38a92f0873bf88))
 - More coverage (#2) - ([3290f46](https://github.com/nelsonlaidev/scoutly/commit/3290f465ffc706eada1c44a34b073a11daf6960b))
-
 

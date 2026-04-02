@@ -5,7 +5,7 @@ use server::{get_test_server_url, start_link_test_server};
 
 #[tokio::test]
 async fn test_crawler() {
-    start_link_test_server().await;
+    let link_server_url = start_link_test_server().await;
     let base_url = get_test_server_url().await;
 
     // Test case 1: Test keep_fragments parameter
@@ -250,7 +250,10 @@ async fn test_crawler() {
         let port_different_iframe = page
             .links
             .iter()
-            .find(|link| link.url.contains("127.0.0.1:3000/ok") && link.text.contains("[iframe]"))
+            .find(|link| {
+                link.url.contains(&format!("{}/ok", link_server_url))
+                    && link.text.contains("[iframe]")
+            })
             .expect("Should find iframe link to different port");
 
         // Note: Different port on same hostname is considered external
@@ -678,10 +681,10 @@ async fn test_crawler() {
         // Verify the specific iframe link to different port is marked as external
         let has_different_port_link = external_link_urls
             .iter()
-            .any(|url| url.contains("127.0.0.1:3000/ok"));
+            .any(|url| url.contains(&format!("{}/ok", link_server_url)));
         assert!(
             has_different_port_link,
-            "Should have external link to different port (127.0.0.1:3000)"
+            "Should have external link to the dedicated link test server"
         );
 
         // Verify that external links were extracted but not crawled
@@ -1017,7 +1020,7 @@ async fn test_content_type_validation() {
     use scoutly::crawler::{Crawler, CrawlerConfig};
     use server::{get_test_server_url, start_link_test_server};
 
-    start_link_test_server().await;
+    let link_server_url = start_link_test_server().await;
 
     // Give server more time to start
     tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
@@ -1074,14 +1077,14 @@ async fn test_content_type_validation() {
             concurrent_requests: 1,
             respect_robots_txt: false,
         };
-        let mut crawler = Crawler::new("http://127.0.0.1:3000/json-response", config)
+        let mut crawler = Crawler::new(&format!("{}/json-response", link_server_url), config)
             .expect("Failed to create crawler");
 
         crawler.crawl().await.expect("JSON crawl should succeed");
 
         let page = crawler
             .pages
-            .get("http://127.0.0.1:3000/json-response")
+            .get(&format!("{}/json-response", link_server_url))
             .expect("json-response page should exist");
 
         assert_eq!(
@@ -1124,14 +1127,14 @@ async fn test_content_type_validation() {
             concurrent_requests: 1,
             respect_robots_txt: false,
         };
-        let mut crawler =
-            Crawler::new("http://127.0.0.1:3000/ok", config).expect("Failed to create crawler");
+        let mut crawler = Crawler::new(&format!("{}/ok", link_server_url), config)
+            .expect("Failed to create crawler");
 
         crawler.crawl().await.expect("Crawl failed");
 
         let page = crawler
             .pages
-            .get("http://127.0.0.1:3000/ok")
+            .get(&format!("{}/ok", link_server_url))
             .expect("/ok page should exist");
 
         // The /ok endpoint returns plain text, should have a content-type

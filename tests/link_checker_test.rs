@@ -4,12 +4,12 @@ use scoutly::crawler::{Crawler, CrawlerConfig};
 use scoutly::link_checker::LinkChecker;
 use scoutly::models::{IssueSeverity, IssueType};
 use scoutly::runtime::RunEvent;
-use server::{get_test_server_url, start_link_test_server};
+use server::{get_test_server_url, link_test_server_url, start_link_test_server};
 use tokio::sync::mpsc::unbounded_channel;
 
 #[tokio::test]
 async fn test_link_checker() {
-    start_link_test_server().await;
+    let link_server_url = start_link_test_server().await;
 
     let base_url = get_test_server_url().await;
 
@@ -47,7 +47,7 @@ async fn test_link_checker() {
         let working_link = page
             .links
             .iter()
-            .find(|link| link.url == "http://127.0.0.1:3000/ok")
+            .find(|link| link.url == format!("{}/ok", link_server_url))
             .expect("Working link not found");
 
         assert_eq!(
@@ -66,7 +66,7 @@ async fn test_link_checker() {
             .iter()
             .filter(|issue| {
                 issue.issue_type == IssueType::BrokenLink
-                    && issue.message.contains("http://127.0.0.1:3000/ok")
+                    && issue.message.contains(&format!("{}/ok", link_server_url))
             })
             .collect();
 
@@ -88,7 +88,7 @@ async fn test_link_checker() {
         let not_found_link = page
             .links
             .iter()
-            .find(|link| link.url == "http://127.0.0.1:3000/not-found")
+            .find(|link| link.url == format!("{}/not-found", link_server_url))
             .expect("404 link not found");
 
         assert_eq!(
@@ -102,7 +102,9 @@ async fn test_link_checker() {
             .iter()
             .filter(|issue| {
                 issue.issue_type == IssueType::BrokenLink
-                    && issue.message.contains("http://127.0.0.1:3000/not-found")
+                    && issue
+                        .message
+                        .contains(&format!("{}/not-found", link_server_url))
             })
             .collect();
 
@@ -121,7 +123,7 @@ async fn test_link_checker() {
         let server_error_link = page
             .links
             .iter()
-            .find(|link| link.url == "http://127.0.0.1:3000/server-error")
+            .find(|link| link.url == format!("{}/server-error", link_server_url))
             .expect("500 link not found");
 
         assert_eq!(
@@ -135,7 +137,9 @@ async fn test_link_checker() {
             .iter()
             .filter(|issue| {
                 issue.issue_type == IssueType::BrokenLink
-                    && issue.message.contains("http://127.0.0.1:3000/server-error")
+                    && issue
+                        .message
+                        .contains(&format!("{}/server-error", link_server_url))
             })
             .collect();
 
@@ -156,7 +160,7 @@ async fn test_link_checker() {
         let redirect_link = page
             .links
             .iter()
-            .find(|link| link.url == "http://127.0.0.1:3000/redirect")
+            .find(|link| link.url == format!("{}/redirect", link_server_url))
             .expect("Redirect link not found");
 
         assert_eq!(
@@ -167,7 +171,7 @@ async fn test_link_checker() {
 
         assert_eq!(
             redirect_link.redirected_url,
-            Some("http://127.0.0.1:3000/ok".to_string()),
+            Some(format!("{}/ok", link_server_url)),
             "Redirect link should capture the final URL"
         );
 
@@ -176,7 +180,9 @@ async fn test_link_checker() {
             .iter()
             .filter(|issue| {
                 issue.issue_type == IssueType::Redirect
-                    && issue.message.contains("http://127.0.0.1:3000/redirect")
+                    && issue
+                        .message
+                        .contains(&format!("{}/redirect", link_server_url))
             })
             .collect();
 
@@ -203,7 +209,7 @@ async fn test_link_checker() {
         let fragment_link = page
             .links
             .iter()
-            .find(|link| link.url == "http://127.0.0.1:3000/ok#section1")
+            .find(|link| link.url == format!("{}/ok#section1", link_server_url))
             .expect("Fragment link not found");
 
         assert_eq!(
@@ -222,7 +228,9 @@ async fn test_link_checker() {
             .iter()
             .filter(|issue| {
                 issue.issue_type == IssueType::Redirect
-                    && issue.message.contains("http://127.0.0.1:3000/ok#section1")
+                    && issue
+                        .message
+                        .contains(&format!("{}/ok#section1", link_server_url))
             })
             .collect();
 
@@ -243,7 +251,7 @@ async fn test_link_checker() {
         let working_link = working_page
             .links
             .iter()
-            .find(|link| link.url == "http://127.0.0.1:3000/ok")
+            .find(|link| link.url == format!("{}/ok", link_server_url))
             .expect("Working link not found on working page");
 
         assert_eq!(
@@ -261,7 +269,7 @@ async fn test_link_checker() {
         let duplicate_link = duplicate_page
             .links
             .iter()
-            .find(|link| link.url == "http://127.0.0.1:3000/ok")
+            .find(|link| link.url == format!("{}/ok", link_server_url))
             .expect("Duplicate link not found on duplicate page");
 
         assert_eq!(
@@ -280,7 +288,7 @@ async fn test_link_checker() {
         let working_link = page
             .links
             .iter()
-            .find(|link| link.url == "http://127.0.0.1:3000/ok")
+            .find(|link| link.url == format!("{}/ok", link_server_url))
             .expect("Working link not found");
 
         assert_eq!(working_link.status_code, Some(200));
@@ -289,7 +297,7 @@ async fn test_link_checker() {
         let broken_link = page
             .links
             .iter()
-            .find(|link| link.url == "http://127.0.0.1:3000/not-found")
+            .find(|link| link.url == format!("{}/not-found", link_server_url))
             .expect("Broken link not found");
 
         assert_eq!(broken_link.status_code, Some(404));
@@ -298,13 +306,13 @@ async fn test_link_checker() {
         let redirect_link = page
             .links
             .iter()
-            .find(|link| link.url == "http://127.0.0.1:3000/redirect")
+            .find(|link| link.url == format!("{}/redirect", link_server_url))
             .expect("Redirect link not found");
 
         assert_eq!(redirect_link.status_code, Some(200));
         assert_eq!(
             redirect_link.redirected_url,
-            Some("http://127.0.0.1:3000/ok".to_string())
+            Some(format!("{}/ok", link_server_url))
         );
 
         // Should have issues for both broken link and redirect
@@ -409,12 +417,12 @@ async fn test_link_checker() {
         let redirect_link = page
             .links
             .iter()
-            .find(|link| link.url == "http://127.0.0.1:3000/redirect")
+            .find(|link| link.url == format!("{}/redirect", link_server_url))
             .expect("Redirect link not found");
 
         assert_eq!(
             redirect_link.redirected_url,
-            Some("http://127.0.0.1:3000/ok".to_string()),
+            Some(format!("{}/ok", link_server_url)),
             "Redirect link should still capture the final URL even when ignored"
         );
 
@@ -423,7 +431,9 @@ async fn test_link_checker() {
             .iter()
             .filter(|issue| {
                 issue.issue_type == IssueType::Redirect
-                    && issue.message.contains("http://127.0.0.1:3000/redirect")
+                    && issue
+                        .message
+                        .contains(&format!("{}/redirect", link_server_url))
             })
             .collect();
 
@@ -489,7 +499,7 @@ async fn test_link_checker_emits_live_progress_with_current_url() {
     assert!(
         snapshots
             .iter()
-            .any(|snapshot| snapshot.message.contains("http://127.0.0.1:3000/")),
+            .any(|snapshot| snapshot.message.contains(link_test_server_url())),
         "At least one progress message should include the current link URL"
     );
 
@@ -543,7 +553,7 @@ async fn test_link_checker_default() {
     let working_link = page
         .links
         .iter()
-        .find(|link| link.url == "http://127.0.0.1:3000/ok")
+        .find(|link| link.url == format!("{}/ok", link_test_server_url()))
         .expect("Working link not found");
 
     assert_eq!(

@@ -1,50 +1,116 @@
-use actix_files::Files;
-use actix_web::{App, HttpResponse, HttpServer, web};
-use std::io::ErrorKind;
-use std::sync::Once;
+use actix_web::{App, HttpRequest, HttpResponse, HttpServer, web};
+use std::fs;
+use std::path::PathBuf;
+use std::sync::{Once, OnceLock};
 
 #[allow(dead_code)]
 static INIT: Once = Once::new();
+static FIXTURE_INIT: Once = Once::new();
+static LINK_TEST_SERVER_BASE_URL: OnceLock<String> = OnceLock::new();
+static FIXTURE_TEST_SERVER_BASE_URL: OnceLock<String> = OnceLock::new();
 
 const LINK_TEST_SERVER_HOST: &str = "127.0.0.1";
-const LINK_TEST_SERVER_PORT: u16 = 3000;
-const LINK_TEST_SERVER_BASE_URL: &str = "http://127.0.0.1:3000";
 
 #[allow(dead_code)]
-pub async fn get_test_server_url() -> String {
-    let http_server = HttpServer::new(|| {
-        App::new().service(
-            Files::new("/", "tests/static/")
-                .index_file("index.html")
-                .show_files_listing(),
-        )
-    })
-    .bind(("127.0.0.1", 0))
-    .expect("Failed to bind test server");
+pub fn link_test_server_url() -> &'static str {
+    LINK_TEST_SERVER_BASE_URL
+        .get()
+        .expect("Link test server should be started before use")
+}
 
-    let addr = http_server
-        .addrs()
-        .first()
-        .cloned()
-        .expect("No address bound");
-    let url = format!("http://{}", addr);
+async fn serve_static_fixture(
+    request: HttpRequest,
+    link_server_url: web::Data<String>,
+) -> HttpResponse {
+    let relative_path = match request.path() {
+        "/" => "index.html",
+        path => path.trim_start_matches('/'),
+    };
 
-    let app_server = http_server.run();
+    let file_path = PathBuf::from("tests/static").join(relative_path);
 
-    tokio::spawn(async move {
-        if let Err(e) = app_server.await {
-            eprintln!("Test server error: {}", e);
+    match fs::read_to_string(&file_path) {
+        Ok(contents) => {
+            let html = contents.replace("http://127.0.0.1:3000", link_server_url.get_ref());
+            HttpResponse::Ok()
+                .content_type("text/html; charset=utf-8")
+                .body(html)
         }
-    });
-
-    url
+        Err(_) => HttpResponse::NotFound().body("Not Found"),
+    }
 }
 
 #[allow(dead_code)]
-pub async fn start_link_test_server() {
-    INIT.call_once(|| {
-        match HttpServer::new(|| {
+pub async fn get_test_server_url() -> String {
+    let link_server_url = start_link_test_server().await;
+
+    FIXTURE_INIT.call_once(|| {
+        let listener = std::net::TcpListener::bind((LINK_TEST_SERVER_HOST, 0))
+            .expect("Failed to bind test server");
+        let base_url = format!(
+            "http://{}",
+            listener
+                .local_addr()
+                .expect("Fixture test server should have a bound address")
+        );
+        FIXTURE_TEST_SERVER_BASE_URL
+            .set(base_url.clone())
+            .expect("Fixture test server URL should only be initialized once");
+
+        let server = HttpServer::new(move || {
             App::new()
+                .app_data(web::Data::new(link_server_url.clone()))
+                .default_service(web::to(serve_static_fixture))
+        })
+        .listen(listener)
+        .expect("Failed to start test server")
+        .run();
+
+        tokio::spawn(async move {
+            if let Err(error) = server.await {
+                eprintln!("Test server error: {error}");
+            }
+        });
+    });
+
+    let base_url = FIXTURE_TEST_SERVER_BASE_URL
+        .get()
+        .expect("Fixture test server should be started before use")
+        .to_string();
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    for _ in 0..20 {
+        match reqwest::get(&base_url).await {
+            Ok(response) if response.status().is_success() => return base_url,
+            _ => tokio::time::sleep(tokio::time::Duration::from_millis(50)).await,
+        }
+    }
+
+    panic!(
+        "Fixture test server at {} failed to start after 1 second",
+        base_url
+    );
+}
+
+#[allow(dead_code)]
+pub async fn start_link_test_server() -> String {
+    INIT.call_once(|| {
+        let listener = std::net::TcpListener::bind((LINK_TEST_SERVER_HOST, 0))
+            .expect("Failed to bind link test server");
+        let base_url = format!(
+            "http://{}",
+            listener
+                .local_addr()
+                .expect("Link test server should have a bound address")
+        );
+        LINK_TEST_SERVER_BASE_URL
+            .set(base_url.clone())
+            .expect("Link test server URL should only be initialized once");
+
+        let server = HttpServer::new(move || {
+            App::new()
+                .app_data(web::Data::new(base_url.clone()))
                 .route(
                     "/ok",
                     web::get().to(|| async { HttpResponse::Ok().body("OK") }),
@@ -55,23 +121,17 @@ pub async fn start_link_test_server() {
                 )
                 .route(
                     "/redirect",
-                    web::get().to(|| async {
+                    web::get().to(|base_url: web::Data<String>| async move {
                         HttpResponse::MovedPermanently()
-                            .append_header((
-                                "Location",
-                                format!("{}/ok", LINK_TEST_SERVER_BASE_URL),
-                            ))
+                            .append_header(("Location", format!("{}/ok", base_url.get_ref())))
                             .finish()
                     }),
                 )
                 .route(
                     "/redirect-temp",
-                    web::get().to(|| async {
+                    web::get().to(|base_url: web::Data<String>| async move {
                         HttpResponse::Found()
-                            .append_header((
-                                "Location",
-                                format!("{}/ok", LINK_TEST_SERVER_BASE_URL),
-                            ))
+                            .append_header(("Location", format!("{}/ok", base_url.get_ref())))
                             .finish()
                     }),
                 )
@@ -92,7 +152,7 @@ pub async fn start_link_test_server() {
                     web::get().to(|| async {
                         HttpResponse::Ok()
                             .content_type("image/png")
-                            .body(vec![0u8; 100]) // Fake image data
+                            .body(vec![0u8; 100])
                     }),
                 )
                 .route(
@@ -100,53 +160,38 @@ pub async fn start_link_test_server() {
                     web::get().to(|| async {
                         HttpResponse::Ok()
                             .content_type("application/pdf")
-                            .body(vec![0u8; 100]) // Fake PDF data
+                            .body(vec![0u8; 100])
                     }),
                 )
         })
-        .bind((LINK_TEST_SERVER_HOST, LINK_TEST_SERVER_PORT))
-        {
-            Ok(server) => {
-                let server = server.run();
-                tokio::spawn(async move {
-                    if let Err(e) = server.await {
-                        eprintln!("Link test server error: {}", e);
-                    }
-                });
+        .listen(listener)
+        .expect("Failed to start link test server")
+        .run();
+
+        tokio::spawn(async move {
+            if let Err(error) = server.await {
+                eprintln!("Link test server error: {error}");
             }
-            Err(err) if err.kind() == ErrorKind::AddrInUse => {
-                // Another test binary already started the shared server; reuse it.
-            }
-            Err(err) => {
-                panic!(
-                    "Failed to bind link test server on port {}: {}",
-                    LINK_TEST_SERVER_PORT, err
-                );
-            }
-        }
+        });
     });
 
-    // ALWAYS wait and verify server is ready (not just on first call)
-    // This ensures all tests have a ready server, even when call_once has already run
+    let base_url = link_test_server_url().to_string();
+
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    // Verify server is responding by attempting a connection
     for _ in 0..20 {
-        match reqwest::get(format!("{}/ok", LINK_TEST_SERVER_BASE_URL)).await {
+        match reqwest::get(format!("{}/ok", base_url)).await {
             Ok(response) if response.status().is_success() => {
-                // Server is ready and responding correctly
-                return;
+                return base_url;
             }
             _ => {
-                // Server not ready yet, wait and retry
                 tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
             }
         }
     }
 
-    // If we get here, server didn't start in time - panic to fail the test clearly
     panic!(
-        "Test server on port {} failed to start after 1 second",
-        LINK_TEST_SERVER_PORT
+        "Link test server at {} failed to start after 1 second",
+        base_url
     );
 }

@@ -2,9 +2,11 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
+    tags-ignore: ["v*"]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,14 +17,15 @@ env:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   ci:
-    name: Build and Test (${{ matrix.os }})
+    name: Build and Test (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    needs: [clippy, format]
+    needs: [clippy, format, audit]
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -53,10 +56,10 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Build
-        run: cargo build --verbose --target ${{ matrix.target }}
+        run: cargo build --locked --verbose --target ${{ matrix.target }}
 
       - name: Run tests
-        run: cargo test --verbose --target ${{ matrix.target }}
+        run: cargo test --locked --verbose --target ${{ matrix.target }}
 
   coverage:
     name: Code Coverage
@@ -81,7 +84,7 @@ jobs:
           key: ${{ runner.os }}-cargo-tarpaulin-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin --locked
+        run: cargo install cargo-tarpaulin --locked --force
         continue-on-error: false
 
       - name: Run tarpaulin
@@ -96,6 +99,7 @@ jobs:
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout branch
         uses: actions/checkout@v4
@@ -109,11 +113,12 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
   format:
     name: Check formatting
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout branch
         uses: actions/checkout@v4
@@ -132,6 +137,7 @@ jobs:
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout branch
         uses: actions/checkout@v4
@@ -143,7 +149,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
+        run: cargo install cargo-audit --locked --force
 
       - name: Run security audit
         run: cargo audit

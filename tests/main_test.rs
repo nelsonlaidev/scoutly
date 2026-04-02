@@ -7,6 +7,7 @@ use std::fs;
 use std::process::Command;
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_invalid_url_no_protocol() {
     let args = Cli {
         url: Some("example.com".to_string()),
@@ -41,6 +42,7 @@ async fn test_invalid_url_no_protocol() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_invalid_url_missing_https() {
     let args = Cli {
         url: Some("ftp://example.com".to_string()),
@@ -68,6 +70,7 @@ async fn test_invalid_url_missing_https() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_valid_http_url() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -95,6 +98,7 @@ async fn test_valid_http_url() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_valid_https_url() {
     let args = Cli {
         url: Some("https://example.com".to_string()),
@@ -125,6 +129,7 @@ async fn test_valid_https_url() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_full_crawl_with_text_output() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -152,6 +157,7 @@ async fn test_full_crawl_with_text_output() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_full_crawl_with_json_output() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -179,6 +185,7 @@ async fn test_full_crawl_with_json_output() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_crawl_with_save_file() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -220,6 +227,7 @@ async fn test_crawl_with_save_file() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_crawl_with_verbose_flag() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -250,6 +258,7 @@ async fn test_crawl_with_verbose_flag() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_crawl_with_external_flag() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -280,6 +289,7 @@ async fn test_crawl_with_external_flag() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_crawl_with_ignore_redirects_flag() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -310,6 +320,7 @@ async fn test_crawl_with_ignore_redirects_flag() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_crawl_with_keep_fragments_flag() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -340,6 +351,7 @@ async fn test_crawl_with_keep_fragments_flag() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_crawl_with_custom_depth_and_max_pages() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -370,6 +382,7 @@ async fn test_crawl_with_custom_depth_and_max_pages() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_crawl_with_all_flags_combined() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -410,6 +423,7 @@ async fn test_crawl_with_all_flags_combined() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_crawl_with_default_text_output() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -440,6 +454,7 @@ async fn test_crawl_with_default_text_output() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_crawl_with_cli_flag() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -470,6 +485,7 @@ async fn test_crawl_with_cli_flag() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_explicit_tui_requires_interactive_terminal() {
     let args = Cli {
         url: None,
@@ -496,6 +512,7 @@ async fn test_explicit_tui_requires_interactive_terminal() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_classic_mode_without_url_errors() {
     let args = Cli {
         url: None,
@@ -522,6 +539,7 @@ async fn test_classic_mode_without_url_errors() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_crawl_with_save_and_json_output() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -565,6 +583,7 @@ async fn test_crawl_with_save_and_json_output() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_crawl_with_verbose_and_json_output() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -595,6 +614,7 @@ async fn test_crawl_with_verbose_and_json_output() {
 }
 
 #[test]
+#[serial_test::serial]
 fn test_binary_with_invalid_url() {
     let output = Command::new("cargo")
         .args(["run", "--", "example.com"])
@@ -610,6 +630,7 @@ fn test_binary_with_invalid_url() {
 }
 
 #[test]
+#[serial_test::serial]
 fn test_binary_with_valid_url() {
     let output = Command::new("cargo")
         .args([
@@ -632,6 +653,7 @@ fn test_binary_with_valid_url() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_binary_json_output_is_valid_json() {
     start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -669,6 +691,7 @@ async fn test_binary_json_output_is_valid_json() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_crawl_with_config_file_verbose() {
     use tempfile::tempdir;
 
@@ -712,6 +735,7 @@ async fn test_crawl_with_config_file_verbose() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_config_merge_with_cli() {
     use tempfile::tempdir;
 

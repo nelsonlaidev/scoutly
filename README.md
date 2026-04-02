@@ -48,6 +48,10 @@ cargo build --release
 # The binary will be at target/release/scoutly
 ```
 
+### Release Process
+
+Release and packaging instructions live in [`RELEASE.md`](RELEASE.md).
+
 ## Usage
 
 ### Default TUI
