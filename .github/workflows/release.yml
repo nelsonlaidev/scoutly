@@ -39,19 +39,15 @@ permissions:
 # If there's a prerelease-style suffix to the version, then the release(s)
 # will be marked as a prerelease.
 on:
+  pull_request:
   push:
     tags:
       - '**[0-9]+.[0-9]+.[0-9]+*'
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
 
 jobs:
   # Run 'dist plan' (or host) to determine what tasks we need to do
   plan:
     runs-on: "ubuntu-22.04"
-    timeout-minutes: 20
     outputs:
       val: ${{ steps.plan.outputs.manifest }}
       tag: ${{ !github.event.pull_request && github.ref_name || '' }}
@@ -112,7 +108,6 @@ jobs:
       # - N "local" tasks that build each platform's binaries and platform-specific installers
       matrix: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
     container: ${{ matrix.container && matrix.container.image || null }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -176,7 +171,6 @@ jobs:
       - plan
       - build-local-artifacts
     runs-on: "ubuntu-22.04"
-    timeout-minutes: 30
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       BUILD_MANIFEST_NAME: target/distrib/global-dist-manifest.json
@@ -228,7 +222,6 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     runs-on: "ubuntu-22.04"
-    timeout-minutes: 30
     outputs:
       val: ${{ steps.host.outputs.manifest }}
     steps:
@@ -290,7 +283,6 @@ jobs:
       - plan
       - host
     runs-on: "ubuntu-22.04"
-    timeout-minutes: 20
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PLAN: ${{ needs.plan.outputs.val }}
@@ -337,7 +329,6 @@ jobs:
       - plan
       - host
     runs-on: "ubuntu-22.04"
-    timeout-minutes: 20
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PLAN: ${{ needs.plan.outputs.val }}
@@ -360,3 +351,22 @@ jobs:
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  announce:
+    needs:
+      - plan
+      - host
+      - publish-homebrew-formula
+      - publish-npm
+    # use "always() && ..." to allow us to wait for all publish jobs while
+    # still allowing individual publish jobs to skip themselves (for prereleases).
+    # "host" however must run to completion, no skipping allowed!
+    if: ${{ always() && needs.host.result == 'success' && (needs.publish-homebrew-formula.result == 'skipped' || needs.publish-homebrew-formula.result == 'success') && (needs.publish-npm.result == 'skipped' || needs.publish-npm.result == 'success') }}
+    runs-on: "ubuntu-22.04"
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          submodules: recursive
