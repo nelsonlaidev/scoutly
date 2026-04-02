@@ -5,6 +5,7 @@ use ratatui::{
     text::{Line, Span, Text},
     widgets::{Block, Cell, Paragraph, Row, Table, Wrap},
 };
+use std::time::Duration;
 
 use super::app::{App, UiMode};
 use crate::models::{IssueSeverity, PageInfo, SeoIssue};
@@ -88,15 +89,19 @@ fn render_main(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
+    if app.has_active_scan() {
+        render_scan_in_progress(frame, app, area);
+        return;
+    }
+
     let pages = app.visible_pages();
 
     if pages.is_empty() && app.report.is_none() {
         let waiting = Paragraph::new(Text::from(vec![
-            Line::raw("The crawl is running. Live counts update above."),
-            Line::raw("Once the report is ready, pages and issue details will appear here."),
-            Line::raw("Press q to quit at any time."),
+            Line::raw("No crawl report is loaded yet."),
+            Line::raw("Press u to enter a URL and start a crawl."),
         ]))
-        .block(Block::bordered().title("Waiting for report"))
+        .block(Block::bordered().title("Ready to crawl"))
         .wrap(Wrap { trim: true });
         frame.render_widget(waiting, area);
         return;
@@ -111,6 +116,42 @@ fn render_main(frame: &mut Frame, app: &App, area: Rect) {
     } else {
         render_pages_table(frame, app, &pages, area);
     }
+}
+
+fn render_scan_in_progress(frame: &mut Frame, app: &App, area: Rect) {
+    let elapsed = app.elapsed_scan_time().unwrap_or_default();
+    let spinner = spinner_frame(elapsed);
+    let summary = &app.progress.summary;
+    let progress = Text::from(vec![
+        Line::from(vec![Span::styled(
+            format!("{spinner} {}", stage_label(app)),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )]),
+        Line::raw(""),
+        Line::raw(app.progress.message.clone()),
+        Line::raw(""),
+        Line::raw(format!(
+            "Elapsed: {}   Pages: {}   Links: {}/{}",
+            format_duration(elapsed),
+            app.progress.pages_crawled,
+            app.progress.links_checked,
+            app.progress.total_links.max(app.progress.links_discovered)
+        )),
+        Line::raw(format!(
+            "Issues so far: {} errors, {} warnings, {} info, {} broken links",
+            summary.errors, summary.warnings, summary.infos, summary.broken_links
+        )),
+        Line::raw(""),
+        Line::raw("Scoutly is actively scanning the site."),
+        Line::raw("Results will appear automatically as soon as the report is ready."),
+    ]);
+
+    let loading = Paragraph::new(progress)
+        .block(Block::bordered().title("Crawl in progress"))
+        .wrap(Wrap { trim: true });
+    frame.render_widget(loading, area);
 }
 
 fn render_url_input(frame: &mut Frame, app: &App, area: Rect) {
@@ -274,6 +315,11 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
     let help = if matches!(app.mode, UiMode::UrlInput) {
         "mode=URL · type a target URL · Enter start crawl · Ctrl-U clear · Esc quit/back"
             .to_string()
+    } else if app.has_active_scan() {
+        format!(
+            "mode={} · crawl running · q quit · live progress updates above",
+            app.mode.label()
+        )
     } else if matches!(app.mode, UiMode::Search) {
         format!(
             "mode={} · search={} · type to filter · Enter accept · Esc close · Ctrl-U clear",
@@ -313,6 +359,37 @@ fn status_span(app: &App) -> Span<'static> {
         app.status_label().to_string(),
         Style::default().fg(color).add_modifier(Modifier::BOLD),
     )
+}
+
+fn stage_label(app: &App) -> &'static str {
+    match app.progress.stage {
+        crate::runtime::RunStage::LoadingConfig => "Setting up crawl",
+        crate::runtime::RunStage::Crawling => "Crawling pages",
+        crate::runtime::RunStage::CheckingLinks => "Checking links",
+        crate::runtime::RunStage::AnalyzingSeo => "Analyzing SEO",
+        crate::runtime::RunStage::GeneratingReport => "Generating report",
+        crate::runtime::RunStage::Completed => "Report ready",
+        crate::runtime::RunStage::Failed => "Crawl failed",
+    }
+}
+
+fn spinner_frame(elapsed: Duration) -> &'static str {
+    const FRAMES: [&str; 4] = ["-", "\\", "|", "/"];
+    let frame = ((elapsed.as_millis() / 120) as usize) % FRAMES.len();
+    FRAMES[frame]
+}
+
+fn format_duration(elapsed: Duration) -> String {
+    let total_seconds = elapsed.as_secs();
+    let hours = total_seconds / 3600;
+    let minutes = (total_seconds % 3600) / 60;
+    let seconds = total_seconds % 60;
+
+    if hours > 0 {
+        format!("{hours:02}:{minutes:02}:{seconds:02}")
+    } else {
+        format!("{minutes:02}:{seconds:02}")
+    }
 }
 
 fn severity_span(severity: IssueSeverity) -> Span<'static> {
@@ -482,6 +559,8 @@ mod tests {
             },
             timestamp: "2026-04-02T00:00:00Z".to_string(),
         });
+        app.scan_in_progress = false;
+        app.scan_started_at = None;
 
         let backend = TestBackend::new(120, 30);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -498,5 +577,51 @@ mod tests {
         assert!(content.contains("Pages"));
         assert!(content.contains("Details"));
         assert!(content.contains("About"));
+    }
+
+    #[test]
+    fn render_shows_explicit_loading_state_while_scan_is_running() {
+        let runtime = crate::config::RuntimeOptions {
+            url: Some("https://example.com".to_string()),
+            depth: 2,
+            max_pages: 10,
+            output: None,
+            save: None,
+            cli: false,
+            external: false,
+            verbose: false,
+            ignore_redirects: false,
+            keep_fragments: false,
+            rate_limit: None,
+            concurrency: 5,
+            respect_robots_txt: true,
+            tui: false,
+            config: None,
+        };
+        let mut app = App::new(runtime);
+        app.progress = ProgressSnapshot::new(
+            crate::runtime::RunStage::Crawling,
+            "Crawling https://example.com".to_string(),
+        );
+        app.progress.pages_crawled = 3;
+        app.progress.links_discovered = 12;
+        app.progress.total_links = 12;
+        app.scan_in_progress = true;
+
+        let backend = TestBackend::new(120, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(frame, &app)).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(content.contains("Crawl in progress"));
+        assert!(content.contains("Crawling pages"));
+        assert!(content.contains("Scoutly is actively scanning the site."));
+        assert!(content.contains("Elapsed:"));
     }
 }

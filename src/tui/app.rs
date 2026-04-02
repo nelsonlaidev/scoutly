@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use std::time::{Duration, Instant};
 
 use crate::config::RuntimeOptions;
 use crate::models::{CrawlReport, IssueSeverity, PageInfo};
@@ -102,12 +103,14 @@ pub struct App {
     pub error: Option<String>,
     pub should_quit: bool,
     pub scan_in_progress: bool,
+    pub scan_started_at: Option<Instant>,
 }
 
 impl App {
     pub fn new(runtime: RuntimeOptions) -> Self {
         let initial_url = runtime.url.clone();
-        let mode = if initial_url.is_some() {
+        let has_initial_url = initial_url.is_some();
+        let mode = if has_initial_url {
             UiMode::Normal
         } else {
             UiMode::UrlInput
@@ -120,7 +123,7 @@ impl App {
 
         Self {
             url: initial_url.clone(),
-            url_input: initial_url.unwrap_or_default(),
+            url_input: initial_url.clone().unwrap_or_default(),
             depth: runtime.depth,
             max_pages: runtime.max_pages,
             mode,
@@ -134,7 +137,8 @@ impl App {
             show_details: true,
             error: None,
             should_quit: false,
-            scan_in_progress: false,
+            scan_in_progress: has_initial_url,
+            scan_started_at: has_initial_url.then(Instant::now),
         }
     }
 
@@ -143,10 +147,16 @@ impl App {
             RunEvent::Progress(snapshot) => {
                 self.scan_in_progress =
                     !matches!(snapshot.stage, RunStage::Completed | RunStage::Failed);
+                self.scan_started_at = if self.scan_in_progress {
+                    self.scan_started_at.or(Some(Instant::now()))
+                } else {
+                    None
+                };
                 self.progress = snapshot;
             }
             RunEvent::ReportReady(report) => {
                 self.scan_in_progress = false;
+                self.scan_started_at = None;
                 self.progress.stage = RunStage::Completed;
                 self.progress.summary = report.summary.clone();
                 self.progress.message = "Report ready".to_string();
@@ -159,6 +169,7 @@ impl App {
             }
             RunEvent::Error(error) => {
                 self.scan_in_progress = false;
+                self.scan_started_at = None;
                 self.error = Some(error.clone());
                 self.progress.stage = RunStage::Failed;
                 self.progress.message = error;
@@ -232,6 +243,10 @@ impl App {
 
     pub const fn has_active_scan(&self) -> bool {
         self.scan_in_progress
+    }
+
+    pub fn elapsed_scan_time(&self) -> Option<Duration> {
+        self.scan_started_at.map(|started_at| started_at.elapsed())
     }
 
     fn handle_url_input_key(&mut self, key: KeyEvent) -> Option<AppAction> {
@@ -346,6 +361,7 @@ impl App {
         self.report = None;
         self.error = None;
         self.scan_in_progress = true;
+        self.scan_started_at = Some(Instant::now());
         self.search_query.clear();
         self.search_input.clear();
         self.selected_index = 0;
@@ -592,6 +608,7 @@ mod tests {
 
         assert_eq!(app.mode, UiMode::UrlInput);
         assert_eq!(app.status_label(), "READY");
+        assert!(!app.has_active_scan());
     }
 
     #[test]
@@ -622,6 +639,32 @@ mod tests {
         );
         assert_eq!(app.mode, UiMode::Normal);
         assert!(app.has_active_scan());
+        assert!(app.elapsed_scan_time().is_some());
+    }
+
+    #[test]
+    fn initial_url_marks_scan_as_active() {
+        let app = App::new(RuntimeOptions {
+            url: Some("https://example.com".to_string()),
+            depth: 5,
+            max_pages: 10,
+            output: None,
+            save: None,
+            cli: false,
+            external: false,
+            verbose: false,
+            ignore_redirects: false,
+            keep_fragments: false,
+            rate_limit: None,
+            concurrency: 5,
+            respect_robots_txt: true,
+            tui: false,
+            config: None,
+        });
+
+        assert_eq!(app.mode, UiMode::Normal);
+        assert!(app.has_active_scan());
+        assert!(app.elapsed_scan_time().is_some());
     }
 
     #[test]

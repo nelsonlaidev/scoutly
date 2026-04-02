@@ -3,7 +3,9 @@ mod server;
 use scoutly::crawler::{Crawler, CrawlerConfig};
 use scoutly::link_checker::LinkChecker;
 use scoutly::models::{IssueSeverity, IssueType};
+use scoutly::runtime::RunEvent;
 use server::{get_test_server_url, start_link_test_server};
+use tokio::sync::mpsc::unbounded_channel;
 
 #[tokio::test]
 async fn test_link_checker() {
@@ -430,6 +432,77 @@ async fn test_link_checker() {
             "Redirect link should NOT generate an issue when ignored"
         );
     }
+}
+
+#[tokio::test]
+async fn test_link_checker_emits_live_progress_with_current_url() {
+    start_link_test_server().await;
+
+    let base_url = get_test_server_url().await;
+
+    let mut crawler = Crawler::new(
+        &base_url,
+        CrawlerConfig {
+            max_depth: 2,
+            max_pages: 50,
+            follow_external: false,
+            keep_fragments: false,
+            requests_per_second: None,
+            concurrent_requests: 1,
+            respect_robots_txt: false,
+        },
+    )
+    .expect("Failed to create crawler");
+
+    crawler.crawl().await.expect("Crawl failed");
+
+    let expected_unique_links = crawler
+        .pages
+        .values()
+        .flat_map(|page| page.links.iter().map(|link| link.url.clone()))
+        .collect::<std::collections::HashSet<_>>()
+        .len();
+
+    let (sender, mut receiver) = unbounded_channel();
+    let mut checker = LinkChecker::with_concurrency(2);
+    checker.set_progress_sender(sender);
+
+    checker
+        .check_all_links(&mut crawler.pages, false)
+        .await
+        .expect("Link checking failed");
+
+    drop(checker);
+
+    let mut snapshots = Vec::new();
+    while let Ok(event) = receiver.try_recv() {
+        if let RunEvent::Progress(snapshot) = event {
+            snapshots.push(snapshot);
+        }
+    }
+
+    assert!(
+        !snapshots.is_empty(),
+        "Link checker should emit progress snapshots while checking links"
+    );
+
+    assert!(
+        snapshots
+            .iter()
+            .any(|snapshot| snapshot.message.contains("http://127.0.0.1:3000/")),
+        "At least one progress message should include the current link URL"
+    );
+
+    let last_snapshot = snapshots.last().expect("Missing final progress snapshot");
+    assert_eq!(last_snapshot.links_checked, expected_unique_links);
+    assert_eq!(last_snapshot.total_links, expected_unique_links);
+    assert!(
+        last_snapshot.message.starts_with(&format!(
+            "Checking link {}/{}:",
+            expected_unique_links, expected_unique_links
+        )),
+        "Final progress message should report the completed unique-link count"
+    );
 }
 
 #[tokio::test]

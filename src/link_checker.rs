@@ -3,7 +3,10 @@ use crate::models::{IssueSeverity, IssueType, Link, PageInfo, SeoIssue};
 use crate::reporter::Reporter;
 use crate::runtime::{ProgressSnapshot, RunEvent, RunEventSender, RunStage};
 use anyhow::Result;
-use futures::stream::{self, StreamExt};
+use futures::{
+    pin_mut,
+    stream::{self, StreamExt},
+};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 
@@ -82,28 +85,29 @@ impl LinkChecker {
         }
 
         let link_urls: Vec<String> = all_links.keys().cloned().collect();
-        let results: HashMap<String, LinkCheckOutcome> = stream::iter(link_urls.iter().cloned())
-            .map(|url| async move {
-                let outcome = self.check_link(&url).await;
-                (url, outcome)
-            })
-            .buffer_unordered(self.concurrent_checks)
-            .collect()
-            .await;
+        let total_links = link_urls.len();
 
         // Initialize progress bar if enabled
         if let Some(ref pb) = self.progress_bar {
             pb.set_position(0);
         }
 
-        for (idx, url) in link_urls.iter().enumerate() {
-            if let Some(locations) = all_links.get(url) {
+        let pending_checks = stream::iter(link_urls.iter().cloned())
+            .map(|url| async move {
+                let outcome = self.check_link(&url).await;
+                (url, outcome)
+            })
+            .buffer_unordered(self.concurrent_checks);
+        pin_mut!(pending_checks);
+
+        let mut completed = 0usize;
+
+        while let Some((url, outcome)) = pending_checks.next().await {
+            if let Some(locations) = all_links.get(&url) {
                 for (page_url, link_idx) in locations {
-                    if let Some(page) = pages.get_mut(page_url)
-                        && let Some(outcome) = results.get(url)
-                    {
+                    if let Some(page) = pages.get_mut(page_url) {
                         let issues = if let Some(link) = page.links.get_mut(*link_idx) {
-                            Self::apply_outcome(link, outcome, ignore_redirects)
+                            Self::apply_outcome(link, &outcome, ignore_redirects)
                         } else {
                             Vec::new()
                         };
@@ -115,20 +119,23 @@ impl LinkChecker {
                 }
             }
 
+            completed += 1;
+
             // Update progress bar
             if let Some(ref pb) = self.progress_bar {
-                pb.set_position((idx + 1) as u64);
+                pb.set_position(completed as u64);
+                pb.set_message(format!("Checking {}", url));
             }
 
             if let Some(sender) = &self.progress_sender {
                 let mut snapshot = ProgressSnapshot::new(
                     RunStage::CheckingLinks,
-                    format!("Checked {}/{} unique link(s)", idx + 1, link_urls.len()),
+                    format!("Checking link {}/{}: {}", completed, total_links, url),
                 );
                 snapshot.pages_crawled = pages.len();
-                snapshot.links_discovered = link_urls.len();
-                snapshot.links_checked = idx + 1;
-                snapshot.total_links = link_urls.len();
+                snapshot.links_discovered = total_links;
+                snapshot.links_checked = completed;
+                snapshot.total_links = total_links;
                 snapshot.summary = Reporter::summarize_pages(pages);
 
                 let _ = sender.send(RunEvent::Progress(snapshot));
@@ -137,7 +144,7 @@ impl LinkChecker {
 
         // Finish progress bar
         if let Some(ref pb) = self.progress_bar {
-            pb.finish_with_message(format!("Checked {} links", link_urls.len()));
+            pb.finish_with_message(format!("Checked {} links", total_links));
         }
 
         Ok(())
