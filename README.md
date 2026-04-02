@@ -25,6 +25,7 @@ A fast, lightweight CLI website crawler and SEO analyzer built with Rust. Scoutl
 ### Optional Development Tools
 
 - **Lefthook** - Git hooks manager for running linters and formatters automatically
+
   ```bash
   # macOS
   brew install lefthook
@@ -103,17 +104,16 @@ scoutly https://example.com --cli --depth 4 --max-pages 200 --verbose --ignore-r
 
 The default TUI is keyboard-first and intentionally close to tools like `llmfit`. If you launch `scoutly` without a URL, the TUI opens a URL input first:
 
-| Key | Action |
-| --- | --- |
-| `j` / `k` or `Up` / `Down` | Move between pages |
-| `/` | Enter search mode |
-| `f` | Cycle severity filter |
-| `s` | Cycle sort mode |
-| `Enter` | Toggle the detail pane |
-| `q` / `Esc` | Quit |
+| Key                        | Action                 |
+| -------------------------- | ---------------------- |
+| `j` / `k` or `Up` / `Down` | Move between pages     |
+| `/`                        | Enter search mode      |
+| `f`                        | Cycle severity filter  |
+| `s`                        | Cycle sort mode        |
+| `Enter`                    | Toggle the detail pane |
+| `q` / `Esc`                | Quit                   |
 
 When Scoutly is not attached to an interactive terminal, it automatically falls back to the classic CLI unless you explicitly pass `--tui`.
-```
 
 ### Configuration Files
 
@@ -138,6 +138,7 @@ Scoutly automatically looks for configuration files in the following locations (
 All configuration fields are optional. You can provide only the fields you want to customize.
 
 **JSON** (`scoutly.json`):
+
 ```json
 {
   "depth": 10,
@@ -155,6 +156,7 @@ All configuration fields are optional. You can provide only the fields you want 
 ```
 
 **TOML** (`scoutly.toml`):
+
 ```toml
 depth = 10
 max_pages = 500
@@ -170,6 +172,7 @@ respect_robots_txt = true
 ```
 
 **YAML** (`scoutly.yaml`):
+
 ```yaml
 depth: 10
 max_pages: 500
@@ -235,6 +238,7 @@ Options:
 ### Default TUI
 
 Running `scoutly https://example.com` in an interactive terminal opens the Ratatui dashboard with:
+
 - a live status/header bar
 - pages / links / error / warning counters
 - a searchable, sortable pages table
@@ -303,28 +307,23 @@ Scoutly extracts links from multiple HTML elements:
 ## SEO Checks Performed
 
 - **Title Tag**
-
   - Missing title
   - Title too short (< 50 characters, recommended: 50-60)
   - Title too long (> 60 characters, recommended: 50-60)
 
 - **Meta Description**
-
   - Missing meta description
   - Description too short (< 150 characters, recommended: 150-160)
   - Description too long (> 160 characters, recommended: 150-160)
 
 - **Headings**
-
   - Missing H1 tag
   - Multiple H1 tags
 
 - **Images**
-
   - Missing alt attributes
 
 - **Content**
-
   - Thin content detection (checks if page has fewer than 5 content indicators)
 
 - **Links**
