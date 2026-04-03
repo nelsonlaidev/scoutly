@@ -32,7 +32,7 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
             " Scoutly ",
             Style::default().fg(Color::Black).bg(Color::Cyan),
         ),
-        Span::raw("  default TUI · classic CLI via --cli"),
+        Span::raw("  default TUI · CLI via --cli"),
     ]);
     let subtitle = Line::from(vec![
         Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),

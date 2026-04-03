@@ -530,7 +530,7 @@ async fn test_crawl_with_default_text_output() {
     .await;
     assert!(
         result.is_ok(),
-        "Should successfully fall back to classic text output in a non-interactive test context"
+        "Should successfully fall back to text output in a non-interactive test context"
     );
 }
 
@@ -565,10 +565,7 @@ async fn test_crawl_with_cli_flag() {
         },
     )
     .await;
-    assert!(
-        result.is_ok(),
-        "Should successfully run in classic CLI mode"
-    );
+    assert!(result.is_ok(), "Should successfully run in CLI mode");
 }
 
 #[tokio::test]
@@ -604,7 +601,7 @@ async fn test_explicit_tui_requires_interactive_terminal() {
 }
 
 #[tokio::test]
-async fn test_classic_mode_without_url_errors() {
+async fn test_cli_mode_without_url_errors() {
     let args = Cli {
         url: None,
         depth: Some(1),
@@ -631,7 +628,7 @@ async fn test_classic_mode_without_url_errors() {
         },
     )
     .await
-    .expect_err("Classic CLI mode should require a URL");
+    .expect_err("CLI mode should require a URL");
     assert!(error.to_string().contains("URL is required"));
 }
 

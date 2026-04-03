@@ -13,7 +13,7 @@ A fast, lightweight CLI website crawler and SEO analyzer built with Rust. Scoutl
   - Find images without alt text
   - Identify thin content
 - **Configuration Files**: Support for JSON, TOML, and YAML configuration files with automatic detection
-- **Default TUI + Classic CLI**: Launch an interactive terminal UI by default, or force the classic text/JSON CLI when needed
+- **Default TUI + CLI**: Launch an interactive terminal UI by default, or force the text/JSON CLI when needed
 - **Fast & Concurrent**: Built with Tokio for async I/O and parallel link checking
 - **robots.txt Support**: Respects robots.txt rules by default
 
@@ -71,10 +71,10 @@ scoutly https://example.com --depth 3 --max-pages 100
 scoutly https://example.com --tui
 ```
 
-### Classic CLI and JSON Modes
+### CLI and JSON Modes
 
 ```bash
-# Force the classic text report instead of the TUI
+# Force the text report instead of the TUI
 scoutly https://example.com --cli
 
 # Output machine-readable JSON instead of launching the TUI
@@ -113,7 +113,7 @@ The default TUI is keyboard-first and intentionally close to tools like `llmfit`
 | `Enter`                    | Toggle the detail pane |
 | `q` / `Esc`                | Quit                   |
 
-When Scoutly is not attached to an interactive terminal, it automatically falls back to the classic CLI unless you explicitly pass `--tui`.
+When Scoutly is not attached to an interactive terminal, it automatically falls back to the CLI unless you explicitly pass `--tui`.
 
 ### Configuration Files
 
@@ -217,8 +217,8 @@ Arguments:
 Options:
   -d, --depth <DEPTH>              Maximum crawl depth (default: 5)
   -m, --max-pages <MAX_PAGES>      Maximum number of pages to crawl (default: 200)
-  -o, --output <OUTPUT>            Classic CLI output format: text or json
-      --cli                        Force classic CLI mode instead of launching the TUI
+  -o, --output <OUTPUT>            CLI output format: text or json
+      --cli                        Force CLI mode instead of launching the TUI
       --tui                        Force the interactive TUI
   -s, --save <SAVE>                Save report to file
   -e, --external                   Follow external links
@@ -281,7 +281,7 @@ Pages with Issues
       [ERROR] Broken link: https://example.com/old-page (HTTP 404)
 ```
 
-### Classic JSON Report
+### JSON Report
 
 Use `--output json` to get machine-readable output suitable for integration with other tools or CI/CD pipelines. In JSON mode, Scoutly writes the report JSON to stdout and keeps human-oriented progress/status messages off stdout so the output stays parseable. Link objects also include an optional `check_error` field when a link fails due to a transport-level error instead of an HTTP response.
 

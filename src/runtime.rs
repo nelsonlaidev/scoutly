@@ -10,16 +10,16 @@ use crate::update::UpdateNotice;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LaunchMode {
     Tui,
-    ClassicText,
-    ClassicJson,
+    Text,
+    Json,
 }
 
 impl LaunchMode {
     pub const fn output_format(self) -> Option<OutputFormat> {
         match self {
             Self::Tui => None,
-            Self::ClassicText => Some(OutputFormat::Text),
-            Self::ClassicJson => Some(OutputFormat::Json),
+            Self::Text => Some(OutputFormat::Text),
+            Self::Json => Some(OutputFormat::Json),
         }
     }
 }
@@ -113,11 +113,11 @@ pub fn resolve_launch_mode(
     }
 
     match runtime.output {
-        Some(OutputFormat::Json) => Ok(LaunchMode::ClassicJson),
-        Some(OutputFormat::Text) => Ok(LaunchMode::ClassicText),
-        None if runtime.cli => Ok(LaunchMode::ClassicText),
+        Some(OutputFormat::Json) => Ok(LaunchMode::Json),
+        Some(OutputFormat::Text) => Ok(LaunchMode::Text),
+        None if runtime.cli => Ok(LaunchMode::Text),
         None if terminal.is_interactive() => Ok(LaunchMode::Tui),
-        None => Ok(LaunchMode::ClassicText),
+        None => Ok(LaunchMode::Text),
     }
 }
 
@@ -175,32 +175,32 @@ mod tests {
     }
 
     #[test]
-    fn defaults_to_classic_text_for_non_interactive_terminals() {
+    fn defaults_to_text_for_non_interactive_terminals() {
         assert_eq!(
             resolve_launch_mode(&runtime(), NON_INTERACTIVE).unwrap(),
-            LaunchMode::ClassicText
+            LaunchMode::Text
         );
     }
 
     #[test]
-    fn cli_flag_forces_classic_text() {
+    fn cli_flag_forces_text() {
         let mut options = runtime();
         options.cli = true;
 
         assert_eq!(
             resolve_launch_mode(&options, INTERACTIVE).unwrap(),
-            LaunchMode::ClassicText
+            LaunchMode::Text
         );
     }
 
     #[test]
-    fn output_json_forces_classic_json() {
+    fn output_json_forces_json() {
         let mut options = runtime();
         options.output = Some(OutputFormat::Json);
 
         assert_eq!(
             resolve_launch_mode(&options, INTERACTIVE).unwrap(),
-            LaunchMode::ClassicJson
+            LaunchMode::Json
         );
     }
 
@@ -217,13 +217,13 @@ mod tests {
     }
 
     #[test]
-    fn output_text_forces_classic_text() {
+    fn output_text_forces_text() {
         let mut options = runtime();
         options.output = Some(OutputFormat::Text);
 
         assert_eq!(
             resolve_launch_mode(&options, INTERACTIVE).unwrap(),
-            LaunchMode::ClassicText
+            LaunchMode::Text
         );
     }
 
@@ -245,7 +245,7 @@ mod tests {
 
         assert_eq!(
             resolve_launch_mode(&options, INTERACTIVE).unwrap(),
-            LaunchMode::ClassicJson
+            LaunchMode::Json
         );
     }
 
@@ -257,7 +257,7 @@ mod tests {
 
         assert_eq!(
             resolve_launch_mode(&options, INTERACTIVE).unwrap(),
-            LaunchMode::ClassicText
+            LaunchMode::Text
         );
     }
 
@@ -291,7 +291,7 @@ mod tests {
 
         assert_eq!(
             resolve_launch_mode(&options, NON_INTERACTIVE).unwrap(),
-            LaunchMode::ClassicText
+            LaunchMode::Text
         );
     }
 
@@ -302,7 +302,7 @@ mod tests {
 
         assert_eq!(
             resolve_launch_mode(&options, NON_INTERACTIVE).unwrap(),
-            LaunchMode::ClassicJson
+            LaunchMode::Json
         );
     }
 
@@ -313,7 +313,7 @@ mod tests {
 
         assert_eq!(
             resolve_launch_mode(&options, NON_INTERACTIVE).unwrap(),
-            LaunchMode::ClassicText
+            LaunchMode::Text
         );
     }
 
@@ -321,7 +321,7 @@ mod tests {
     fn stdin_only_is_not_interactive() {
         assert_eq!(
             resolve_launch_mode(&runtime(), STDIN_ONLY).unwrap(),
-            LaunchMode::ClassicText
+            LaunchMode::Text
         );
     }
 
@@ -329,7 +329,7 @@ mod tests {
     fn stdout_only_is_not_interactive() {
         assert_eq!(
             resolve_launch_mode(&runtime(), STDOUT_ONLY).unwrap(),
-            LaunchMode::ClassicText
+            LaunchMode::Text
         );
     }
 
@@ -345,13 +345,7 @@ mod tests {
     #[test]
     fn launch_mode_output_format_mapping() {
         assert_eq!(LaunchMode::Tui.output_format(), None);
-        assert_eq!(
-            LaunchMode::ClassicText.output_format(),
-            Some(OutputFormat::Text)
-        );
-        assert_eq!(
-            LaunchMode::ClassicJson.output_format(),
-            Some(OutputFormat::Json)
-        );
+        assert_eq!(LaunchMode::Text.output_format(), Some(OutputFormat::Text));
+        assert_eq!(LaunchMode::Json.output_format(), Some(OutputFormat::Json));
     }
 }

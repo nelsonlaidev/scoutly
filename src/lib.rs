@@ -46,13 +46,13 @@ pub async fn run_with_terminal(args: Cli, terminal: TerminalSupport) -> Result<(
             }
             tui::run(runtime).await
         }
-        LaunchMode::ClassicText => {
-            validate_required_url(&runtime, "classic CLI mode")?;
-            run_classic(runtime, loaded_config, OutputFormat::Text).await
+        LaunchMode::Text => {
+            validate_required_url(&runtime, "CLI mode")?;
+            run_cli(runtime, loaded_config, OutputFormat::Text).await
         }
-        LaunchMode::ClassicJson => {
+        LaunchMode::Json => {
             validate_required_url(&runtime, "JSON output mode")?;
-            run_classic(runtime, loaded_config, OutputFormat::Json).await
+            run_cli(runtime, loaded_config, OutputFormat::Json).await
         }
     }
 }
@@ -150,7 +150,7 @@ pub(crate) async fn execute_scan(
     Ok(report)
 }
 
-async fn run_classic(
+async fn run_cli(
     runtime: RuntimeOptions,
     loaded_config: LoadedConfig,
     output_format: OutputFormat,

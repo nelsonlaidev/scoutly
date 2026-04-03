@@ -18,10 +18,10 @@ pub struct Config {
     /// Maximum number of pages to crawl
     pub max_pages: Option<usize>,
 
-    /// Classic CLI output format
+    /// CLI output format
     pub output: Option<OutputFormat>,
 
-    /// Prefer the classic CLI renderer instead of the default TUI
+    /// Prefer the CLI renderer instead of the default TUI
     pub cli: Option<bool>,
 
     /// Save report to file

@@ -35,11 +35,11 @@ pub struct Cli {
     #[arg(short, long)]
     pub max_pages: Option<usize>,
 
-    /// Classic CLI output format: text or json
+    /// CLI output format: text or json
     #[arg(short, long, value_enum, conflicts_with = "tui")]
     pub output: Option<OutputFormat>,
 
-    /// Force classic CLI mode instead of launching the TUI
+    /// Force CLI mode instead of launching the TUI
     #[arg(long, conflicts_with = "tui")]
     pub cli: bool,
 
