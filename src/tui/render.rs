@@ -134,8 +134,14 @@ fn render_main(frame: &mut Frame, app: &App, area: Rect) {
 fn render_scan_in_progress(frame: &mut Frame, app: &App, area: Rect) {
     let elapsed = app.elapsed_scan_time().unwrap_or_default();
     let spinner = spinner_frame(elapsed);
-    let summary = &app.progress.summary;
-    let progress = Text::from(vec![
+    let section = Block::bordered()
+        .title("Crawl in progress")
+        .border_style(Style::default().fg(Color::Red));
+    let inner = section.inner(area);
+    frame.render_widget(section, area);
+
+    let content_area = center_rect(inner, inner.width.min(76), inner.height.min(7));
+    let progress = Paragraph::new(Text::from(vec![
         Line::from(vec![Span::styled(
             format!("{spinner} {}", stage_label(app)),
             Style::default()
@@ -143,32 +149,63 @@ fn render_scan_in_progress(frame: &mut Frame, app: &App, area: Rect) {
                 .add_modifier(Modifier::BOLD),
         )]),
         Line::raw(""),
-        Line::raw(app.progress.message.clone()),
+        Line::styled(
+            app.progress.message.clone(),
+            Style::default().fg(Color::White),
+        ),
         Line::raw(""),
-        Line::raw(format!(
-            "Elapsed: {}   Pages: {}   Links: {}/{}",
-            format_duration(elapsed),
-            app.progress.pages_crawled,
-            app.progress.links_checked,
-            app.progress.total_links.max(app.progress.links_discovered)
-        )),
-        Line::raw(format!(
-            "Issues so far: {} errors, {} warnings, {} info, {} broken links",
-            summary.errors, summary.warnings, summary.infos, summary.broken_links
-        )),
-        Line::raw(""),
-        Line::raw("Scoutly is actively scanning the site."),
-        Line::raw("Results will appear automatically as soon as the report is ready."),
-    ]);
+        Line::from(vec![
+            Span::styled(
+                "Elapsed",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" "),
+            Span::styled(
+                format_duration(elapsed),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("  •  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Pages",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" "),
+            Span::styled(
+                app.progress.pages_crawled.to_string(),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("  •  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Links",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" "),
+            Span::styled(
+                format!(
+                    "{}/{}",
+                    app.progress.links_checked,
+                    app.progress.total_links.max(app.progress.links_discovered)
+                ),
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+    ]))
+    .alignment(Alignment::Center)
+    .wrap(Wrap { trim: true });
 
-    let loading = Paragraph::new(progress)
-        .block(
-            Block::bordered()
-                .title("Crawl in progress")
-                .border_style(Style::default().fg(Color::Red)),
-        )
-        .wrap(Wrap { trim: true });
-    frame.render_widget(loading, area);
+    frame.render_widget(progress, content_area);
 }
 
 fn render_url_input(frame: &mut Frame, app: &App, area: Rect) {
@@ -764,8 +801,10 @@ mod tests {
 
         assert!(content.contains("Crawl in progress"));
         assert!(content.contains("Crawling pages"));
-        assert!(content.contains("Scoutly is actively scanning the site."));
-        assert!(content.contains("Elapsed:"));
+        assert!(content.contains("Crawling https://example.com"));
+        assert!(content.contains("Elapsed"));
+        assert!(content.contains("Pages"));
+        assert!(content.contains("Links"));
     }
 
     #[test]
