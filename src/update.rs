@@ -32,6 +32,12 @@ pub async fn check_for_update() -> Option<UpdateNotice> {
         .ok()
         .or_else(|| latest_release_api_url(REPOSITORY_URL))?;
 
+    tracing::debug!(
+        endpoint = %endpoint,
+        current_version = %CURRENT_VERSION,
+        "Checking for updates"
+    );
+
     check_for_update_with_endpoint(CURRENT_VERSION, &endpoint).await
 }
 
@@ -41,6 +47,7 @@ pub async fn check_for_update_with_endpoint(
     endpoint: &str,
 ) -> Option<UpdateNotice> {
     let client = build_api_client(UPDATE_CHECK_TIMEOUT_SECS).ok()?;
+    tracing::debug!(endpoint = %endpoint, "Fetching latest release info");
     fetch_update_notice(&client, current_version, endpoint)
         .await
         .ok()
@@ -63,8 +70,14 @@ async fn fetch_update_notice(
     current_version: &str,
     endpoint: &str,
 ) -> anyhow::Result<Option<UpdateNotice>> {
+    tracing::debug!(endpoint = %endpoint, "Sending request to releases API");
     let response = client.get(endpoint).send().await?.error_for_status()?;
     let release: LatestReleaseResponse = response.json().await?;
+    tracing::debug!(
+        tag_name = ?release.tag_name,
+        html_url = ?release.html_url,
+        "Received release response"
+    );
 
     let latest_version = release
         .tag_name
@@ -72,6 +85,12 @@ async fn fetch_update_notice(
         .and_then(normalize_version)
         .filter(|latest_version| is_newer_version(current_version, latest_version))
         .map(str::to_string);
+
+    tracing::debug!(
+        current_version = %current_version,
+        latest_version = ?latest_version,
+        "Version comparison result"
+    );
 
     Ok(match (latest_version, release.html_url) {
         (Some(latest_version), Some(release_url)) => Some(UpdateNotice {

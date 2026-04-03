@@ -150,6 +150,46 @@ async fn binary_json_output_stays_valid_when_update_is_available() {
 
 #[tokio::test]
 #[serial_test::serial]
+async fn binary_emits_debug_logs_when_logging_env_is_set() {
+    start_link_test_server().await;
+    let crawl_url = get_test_server_url().await;
+    let update_url = format!("{}/latest", start_update_server().await);
+
+    let output = tokio::task::spawn_blocking(move || {
+        Command::new(env!("CARGO_BIN_EXE_scoutly"))
+            .env("SCOUTLY_UPDATE_API_URL", update_url)
+            .env("SCOUTLY_LOG", "scoutly=debug")
+            .args([
+                crawl_url.as_str(),
+                "--depth",
+                "1",
+                "--max-pages",
+                "1",
+                "--output",
+                "json",
+            ])
+            .output()
+            .expect("run binary with debug logging enabled")
+    })
+    .await
+    .expect("binary task should complete");
+
+    assert!(
+        output.status.success(),
+        "debug logging should not break JSON mode"
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    serde_json::from_str::<serde_json::Value>(&stdout).expect("stdout should stay valid JSON");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Checking for updates"),
+        "stderr should include tracing debug output when SCOUTLY_LOG is set"
+    );
+}
+
+#[tokio::test]
+#[serial_test::serial]
 async fn binary_text_mode_surfaces_update_notice() {
     start_link_test_server().await;
     let crawl_url = get_test_server_url().await;
