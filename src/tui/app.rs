@@ -420,12 +420,7 @@ impl App {
         }
 
         let in_url = page.url.to_lowercase().contains(query);
-        let in_title = page
-            .title
-            .as_deref()
-            .unwrap_or_default()
-            .to_lowercase()
-            .contains(query);
+        let in_title = page.display_title().to_lowercase().contains(query);
         let in_issues = page
             .issues
             .iter()

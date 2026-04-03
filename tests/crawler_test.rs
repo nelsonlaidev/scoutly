@@ -1161,3 +1161,54 @@ async fn test_content_type_validation() {
         );
     }
 }
+
+#[tokio::test]
+#[serial_test::serial]
+async fn test_media_resources_are_not_crawled_as_pages() {
+    use scoutly::crawler::{Crawler, CrawlerConfig};
+    use server::get_test_server_url;
+
+    let base_url = get_test_server_url().await;
+    let start_url = format!("{}/crawler-media.html", base_url);
+    let mut crawler = Crawler::new(
+        &start_url,
+        CrawlerConfig {
+            max_depth: 2,
+            max_pages: 50,
+            follow_external: false,
+            keep_fragments: false,
+            requests_per_second: None,
+            concurrent_requests: 1,
+            respect_robots_txt: false,
+        },
+    )
+    .expect("Failed to create crawler");
+
+    crawler.crawl().await.expect("Crawl failed");
+
+    assert_eq!(
+        crawler.pages.len(),
+        1,
+        "Embedded media assets should remain links, not crawled pages"
+    );
+    assert!(
+        crawler.pages.contains_key(&start_url),
+        "The HTML page itself should still be crawled"
+    );
+
+    let page = crawler
+        .pages
+        .get(&start_url)
+        .expect("crawler-media.html should be present");
+
+    assert!(
+        page.links
+            .iter()
+            .any(|link| link.url.ends_with("/media/video1.mp4")),
+        "Media URLs should still be extracted as links"
+    );
+    assert!(
+        !crawler.pages.keys().any(|url| url.ends_with(".mp4")),
+        "MP4 resources should not appear in the crawled pages list"
+    );
+}

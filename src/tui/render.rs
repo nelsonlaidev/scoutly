@@ -303,7 +303,7 @@ fn render_pages_table(frame: &mut Frame, app: &App, pages: &[&PageInfo], area: R
                     .unwrap_or_else(|| "-".to_string()),
             ),
             Cell::from(issue_summary(page)),
-            Cell::from(trimmed(page.title.as_deref().unwrap_or("(untitled)"), 24)),
+            Cell::from(trimmed(&page.display_title(), 24)),
             Cell::from(trimmed(&page.url, 48)),
         ])
     });
@@ -368,11 +368,7 @@ fn render_detail_pane(frame: &mut Frame, app: &App, pages: &[&PageInfo], area: R
         ]),
         Line::from(vec![
             Span::styled("Title: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(
-                page.title
-                    .clone()
-                    .unwrap_or_else(|| "(untitled)".to_string()),
-            ),
+            Span::raw(page.display_title()),
         ]),
         Line::from(vec![
             Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),

@@ -250,11 +250,15 @@ impl Crawler {
                         // Queue internal links for crawling
                         if depth < self.max_depth {
                             for link in &page_info.links {
-                                if !link.is_external || self.follow_external {
-                                    let normalized_link_url = self.normalize_url(&link.url);
-                                    if !self.visited.contains(&normalized_link_url) {
-                                        self.to_visit.push_back((link.url.clone(), depth + 1));
-                                    }
+                                if (link.is_external && !self.follow_external)
+                                    || !Self::should_crawl_discovered_url(&link.url)
+                                {
+                                    continue;
+                                }
+
+                                let normalized_link_url = self.normalize_url(&link.url);
+                                if !self.visited.contains(&normalized_link_url) {
+                                    self.to_visit.push_back((link.url.clone(), depth + 1));
                                 }
                             }
                         }
@@ -316,7 +320,7 @@ impl Crawler {
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
 
-        if !Self::is_html_content_type(content_type.as_deref()) {
+        if !PageInfo::is_html_content_type(content_type.as_deref()) {
             if let Some(ref ct) = content_type {
                 tracing::info!(
                     url = %url,
@@ -511,10 +515,81 @@ impl Crawler {
         Ok(images)
     }
 
-    fn is_html_content_type(content_type: Option<&str>) -> bool {
-        content_type.is_none_or(|ct| {
-            let ct_lower = ct.to_lowercase();
-            ct_lower.contains("text/html") || ct_lower.contains("application/xhtml")
-        })
+    fn should_crawl_discovered_url(url: &str) -> bool {
+        !Self::is_known_non_html_resource_url(url)
+    }
+
+    fn is_known_non_html_resource_url(url: &str) -> bool {
+        let Some(extension) = Url::parse(url)
+            .ok()
+            .and_then(|parsed| {
+                parsed
+                    .path_segments()
+                    .and_then(|segments| segments.filter(|segment| !segment.is_empty()).next_back())
+                    .map(str::to_owned)
+            })
+            .and_then(|segment| {
+                segment
+                    .rsplit_once('.')
+                    .map(|(_, ext)| ext.to_ascii_lowercase())
+            })
+        else {
+            return false;
+        };
+
+        matches!(
+            extension.as_str(),
+            "7z" | "aac"
+                | "avi"
+                | "avif"
+                | "bin"
+                | "bmp"
+                | "css"
+                | "csv"
+                | "doc"
+                | "docx"
+                | "eot"
+                | "flac"
+                | "gif"
+                | "gz"
+                | "ico"
+                | "jpeg"
+                | "jpg"
+                | "js"
+                | "json"
+                | "m4a"
+                | "m4v"
+                | "mid"
+                | "midi"
+                | "mjs"
+                | "mov"
+                | "mp3"
+                | "mp4"
+                | "mpeg"
+                | "mpg"
+                | "ogg"
+                | "ogv"
+                | "otf"
+                | "pdf"
+                | "png"
+                | "ppt"
+                | "pptx"
+                | "rar"
+                | "svg"
+                | "swf"
+                | "tar"
+                | "tgz"
+                | "ttf"
+                | "txt"
+                | "wav"
+                | "webm"
+                | "webp"
+                | "woff"
+                | "woff2"
+                | "xls"
+                | "xlsx"
+                | "xml"
+                | "zip"
+        )
     }
 }
