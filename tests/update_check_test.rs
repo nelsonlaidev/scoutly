@@ -49,6 +49,7 @@ async fn start_update_server() -> String {
                 }),
             )
     })
+    .workers(1)
     .listen(listener)
     .expect("listen update test server")
     .run();

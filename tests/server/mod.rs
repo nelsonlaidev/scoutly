@@ -2,6 +2,7 @@ use actix_web::{App, HttpRequest, HttpResponse, HttpServer, web};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Once, OnceLock};
+use std::time::Duration;
 
 #[allow(dead_code)]
 static INIT: Once = Once::new();
@@ -40,6 +41,17 @@ async fn serve_static_fixture(
     }
 }
 
+async fn wait_for_server(url: &str) {
+    for _ in 0..20 {
+        match reqwest::get(url).await {
+            Ok(response) if response.status().is_success() => return,
+            _ => tokio::time::sleep(Duration::from_millis(50)).await,
+        }
+    }
+
+    panic!("Test server at {url} failed to start");
+}
+
 #[allow(dead_code)]
 pub async fn get_test_server_url() -> String {
     let link_server_url = start_link_test_server().await;
@@ -62,6 +74,7 @@ pub async fn get_test_server_url() -> String {
                 .app_data(web::Data::new(link_server_url.clone()))
                 .default_service(web::to(serve_static_fixture))
         })
+        .workers(1)
         .listen(listener)
         .expect("Failed to start test server")
         .run();
@@ -78,7 +91,7 @@ pub async fn get_test_server_url() -> String {
         .expect("Fixture test server should be started before use")
         .to_string();
 
-    tokio::task::yield_now().await;
+    wait_for_server(&base_url).await;
 
     base_url
 }
@@ -154,6 +167,7 @@ pub async fn start_link_test_server() -> String {
                     }),
                 )
         })
+        .workers(1)
         .listen(listener)
         .expect("Failed to start link test server")
         .run();
@@ -167,7 +181,7 @@ pub async fn start_link_test_server() -> String {
 
     let base_url = link_test_server_url().to_string();
 
-    tokio::task::yield_now().await;
+    wait_for_server(&format!("{base_url}/ok")).await;
 
     base_url
 }

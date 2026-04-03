@@ -8,6 +8,7 @@ use server::{get_test_server_url, link_test_server_url, start_link_test_server};
 use tokio::sync::mpsc::unbounded_channel;
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_link_checker() {
     let link_server_url = start_link_test_server().await;
 
@@ -445,6 +446,7 @@ async fn test_link_checker() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_link_checker_emits_live_progress_with_current_url() {
     start_link_test_server().await;
 
@@ -516,6 +518,7 @@ async fn test_link_checker_emits_live_progress_with_current_url() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_link_checker_default() {
     start_link_test_server().await;
 

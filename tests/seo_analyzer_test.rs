@@ -6,6 +6,7 @@ use scoutly::seo_analyzer::SeoAnalyzer;
 use server::get_test_server_url;
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_seo_analyzer() {
     let base_url = get_test_server_url().await;
 
@@ -153,6 +154,7 @@ struct TestCase {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_open_graph_extraction() {
     let base_url = get_test_server_url().await;
 

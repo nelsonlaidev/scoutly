@@ -2,6 +2,7 @@ use assert_cmd::cargo;
 use predicates::prelude::*;
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_cli_help() {
     let mut cmd = cargo::cargo_bin_cmd!("scoutly");
     let assert = cmd.arg("--help").assert();

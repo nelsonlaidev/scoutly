@@ -60,6 +60,7 @@ Allow: /private/public
                     .body("<html><head><title>Allowed</title></head><body><h1>Allowed</h1></body></html>")
             }))
     })
+    .workers(1)
     .bind(("127.0.0.1", 0))
     .expect("Failed to bind robots test server");
 
@@ -80,6 +81,7 @@ Allow: /private/public
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_robots_txt_respected() {
     let base_url = start_robots_test_server().await;
 
@@ -140,6 +142,7 @@ async fn test_robots_txt_respected() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_robots_txt_disabled() {
     let base_url = start_robots_test_server().await;
 
@@ -173,6 +176,7 @@ async fn test_robots_txt_disabled() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_robots_txt_not_found() {
     // Create a server without robots.txt
     let server = HttpServer::new(|| {
@@ -185,6 +189,7 @@ async fn test_robots_txt_not_found() {
             }),
         )
     })
+    .workers(1)
     .bind(("127.0.0.1", 0))
     .expect("Failed to bind test server");
 
@@ -223,6 +228,7 @@ async fn test_robots_txt_not_found() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_robots_txt_server_error() {
     // Create a server that returns 500 for robots.txt
     let server = HttpServer::new(|| {
@@ -241,6 +247,7 @@ async fn test_robots_txt_server_error() {
                 }),
             )
     })
+    .workers(1)
     .bind(("127.0.0.1", 0))
     .expect("Failed to bind test server");
 
@@ -279,6 +286,7 @@ async fn test_robots_txt_server_error() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_robots_txt_cache() {
     use scoutly::http_client::build_http_client;
     use scoutly::robots::RobotsTxt;
@@ -310,6 +318,7 @@ async fn test_robots_txt_cache() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_robots_txt_connection_failure() {
     use scoutly::http_client::build_http_client;
     use scoutly::robots::RobotsTxt;

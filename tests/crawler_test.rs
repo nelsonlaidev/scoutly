@@ -4,6 +4,7 @@ use scoutly::crawler::{Crawler, CrawlerConfig};
 use server::{get_test_server_url, start_link_test_server};
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_crawler() {
     let link_server_url = start_link_test_server().await;
     let base_url = get_test_server_url().await;
@@ -987,6 +988,7 @@ async fn test_crawler() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_robots_txt_fetch_failure_warning() {
     use scoutly::crawler::{Crawler, CrawlerConfig};
 
@@ -1016,6 +1018,7 @@ async fn test_robots_txt_fetch_failure_warning() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_content_type_validation() {
     use scoutly::crawler::{Crawler, CrawlerConfig};
     use server::{get_test_server_url, start_link_test_server};
