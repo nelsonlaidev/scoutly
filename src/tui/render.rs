@@ -1,9 +1,9 @@
 use ratatui::{
     Frame,
-    layout::{Constraint, Layout, Rect},
+    layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Cell, Paragraph, Row, Table, Wrap},
+    widgets::{Block, Cell, Padding, Paragraph, Row, Table, Wrap},
 };
 use std::time::Duration;
 
@@ -46,7 +46,11 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
     ]);
 
     let header = Paragraph::new(Text::from(vec![title, subtitle]))
-        .block(Block::bordered().title("Run"))
+        .block(
+            Block::bordered()
+                .title("Run")
+                .border_style(Style::default().fg(Color::Red)),
+        )
         .wrap(Wrap { trim: true });
     frame.render_widget(header, area);
 }
@@ -79,7 +83,11 @@ fn render_metrics(frame: &mut Frame, app: &App, area: Rect) {
         metrics,
         Line::raw(app.progress.message.clone()),
     ]))
-    .block(Block::bordered().title("Live summary"))
+    .block(
+        Block::bordered()
+            .title("Live summary")
+            .border_style(Style::default().fg(Color::Red)),
+    )
     .wrap(Wrap { trim: true });
     frame.render_widget(message, area);
 }
@@ -102,7 +110,11 @@ fn render_main(frame: &mut Frame, app: &App, area: Rect) {
             Line::raw("No crawl report is loaded yet."),
             Line::raw("Press u to enter a URL and start a crawl."),
         ]))
-        .block(Block::bordered().title("Ready to crawl"))
+        .block(
+            Block::bordered()
+                .title("Ready to crawl")
+                .border_style(Style::default().fg(Color::Red)),
+        )
         .wrap(Wrap { trim: true });
         frame.render_widget(waiting, area);
         return;
@@ -150,41 +162,98 @@ fn render_scan_in_progress(frame: &mut Frame, app: &App, area: Rect) {
     ]);
 
     let loading = Paragraph::new(progress)
-        .block(Block::bordered().title("Crawl in progress"))
+        .block(
+            Block::bordered()
+                .title("Crawl in progress")
+                .border_style(Style::default().fg(Color::Red)),
+        )
         .wrap(Wrap { trim: true });
     frame.render_widget(loading, area);
 }
 
 fn render_url_input(frame: &mut Frame, app: &App, area: Rect) {
-    let mut lines = vec![
-        Line::raw("Enter the starting URL for your crawl, then press Enter."),
-        Line::raw(""),
-        Line::from(vec![
-            Span::styled("URL: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(if app.url_input.is_empty() {
-                "https://example.com".to_string()
-            } else {
-                app.url_input.clone()
-            }),
-        ]),
-    ];
+    let section = Block::bordered()
+        .title("Start crawl")
+        .border_style(Style::default().fg(Color::Red));
+    let inner = section.inner(area);
+    frame.render_widget(section, area);
 
+    let details_height = if app.error.is_some() || app.report.is_some() {
+        4
+    } else {
+        2
+    };
+    let content_height = (2 + 1 + 3 + details_height).min(inner.height);
+    let content_width = inner.width.min(74);
+    let content_area = center_rect(inner, content_width, content_height);
+    let [intro_area, spacer_area, input_area, detail_area] = Layout::vertical([
+        Constraint::Length(2),
+        Constraint::Length(1),
+        Constraint::Length(3),
+        Constraint::Min(1),
+    ])
+    .areas(content_area);
+
+    let intro = Paragraph::new(Text::from(vec![
+        Line::styled(
+            "Start a new crawl",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Line::raw("Enter the URL you want Scoutly to scan."),
+    ]))
+    .alignment(Alignment::Center)
+    .wrap(Wrap { trim: true });
+    frame.render_widget(intro, intro_area);
+
+    frame.render_widget(Paragraph::new(""), spacer_area);
+
+    let input_width = input_area.width.clamp(24, 64);
+    let input_area = center_rect(input_area, input_width, input_area.height);
+    let input_border = Color::Red;
+    let input_value = if app.url_input.is_empty() {
+        Line::from(Span::styled(
+            "https://example.com",
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::ITALIC),
+        ))
+    } else {
+        Line::from(Span::styled(
+            visible_input_value(&app.url_input, input_area.width.saturating_sub(4)),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        ))
+    };
+    let input = Paragraph::new(input_value)
+        .block(
+            Block::bordered()
+                .title(" URL ")
+                .border_style(Style::default().fg(input_border))
+                .padding(Padding::horizontal(1)),
+        )
+        .style(Style::default().bg(Color::Black));
+    frame.render_widget(input, input_area);
+
+    let mut detail_lines = vec![Line::styled(
+        "Press Enter to begin crawling.",
+        Style::default().fg(Color::Gray),
+    )];
     if let Some(error) = &app.error {
-        lines.push(Line::raw(""));
-        lines.push(Line::styled(error.clone(), Style::default().fg(Color::Red)));
+        detail_lines.push(Line::styled(error.clone(), Style::default().fg(Color::Red)));
     }
-
     if app.report.is_some() {
-        lines.push(Line::raw(""));
-        lines.push(Line::raw(
+        detail_lines.push(Line::raw(
             "Press Esc to return to the current report without starting a new crawl.",
         ));
     }
 
-    let input = Paragraph::new(Text::from(lines))
-        .block(Block::bordered().title("Start crawl"))
+    let details = Paragraph::new(Text::from(detail_lines))
+        .alignment(Alignment::Center)
         .wrap(Wrap { trim: true });
-    frame.render_widget(input, area);
+    frame.render_widget(details, detail_area);
 }
 
 fn render_pages_table(frame: &mut Frame, app: &App, pages: &[&PageInfo], area: Rect) {
@@ -224,17 +293,21 @@ fn render_pages_table(frame: &mut Frame, app: &App, pages: &[&PageInfo], area: R
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol("▶ ")
-        .block(Block::bordered().title(format!(
-            "Pages · {} · filter={} · sort={}{}",
-            pages.len(),
-            app.severity_filter.label(),
-            app.sort_mode.label(),
-            if app.search_query.is_empty() {
-                String::new()
-            } else {
-                format!(" · search=\"{}\"", app.search_query)
-            }
-        )));
+        .block(
+            Block::bordered()
+                .title(format!(
+                    "Pages · {} · filter={} · sort={}{}",
+                    pages.len(),
+                    app.severity_filter.label(),
+                    app.sort_mode.label(),
+                    if app.search_query.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" · search=\"{}\"", app.search_query)
+                    }
+                ))
+                .border_style(Style::default().fg(Color::Red)),
+        );
 
     let mut state = ratatui::widgets::TableState::default().with_selected(Some(app.selected_index));
     frame.render_stateful_widget(table, area, &mut state);
@@ -242,8 +315,11 @@ fn render_pages_table(frame: &mut Frame, app: &App, pages: &[&PageInfo], area: R
 
 fn render_detail_pane(frame: &mut Frame, app: &App, pages: &[&PageInfo], area: Rect) {
     let Some(page) = app.selected_page(pages) else {
-        let empty = Paragraph::new("No page matches the current search/filter.")
-            .block(Block::bordered().title("Details"));
+        let empty = Paragraph::new("No page matches the current search/filter.").block(
+            Block::bordered()
+                .title("Details")
+                .border_style(Style::default().fg(Color::Red)),
+        );
         frame.render_widget(empty, area);
         return;
     };
@@ -307,7 +383,11 @@ fn render_detail_pane(frame: &mut Frame, app: &App, pages: &[&PageInfo], area: R
     }
 
     let details = Paragraph::new(Text::from(lines))
-        .block(Block::bordered().title("Details"))
+        .block(
+            Block::bordered()
+                .title("Details")
+                .border_style(Style::default().fg(Color::Red)),
+        )
         .wrap(Wrap { trim: true });
     frame.render_widget(details, area);
 }
@@ -340,7 +420,11 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     let footer = Paragraph::new(help)
-        .block(Block::bordered().title("Keys"))
+        .block(
+            Block::bordered()
+                .title("Keys")
+                .border_style(Style::default().fg(Color::Red)),
+        )
         .wrap(Wrap { trim: true });
     frame.render_widget(footer, area);
 }
@@ -422,6 +506,59 @@ fn issue_severity_rank(severity: IssueSeverity) -> u8 {
         IssueSeverity::Error => 0,
         IssueSeverity::Warning => 1,
         IssueSeverity::Info => 2,
+    }
+}
+
+fn center_rect(area: Rect, width: u16, height: u16) -> Rect {
+    let width = width.min(area.width);
+    let height = height.min(area.height);
+    let x = area.x + area.width.saturating_sub(width) / 2;
+    let y = area.y + area.height.saturating_sub(height) / 2;
+    Rect::new(x, y, width, height)
+}
+
+fn visible_input_value(value: &str, max_width: u16) -> String {
+    let max_width = max_width as usize;
+    if max_width == 0 {
+        return String::new();
+    }
+
+    let characters = value.chars().collect::<Vec<_>>();
+    if characters.len() <= max_width {
+        return value.to_string();
+    }
+
+    let tail_length = max_width.saturating_sub(1);
+    let tail = characters[characters.len().saturating_sub(tail_length)..]
+        .iter()
+        .collect::<String>();
+    format!("…{tail}")
+}
+
+#[cfg(test)]
+mod helper_tests {
+    use super::*;
+
+    #[test]
+    fn center_rect_keeps_requested_area_centered() {
+        let centered = center_rect(Rect::new(0, 0, 100, 20), 40, 6);
+        assert_eq!(centered, Rect::new(30, 7, 40, 6));
+    }
+
+    #[test]
+    fn visible_input_value_truncates_from_the_left() {
+        assert_eq!(
+            visible_input_value("https://example.com/really/long/path", 18),
+            "…/really/long/path"
+        );
+    }
+
+    #[test]
+    fn visible_input_value_keeps_short_urls_unchanged() {
+        assert_eq!(
+            visible_input_value("https://example.com", 24),
+            "https://example.com"
+        );
     }
 }
 
