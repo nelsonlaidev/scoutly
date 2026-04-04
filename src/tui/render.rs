@@ -7,7 +7,7 @@ use ratatui::{
 };
 use std::time::Duration;
 
-use super::app::{App, UiMode};
+use super::app::{App, LinkOccurrence, LinkStatusBucket, LinkUrlGroup, ResultSection, UiMode};
 use crate::models::{IssueSeverity, PageInfo, SeoIssue};
 use crate::update::format_tui_update_message;
 
@@ -103,9 +103,7 @@ fn render_main(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    let pages = app.visible_pages();
-
-    if pages.is_empty() && app.report.is_none() {
+    if app.report.is_none() {
         let waiting = Paragraph::new(Text::from(vec![
             Line::raw("No crawl report is loaded yet."),
             Line::raw("Press u to enter a URL and start a crawl."),
@@ -120,14 +118,55 @@ fn render_main(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    if app.show_details {
-        let [table_area, detail_area] =
-            Layout::horizontal([Constraint::Percentage(58), Constraint::Percentage(42)])
-                .areas(area);
-        render_pages_table(frame, app, &pages, table_area);
-        render_detail_pane(frame, app, &pages, detail_area);
-    } else {
-        render_pages_table(frame, app, &pages, area);
+    match app.result_section {
+        ResultSection::ByPage => {
+            let pages = app.visible_pages();
+            if app.show_details {
+                let [table_area, detail_area] =
+                    Layout::horizontal([Constraint::Percentage(58), Constraint::Percentage(42)])
+                        .areas(area);
+                render_pages_table(frame, app, &pages, table_area);
+                render_page_detail_pane(frame, app, &pages, detail_area);
+            } else {
+                render_pages_table(frame, app, &pages, area);
+            }
+        }
+        ResultSection::ByLinkUrl => {
+            let groups = app.visible_link_url_groups();
+            if app.show_details {
+                let [table_area, detail_area] =
+                    Layout::horizontal([Constraint::Percentage(58), Constraint::Percentage(42)])
+                        .areas(area);
+                render_link_url_table(frame, app, &groups, table_area);
+                render_link_url_detail_pane(frame, app, &groups, detail_area);
+            } else {
+                render_link_url_table(frame, app, &groups, area);
+            }
+        }
+        ResultSection::ByStatus => {
+            let buckets = app.visible_status_buckets();
+            if app.show_details {
+                let [table_area, detail_area] =
+                    Layout::horizontal([Constraint::Percentage(58), Constraint::Percentage(42)])
+                        .areas(area);
+                render_status_table(frame, app, &buckets, table_area);
+                render_status_detail_pane(frame, app, &buckets, detail_area);
+            } else {
+                render_status_table(frame, app, &buckets, area);
+            }
+        }
+        ResultSection::AllLinks => {
+            let occurrences = app.visible_link_occurrences();
+            if app.show_details {
+                let [table_area, detail_area] =
+                    Layout::horizontal([Constraint::Percentage(58), Constraint::Percentage(42)])
+                        .areas(area);
+                render_all_links_table(frame, app, &occurrences, table_area);
+                render_all_links_detail_pane(frame, app, &occurrences, detail_area);
+            } else {
+                render_all_links_table(frame, app, &occurrences, area);
+            }
+        }
     }
 }
 
@@ -330,17 +369,7 @@ fn render_pages_table(frame: &mut Frame, app: &App, pages: &[&PageInfo], area: R
         .highlight_symbol("▶ ")
         .block(
             Block::bordered()
-                .title(format!(
-                    "Pages · {} · filter={} · sort={}{}",
-                    pages.len(),
-                    app.severity_filter.label(),
-                    app.sort_mode.label(),
-                    if app.search_query.is_empty() {
-                        String::new()
-                    } else {
-                        format!(" · search=\"{}\"", app.search_query)
-                    }
-                ))
+                .title(section_title(app, pages.len()))
                 .border_style(Style::default().fg(Color::Red)),
         );
 
@@ -348,7 +377,134 @@ fn render_pages_table(frame: &mut Frame, app: &App, pages: &[&PageInfo], area: R
     frame.render_stateful_widget(table, area, &mut state);
 }
 
-fn render_detail_pane(frame: &mut Frame, app: &App, pages: &[&PageInfo], area: Rect) {
+fn render_link_url_table(frame: &mut Frame, app: &App, groups: &[LinkUrlGroup], area: Rect) {
+    let rows = groups.iter().map(|group| {
+        Row::new(vec![
+            Cell::from(group.result_label()),
+            Cell::from(group.occurrence_count().to_string()),
+            Cell::from(group.referring_pages().len().to_string()),
+            Cell::from(trimmed(&group.destination_url, 56)),
+        ])
+    });
+
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(14),
+            Constraint::Length(7),
+            Constraint::Length(7),
+            Constraint::Min(20),
+        ],
+    )
+    .header(
+        Row::new(["Result", "Links", "Pages", "Destination URL"]).style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+    )
+    .row_highlight_style(
+        Style::default()
+            .bg(Color::DarkGray)
+            .add_modifier(Modifier::BOLD),
+    )
+    .highlight_symbol("▶ ")
+    .block(
+        Block::bordered()
+            .title(section_title(app, groups.len()))
+            .border_style(Style::default().fg(Color::Red)),
+    );
+
+    let mut state = ratatui::widgets::TableState::default().with_selected(Some(app.selected_index));
+    frame.render_stateful_widget(table, area, &mut state);
+}
+
+fn render_status_table(frame: &mut Frame, app: &App, buckets: &[LinkStatusBucket], area: Rect) {
+    let rows = buckets.iter().map(|bucket| {
+        Row::new(vec![
+            Cell::from(bucket.label()),
+            Cell::from(bucket.occurrences.len().to_string()),
+            Cell::from(unique_source_pages(&bucket.occurrences).to_string()),
+        ])
+    });
+
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(14),
+            Constraint::Length(7),
+            Constraint::Length(7),
+        ],
+    )
+    .header(
+        Row::new(["Status", "Links", "Pages"]).style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+    )
+    .row_highlight_style(
+        Style::default()
+            .bg(Color::DarkGray)
+            .add_modifier(Modifier::BOLD),
+    )
+    .highlight_symbol("▶ ")
+    .block(
+        Block::bordered()
+            .title(section_title(app, buckets.len()))
+            .border_style(Style::default().fg(Color::Red)),
+    );
+
+    let mut state = ratatui::widgets::TableState::default().with_selected(Some(app.selected_index));
+    frame.render_stateful_widget(table, area, &mut state);
+}
+
+fn render_all_links_table(
+    frame: &mut Frame,
+    app: &App,
+    occurrences: &[LinkOccurrence],
+    area: Rect,
+) {
+    let rows = occurrences.iter().map(|occurrence| {
+        Row::new(vec![
+            Cell::from(occurrence.status_label()),
+            Cell::from(trimmed(&occurrence.source_page_url, 28)),
+            Cell::from(trimmed(&occurrence.destination_url, 48)),
+        ])
+    });
+
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(14),
+            Constraint::Length(30),
+            Constraint::Min(20),
+        ],
+    )
+    .header(
+        Row::new(["Result", "Source Page", "Destination URL"]).style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+    )
+    .row_highlight_style(
+        Style::default()
+            .bg(Color::DarkGray)
+            .add_modifier(Modifier::BOLD),
+    )
+    .highlight_symbol("▶ ")
+    .block(
+        Block::bordered()
+            .title(section_title(app, occurrences.len()))
+            .border_style(Style::default().fg(Color::Red)),
+    );
+
+    let mut state = ratatui::widgets::TableState::default().with_selected(Some(app.selected_index));
+    frame.render_stateful_widget(table, area, &mut state);
+}
+
+fn render_page_detail_pane(frame: &mut Frame, app: &App, pages: &[&PageInfo], area: Rect) {
     let Some(page) = app.selected_page(pages) else {
         let empty = Paragraph::new("No page matches the current search/filter.").block(
             Block::bordered()
@@ -423,6 +579,192 @@ fn render_detail_pane(frame: &mut Frame, app: &App, pages: &[&PageInfo], area: R
     frame.render_widget(details, area);
 }
 
+fn render_link_url_detail_pane(frame: &mut Frame, app: &App, groups: &[LinkUrlGroup], area: Rect) {
+    let Some(group) = app.selected_link_url_group(groups) else {
+        let empty = Paragraph::new("No link URL matches the current search.").block(
+            Block::bordered()
+                .title("Details")
+                .border_style(Style::default().fg(Color::Red)),
+        );
+        frame.render_widget(empty, area);
+        return;
+    };
+
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled("URL: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(group.destination_url.clone()),
+        ]),
+        Line::from(vec![
+            Span::styled("Result: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(group.result_label()),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "Occurrences: ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(group.occurrence_count().to_string()),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "Referring pages: ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(group.referring_pages().len().to_string()),
+        ]),
+        Line::raw(""),
+        Line::styled(
+            "Occurrences",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ];
+
+    for occurrence in &group.occurrences {
+        lines.push(Line::from(Span::raw(link_occurrence_summary(occurrence))));
+    }
+
+    let details = Paragraph::new(Text::from(lines))
+        .block(
+            Block::bordered()
+                .title("Details")
+                .border_style(Style::default().fg(Color::Red)),
+        )
+        .wrap(Wrap { trim: true });
+    frame.render_widget(details, area);
+}
+
+fn render_status_detail_pane(
+    frame: &mut Frame,
+    app: &App,
+    buckets: &[LinkStatusBucket],
+    area: Rect,
+) {
+    let Some(bucket) = app.selected_status_bucket(buckets) else {
+        let empty = Paragraph::new("No status bucket matches the current search.").block(
+            Block::bordered()
+                .title("Details")
+                .border_style(Style::default().fg(Color::Red)),
+        );
+        frame.render_widget(empty, area);
+        return;
+    };
+
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(bucket.label()),
+        ]),
+        Line::from(vec![
+            Span::styled("Links: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(bucket.occurrences.len().to_string()),
+        ]),
+        Line::from(vec![
+            Span::styled("Pages: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(unique_source_pages(&bucket.occurrences).to_string()),
+        ]),
+        Line::raw(""),
+        Line::styled(
+            "Matching links",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ];
+
+    for occurrence in &bucket.occurrences {
+        lines.push(Line::from(Span::raw(link_occurrence_summary(occurrence))));
+    }
+
+    let details = Paragraph::new(Text::from(lines))
+        .block(
+            Block::bordered()
+                .title("Details")
+                .border_style(Style::default().fg(Color::Red)),
+        )
+        .wrap(Wrap { trim: true });
+    frame.render_widget(details, area);
+}
+
+fn render_all_links_detail_pane(
+    frame: &mut Frame,
+    app: &App,
+    occurrences: &[LinkOccurrence],
+    area: Rect,
+) {
+    let Some(occurrence) = app.selected_link_occurrence(occurrences) else {
+        let empty = Paragraph::new("No link matches the current search.").block(
+            Block::bordered()
+                .title("Details")
+                .border_style(Style::default().fg(Color::Red)),
+        );
+        frame.render_widget(empty, area);
+        return;
+    };
+
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled("Source: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(occurrence.source_page_url.clone()),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "Destination: ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(occurrence.destination_url.clone()),
+        ]),
+        Line::from(vec![
+            Span::styled("Result: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(occurrence.result_summary()),
+        ]),
+        Line::from(vec![
+            Span::styled("Depth: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(occurrence.source_page_depth.to_string()),
+        ]),
+    ];
+
+    if !occurrence.link_text.trim().is_empty() {
+        lines.push(Line::from(vec![
+            Span::styled("Text: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(occurrence.link_text.clone()),
+        ]));
+    }
+
+    lines.push(Line::from(vec![
+        Span::styled("External: ", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(if occurrence.is_external { "yes" } else { "no" }),
+    ]));
+
+    if let Some(redirected_url) = &occurrence.redirected_url {
+        lines.push(Line::from(vec![
+            Span::styled(
+                "Redirected to: ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(redirected_url.clone()),
+        ]));
+    }
+
+    if let Some(error) = &occurrence.check_error {
+        lines.push(Line::from(vec![
+            Span::styled("Error: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(error.clone(), Style::default().fg(Color::Red)),
+        ]));
+    }
+
+    let details = Paragraph::new(Text::from(lines))
+        .block(
+            Block::bordered()
+                .title("Details")
+                .border_style(Style::default().fg(Color::Red)),
+        )
+        .wrap(Wrap { trim: true });
+    frame.render_widget(details, area);
+}
+
 fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
     let mut help = if matches!(app.mode, UiMode::UrlInput) {
         "mode=URL · type a target URL · Enter start crawl · Ctrl-U clear · Esc quit/back"
@@ -439,10 +781,7 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             app.search_input
         )
     } else {
-        format!(
-            "mode={} · j/k or ↑/↓ move · / search · f severity · s sort · u URL input · Enter details · q quit",
-            app.mode.label()
-        )
+        footer_help(app)
     };
 
     if let Some(notice) = &app.update_notice {
@@ -480,6 +819,58 @@ fn status_span(app: &App) -> Span<'static> {
         app.status_label().to_string(),
         Style::default().fg(color).add_modifier(Modifier::BOLD),
     )
+}
+
+fn footer_help(app: &App) -> String {
+    if app.page_controls_enabled() {
+        format!(
+            "mode={} · section={} · j/k or ↑/↓ move · Tab/Shift-Tab section · / search · f severity · s sort · u URL input · Enter details · q quit",
+            app.mode.label(),
+            app.result_section.label()
+        )
+    } else {
+        format!(
+            "mode={} · section={} · j/k or ↑/↓ move · Tab/Shift-Tab section · / search · u URL input · Enter details · q quit",
+            app.mode.label(),
+            app.result_section.label()
+        )
+    }
+}
+
+fn section_title(app: &App, item_count: usize) -> String {
+    let tabs = [
+        ResultSection::ByPage,
+        ResultSection::ByLinkUrl,
+        ResultSection::ByStatus,
+        ResultSection::AllLinks,
+    ]
+    .into_iter()
+    .map(|section| {
+        if section == app.result_section {
+            format!("[{}]", section.label())
+        } else {
+            section.label().to_string()
+        }
+    })
+    .collect::<Vec<_>>()
+    .join(" | ");
+
+    let search = if app.search_query.is_empty() {
+        String::new()
+    } else {
+        format!(" · search=\"{}\"", app.search_query)
+    };
+
+    if app.page_controls_enabled() {
+        format!(
+            "{tabs} · {item_count} · filter={} · sort={}{}",
+            app.severity_filter.label(),
+            app.sort_mode.label(),
+            search
+        )
+    } else {
+        format!("{tabs} · {item_count}{search}")
+    }
 }
 
 fn stage_label(app: &App) -> &'static str {
@@ -613,6 +1004,32 @@ fn issue_summary(page: &PageInfo) -> String {
     format!("E:{errors} W:{warnings} I:{infos}")
 }
 
+fn unique_source_pages(occurrences: &[LinkOccurrence]) -> usize {
+    let mut pages = occurrences
+        .iter()
+        .map(|occurrence| occurrence.source_page_url.clone())
+        .collect::<Vec<_>>();
+    pages.sort();
+    pages.dedup();
+    pages.len()
+}
+
+fn link_occurrence_summary(occurrence: &LinkOccurrence) -> String {
+    let text = if occurrence.link_text.trim().is_empty() {
+        String::new()
+    } else {
+        format!(" · text=\"{}\"", occurrence.link_text)
+    };
+
+    format!(
+        "{} → {}{} · {}",
+        occurrence.source_page_url,
+        occurrence.destination_url,
+        text,
+        occurrence.result_summary()
+    )
+}
+
 fn trimmed(value: &str, max_len: usize) -> String {
     if value.chars().count() <= max_len {
         return value.to_string();
@@ -629,7 +1046,7 @@ fn trimmed(value: &str, max_len: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{CrawlReport, CrawlSummary, IssueType, OpenGraphTags, SeoIssue};
+    use crate::models::{CrawlReport, CrawlSummary, IssueType, Link, OpenGraphTags, SeoIssue};
     use crate::runtime::ProgressSnapshot;
     use ratatui::{Terminal, backend::TestBackend};
     use std::collections::HashMap;
@@ -642,7 +1059,14 @@ mod tests {
             title: Some("About".to_string()),
             meta_description: None,
             h1_tags: vec!["About".to_string()],
-            links: vec![],
+            links: vec![Link {
+                url: "https://example.com/contact".to_string(),
+                text: "Contact".to_string(),
+                is_external: false,
+                status_code: Some(200),
+                redirected_url: None,
+                check_error: None,
+            }],
             images: vec![],
             open_graph: OpenGraphTags::default(),
             issues: vec![SeoIssue {
@@ -751,6 +1175,67 @@ mod tests {
         assert!(content.contains("Pages"));
         assert!(content.contains("Details"));
         assert!(content.contains("About"));
+        assert!(content.contains("By Page"));
+        assert!(content.contains("By Link URL"));
+        assert!(content.contains("All Links"));
+    }
+
+    #[test]
+    fn render_all_links_section_shows_link_columns() {
+        let runtime = crate::config::RuntimeOptions {
+            url: Some("https://example.com".to_string()),
+            depth: 2,
+            max_pages: 10,
+            output: None,
+            save: None,
+            cli: false,
+            external: false,
+            verbose: false,
+            ignore_redirects: false,
+            keep_fragments: false,
+            rate_limit: None,
+            concurrency: 5,
+            respect_robots_txt: true,
+            tui: false,
+            config: None,
+        };
+        let mut app = App::new(runtime);
+        let page = sample_page();
+        let mut pages = HashMap::new();
+        pages.insert(page.url.clone(), page);
+        app.progress = ProgressSnapshot::new(crate::runtime::RunStage::Completed, "Report ready");
+        app.report = Some(CrawlReport {
+            start_url: "https://example.com".to_string(),
+            pages,
+            summary: CrawlSummary {
+                total_pages: 1,
+                total_links: 1,
+                broken_links: 0,
+                errors: 0,
+                warnings: 1,
+                infos: 0,
+            },
+            timestamp: "2026-04-02T00:00:00Z".to_string(),
+        });
+        app.result_section = ResultSection::AllLinks;
+        app.scan_in_progress = false;
+        app.scan_started_at = None;
+
+        let backend = TestBackend::new(120, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(frame, &app)).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(content.contains("All Links"));
+        assert!(content.contains("Source Page"));
+        assert!(content.contains("Destination URL"));
+        assert!(content.contains("https://example.com/contact"));
     }
 
     #[test]

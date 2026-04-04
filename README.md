@@ -106,10 +106,11 @@ The default TUI is keyboard-first and intentionally close to tools like `llmfit`
 
 | Key                        | Action                 |
 | -------------------------- | ---------------------- |
-| `j` / `k` or `Up` / `Down` | Move between pages     |
+| `j` / `k` or `Up` / `Down` | Move within active section |
+| `Tab` / `Shift-Tab`        | Switch result section  |
 | `/`                        | Enter search mode      |
-| `f`                        | Cycle severity filter  |
-| `s`                        | Cycle sort mode        |
+| `f`                        | Cycle severity filter (`By Page`) |
+| `s`                        | Cycle sort mode (`By Page`) |
 | `Enter`                    | Toggle the detail pane |
 | `q` / `Esc`                | Quit                   |
 
@@ -241,8 +242,10 @@ Running `scoutly https://example.com` in an interactive terminal opens the Ratat
 
 - a live status/header bar
 - pages / links / error / warning counters
-- a searchable, sortable pages table
-- a detail pane for the selected page
+- four result sections: By Page, By Link URL, By Status, and All Links
+- searchable browsing across the active section
+- page-only severity/sort controls in the By Page section
+- a detail pane for the selected page, link URL group, status bucket, or individual link
 - a footer showing the active mode and available keys
 
 ### Text Report

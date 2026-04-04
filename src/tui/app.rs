@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use crate::config::RuntimeOptions;
@@ -87,6 +88,145 @@ impl SortMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResultSection {
+    ByPage,
+    ByLinkUrl,
+    ByStatus,
+    AllLinks,
+}
+
+impl ResultSection {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::ByPage => "By Page",
+            Self::ByLinkUrl => "By Link URL",
+            Self::ByStatus => "By Status",
+            Self::AllLinks => "All Links",
+        }
+    }
+
+    pub const fn next(self) -> Self {
+        match self {
+            Self::ByPage => Self::ByLinkUrl,
+            Self::ByLinkUrl => Self::ByStatus,
+            Self::ByStatus => Self::AllLinks,
+            Self::AllLinks => Self::ByPage,
+        }
+    }
+
+    pub const fn previous(self) -> Self {
+        match self {
+            Self::ByPage => Self::AllLinks,
+            Self::ByLinkUrl => Self::ByPage,
+            Self::ByStatus => Self::ByLinkUrl,
+            Self::AllLinks => Self::ByStatus,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkOccurrence {
+    pub source_page_url: String,
+    pub source_page_title: String,
+    pub source_page_depth: usize,
+    pub destination_url: String,
+    pub link_text: String,
+    pub is_external: bool,
+    pub status_code: Option<u16>,
+    pub redirected_url: Option<String>,
+    pub check_error: Option<String>,
+}
+
+impl LinkOccurrence {
+    pub fn status_label(&self) -> String {
+        match (&self.check_error, self.status_code) {
+            (Some(_), _) => "Check failed".to_string(),
+            (None, Some(status)) => status.to_string(),
+            (None, None) => "Unknown".to_string(),
+        }
+    }
+
+    pub fn result_summary(&self) -> String {
+        match (&self.check_error, self.status_code, &self.redirected_url) {
+            (Some(error), _, _) => format!("Check failed: {error}"),
+            (None, Some(status), Some(redirected_url)) => {
+                format!("HTTP {status} → {redirected_url}")
+            }
+            (None, Some(status), None) => format!("HTTP {status}"),
+            (None, None, _) => "Status unknown".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkUrlGroup {
+    pub destination_url: String,
+    pub occurrences: Vec<LinkOccurrence>,
+}
+
+impl LinkUrlGroup {
+    pub fn occurrence_count(&self) -> usize {
+        self.occurrences.len()
+    }
+
+    pub fn referring_pages(&self) -> Vec<String> {
+        let mut pages = self
+            .occurrences
+            .iter()
+            .map(|occurrence| occurrence.source_page_url.clone())
+            .collect::<Vec<_>>();
+        pages.sort();
+        pages.dedup();
+        pages
+    }
+
+    pub fn result_label(&self) -> String {
+        let mut labels = self
+            .occurrences
+            .iter()
+            .map(LinkOccurrence::status_label)
+            .collect::<Vec<_>>();
+        labels.sort();
+        labels.dedup();
+
+        if labels.len() == 1 {
+            labels.pop().unwrap_or_else(|| "Unknown".to_string())
+        } else {
+            "Mixed".to_string()
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum LinkStatusBucketKey {
+    CheckFailed,
+    Unknown,
+    Http(u16),
+}
+
+impl LinkStatusBucketKey {
+    pub fn label(&self) -> String {
+        match self {
+            Self::CheckFailed => "Check failed".to_string(),
+            Self::Unknown => "Unknown".to_string(),
+            Self::Http(status) => status.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkStatusBucket {
+    pub key: LinkStatusBucketKey,
+    pub occurrences: Vec<LinkOccurrence>,
+}
+
+impl LinkStatusBucket {
+    pub fn label(&self) -> String {
+        self.key.label()
+    }
+}
+
 pub struct App {
     pub url: Option<String>,
     pub url_input: String,
@@ -99,6 +239,7 @@ pub struct App {
     pub search_input: String,
     pub severity_filter: SeverityFilter,
     pub sort_mode: SortMode,
+    pub result_section: ResultSection,
     pub selected_index: usize,
     pub show_details: bool,
     pub error: Option<String>,
@@ -135,6 +276,7 @@ impl App {
             search_input: String::new(),
             severity_filter: SeverityFilter::All,
             sort_mode: SortMode::Severity,
+            result_section: ResultSection::ByPage,
             selected_index: 0,
             show_details: true,
             error: None,
@@ -213,8 +355,98 @@ impl App {
         pages
     }
 
+    pub fn visible_link_occurrences(&self) -> Vec<LinkOccurrence> {
+        let query = self.search_query.trim().to_lowercase();
+        let mut occurrences = self
+            .link_occurrences()
+            .into_iter()
+            .filter(|occurrence| self.matches_link_occurrence(occurrence, &query))
+            .collect::<Vec<_>>();
+
+        occurrences.sort_by(|left, right| {
+            (
+                &left.source_page_url,
+                &left.destination_url,
+                &left.link_text,
+                &left.redirected_url,
+            )
+                .cmp(&(
+                    &right.source_page_url,
+                    &right.destination_url,
+                    &right.link_text,
+                    &right.redirected_url,
+                ))
+        });
+        occurrences
+    }
+
+    pub fn visible_link_url_groups(&self) -> Vec<LinkUrlGroup> {
+        let query = self.search_query.trim().to_lowercase();
+        let mut groups = BTreeMap::<String, Vec<LinkOccurrence>>::new();
+
+        for occurrence in self.link_occurrences() {
+            groups
+                .entry(occurrence.destination_url.clone())
+                .or_default()
+                .push(occurrence);
+        }
+
+        groups
+            .into_iter()
+            .map(|(destination_url, occurrences)| LinkUrlGroup {
+                destination_url,
+                occurrences,
+            })
+            .filter(|group| self.matches_link_url_group(group, &query))
+            .collect()
+    }
+
+    pub fn visible_status_buckets(&self) -> Vec<LinkStatusBucket> {
+        let query = self.search_query.trim().to_lowercase();
+        let mut groups = BTreeMap::<LinkStatusBucketKey, Vec<LinkOccurrence>>::new();
+
+        for occurrence in self.link_occurrences() {
+            groups
+                .entry(Self::status_bucket_key(&occurrence))
+                .or_default()
+                .push(occurrence);
+        }
+
+        let mut buckets = groups
+            .into_iter()
+            .map(|(key, occurrences)| LinkStatusBucket { key, occurrences })
+            .filter(|bucket| self.matches_status_bucket(bucket, &query))
+            .collect::<Vec<_>>();
+
+        buckets.sort_by(|left, right| {
+            Self::status_bucket_sort_key(&left.key).cmp(&Self::status_bucket_sort_key(&right.key))
+        });
+        buckets
+    }
+
     pub fn selected_page<'a>(&'a self, pages: &'a [&'a PageInfo]) -> Option<&'a PageInfo> {
         pages.get(self.selected_index).copied()
+    }
+
+    pub fn selected_link_occurrence<'a>(
+        &'a self,
+        occurrences: &'a [LinkOccurrence],
+    ) -> Option<&'a LinkOccurrence> {
+        occurrences.get(self.selected_index)
+    }
+
+    pub fn selected_link_url_group<'a>(
+        &'a self,
+        groups: &'a [LinkUrlGroup],
+    ) -> Option<&'a LinkUrlGroup> {
+        groups.get(self.selected_index)
+    }
+
+    pub fn selected_status_bucket<'a>(
+        &'a self,
+        buckets: &'a [LinkStatusBucket],
+    ) -> Option<&'a LinkStatusBucket> {
+        buckets.get(self.selected_index)
     }
 
     pub fn status_label(&self) -> &'static str {
@@ -249,6 +481,10 @@ impl App {
 
     pub const fn has_active_scan(&self) -> bool {
         self.scan_in_progress
+    }
+
+    pub const fn page_controls_enabled(&self) -> bool {
+        matches!(self.result_section, ResultSection::ByPage)
     }
 
     pub fn elapsed_scan_time(&self) -> Option<Duration> {
@@ -303,21 +539,23 @@ impl App {
             KeyCode::PageUp => self.move_selection(-10),
             KeyCode::Char('g') => self.selected_index = 0,
             KeyCode::Char('G') => {
-                let len = self.visible_pages().len();
+                let len = self.visible_row_count();
                 self.selected_index = len.saturating_sub(1);
             }
             KeyCode::Char('/') if self.report.is_some() => {
                 self.mode = UiMode::Search;
                 self.search_input = self.search_query.clone();
             }
-            KeyCode::Char('f') if self.report.is_some() => {
+            KeyCode::Char('f') if self.report.is_some() && self.page_controls_enabled() => {
                 self.severity_filter = self.severity_filter.next();
                 self.selected_index = 0;
             }
-            KeyCode::Char('s') if self.report.is_some() => {
+            KeyCode::Char('s') if self.report.is_some() && self.page_controls_enabled() => {
                 self.sort_mode = self.sort_mode.next();
                 self.selected_index = 0;
             }
+            KeyCode::Tab if self.report.is_some() => self.cycle_result_section(true),
+            KeyCode::BackTab if self.report.is_some() => self.cycle_result_section(false),
             KeyCode::Enter if self.report.is_some() => {
                 self.show_details = !self.show_details;
             }
@@ -370,6 +608,7 @@ impl App {
         self.scan_started_at = Some(Instant::now());
         self.search_query.clear();
         self.search_input.clear();
+        self.result_section = ResultSection::ByPage;
         self.selected_index = 0;
         self.show_details = true;
         self.mode = UiMode::Normal;
@@ -377,7 +616,7 @@ impl App {
     }
 
     fn move_selection(&mut self, delta: isize) {
-        let len = self.visible_pages().len();
+        let len = self.visible_row_count();
         if len == 0 {
             self.selected_index = 0;
             return;
@@ -388,7 +627,7 @@ impl App {
     }
 
     fn clamp_selection(&mut self) {
-        let len = self.visible_pages().len();
+        let len = self.visible_row_count();
         if len == 0 {
             self.selected_index = 0;
         } else if self.selected_index >= len {
@@ -427,6 +666,129 @@ impl App {
             .any(|issue| issue.message.to_lowercase().contains(query));
 
         in_url || in_title || in_issues
+    }
+
+    fn link_occurrences(&self) -> Vec<LinkOccurrence> {
+        let Some(report) = &self.report else {
+            return Vec::new();
+        };
+
+        let mut occurrences = report
+            .pages
+            .values()
+            .flat_map(|page| {
+                page.links.iter().map(|link| LinkOccurrence {
+                    source_page_url: page.url.clone(),
+                    source_page_title: page.display_title(),
+                    source_page_depth: page.crawl_depth,
+                    destination_url: link.url.clone(),
+                    link_text: link.text.clone(),
+                    is_external: link.is_external,
+                    status_code: link.status_code,
+                    redirected_url: link.redirected_url.clone(),
+                    check_error: link.check_error.clone(),
+                })
+            })
+            .collect::<Vec<_>>();
+
+        occurrences.sort_by(|left, right| {
+            (
+                &left.source_page_url,
+                &left.destination_url,
+                &left.link_text,
+                &left.redirected_url,
+            )
+                .cmp(&(
+                    &right.source_page_url,
+                    &right.destination_url,
+                    &right.link_text,
+                    &right.redirected_url,
+                ))
+        });
+        occurrences
+    }
+
+    fn visible_row_count(&self) -> usize {
+        match self.result_section {
+            ResultSection::ByPage => self.visible_pages().len(),
+            ResultSection::ByLinkUrl => self.visible_link_url_groups().len(),
+            ResultSection::ByStatus => self.visible_status_buckets().len(),
+            ResultSection::AllLinks => self.visible_link_occurrences().len(),
+        }
+    }
+
+    fn cycle_result_section(&mut self, forward: bool) {
+        self.result_section = if forward {
+            self.result_section.next()
+        } else {
+            self.result_section.previous()
+        };
+        self.selected_index = 0;
+    }
+
+    fn matches_link_occurrence(&self, occurrence: &LinkOccurrence, query: &str) -> bool {
+        if query.is_empty() {
+            return true;
+        }
+
+        occurrence.source_page_url.to_lowercase().contains(query)
+            || occurrence.source_page_title.to_lowercase().contains(query)
+            || occurrence.destination_url.to_lowercase().contains(query)
+            || occurrence.link_text.to_lowercase().contains(query)
+            || occurrence.status_label().to_lowercase().contains(query)
+            || occurrence
+                .redirected_url
+                .as_deref()
+                .unwrap_or_default()
+                .to_lowercase()
+                .contains(query)
+            || occurrence
+                .check_error
+                .as_deref()
+                .unwrap_or_default()
+                .to_lowercase()
+                .contains(query)
+    }
+
+    fn matches_link_url_group(&self, group: &LinkUrlGroup, query: &str) -> bool {
+        if query.is_empty() {
+            return true;
+        }
+
+        group.destination_url.to_lowercase().contains(query)
+            || group.result_label().to_lowercase().contains(query)
+            || group
+                .occurrences
+                .iter()
+                .any(|occurrence| self.matches_link_occurrence(occurrence, query))
+    }
+
+    fn matches_status_bucket(&self, bucket: &LinkStatusBucket, query: &str) -> bool {
+        if query.is_empty() {
+            return true;
+        }
+
+        bucket.label().to_lowercase().contains(query)
+            || bucket
+                .occurrences
+                .iter()
+                .any(|occurrence| self.matches_link_occurrence(occurrence, query))
+    }
+
+    fn status_bucket_key(occurrence: &LinkOccurrence) -> LinkStatusBucketKey {
+        match (&occurrence.check_error, occurrence.status_code) {
+            (Some(_), _) => LinkStatusBucketKey::CheckFailed,
+            (None, Some(status)) => LinkStatusBucketKey::Http(status),
+            (None, None) => LinkStatusBucketKey::Unknown,
+        }
+    }
+
+    fn status_bucket_sort_key(key: &LinkStatusBucketKey) -> (u8, u16) {
+        match key {
+            LinkStatusBucketKey::CheckFailed => (0, 0),
+            LinkStatusBucketKey::Unknown => (1, 0),
+            LinkStatusBucketKey::Http(status) => (2, *status),
+        }
     }
 
     fn compare_pages(&self, left: &PageInfo, right: &PageInfo) -> std::cmp::Ordering {
@@ -505,10 +867,15 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{CrawlSummary, IssueType, OpenGraphTags, SeoIssue};
+    use crate::models::{CrawlSummary, IssueType, Link, OpenGraphTags, SeoIssue};
     use std::collections::HashMap;
 
-    fn page(url: &str, issues: Vec<SeoIssue>) -> PageInfo {
+    fn page_with_links(
+        url: &str,
+        issues: Vec<SeoIssue>,
+        links: Vec<Link>,
+        crawl_depth: usize,
+    ) -> PageInfo {
         PageInfo {
             url: url.to_string(),
             status_code: Some(200),
@@ -516,11 +883,11 @@ mod tests {
             title: Some(url.to_string()),
             meta_description: None,
             h1_tags: vec![],
-            links: vec![],
+            links,
             images: vec![],
             open_graph: OpenGraphTags::default(),
             issues,
-            crawl_depth: 0,
+            crawl_depth,
         }
     }
 
@@ -529,6 +896,22 @@ mod tests {
             severity,
             issue_type: IssueType::BrokenLink,
             message: message.to_string(),
+        }
+    }
+
+    fn link(
+        url: &str,
+        status_code: Option<u16>,
+        redirected_url: Option<&str>,
+        check_error: Option<&str>,
+    ) -> Link {
+        Link {
+            url: url.to_string(),
+            text: "Link text".to_string(),
+            is_external: false,
+            status_code,
+            redirected_url: redirected_url.map(str::to_string),
+            check_error: check_error.map(str::to_string),
         }
     }
 
@@ -554,16 +937,31 @@ mod tests {
         let mut pages = HashMap::new();
         pages.insert(
             "https://example.com/error".to_string(),
-            page(
+            page_with_links(
                 "https://example.com/error",
                 vec![issue(IssueSeverity::Error, "broken")],
+                vec![
+                    link("https://example.com/shared", Some(200), None, None),
+                    link("https://example.com/not-found", Some(404), None, None),
+                ],
+                0,
             ),
         );
         pages.insert(
             "https://example.com/warn".to_string(),
-            page(
+            page_with_links(
                 "https://example.com/warn",
                 vec![issue(IssueSeverity::Warning, "missing description")],
+                vec![
+                    link("https://example.com/shared", Some(200), None, None),
+                    link(
+                        "https://example.com/timeout",
+                        None,
+                        None,
+                        Some("connection timed out"),
+                    ),
+                ],
+                1,
             ),
         );
 
@@ -572,8 +970,8 @@ mod tests {
             pages,
             summary: CrawlSummary {
                 total_pages: 2,
-                total_links: 0,
-                broken_links: 1,
+                total_links: 4,
+                broken_links: 2,
                 errors: 1,
                 warnings: 1,
                 infos: 0,
@@ -686,6 +1084,58 @@ mod tests {
         let pages = app.visible_pages();
         assert_eq!(pages.len(), 1);
         assert!(pages[0].url.contains("warn"));
+    }
+
+    #[test]
+    fn tab_cycles_result_sections() {
+        let mut app = app_with_report();
+
+        app.handle_key(KeyEvent::from(KeyCode::Tab));
+        assert_eq!(app.result_section, ResultSection::ByLinkUrl);
+
+        app.handle_key(KeyEvent::from(KeyCode::BackTab));
+        assert_eq!(app.result_section, ResultSection::ByPage);
+    }
+
+    #[test]
+    fn by_link_url_groups_duplicate_destinations() {
+        let app = app_with_report();
+
+        let groups = app.visible_link_url_groups();
+        let shared = groups
+            .iter()
+            .find(|group| group.destination_url == "https://example.com/shared")
+            .expect("shared URL should be grouped");
+
+        assert_eq!(shared.occurrence_count(), 2);
+        assert_eq!(shared.referring_pages().len(), 2);
+        assert_eq!(shared.result_label(), "200");
+    }
+
+    #[test]
+    fn by_status_groups_http_and_failed_links() {
+        let app = app_with_report();
+
+        let labels = app
+            .visible_status_buckets()
+            .into_iter()
+            .map(|bucket| bucket.label())
+            .collect::<Vec<_>>();
+
+        assert_eq!(labels, vec!["Check failed", "200", "404"]);
+    }
+
+    #[test]
+    fn all_links_preserve_duplicate_occurrences() {
+        let app = app_with_report();
+
+        let shared_count = app
+            .visible_link_occurrences()
+            .into_iter()
+            .filter(|occurrence| occurrence.destination_url == "https://example.com/shared")
+            .count();
+
+        assert_eq!(shared_count, 2);
     }
 
     #[test]
