@@ -1,9 +1,9 @@
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Block, Cell, Padding, Paragraph, Row, Table, Wrap},
-    Frame,
 };
 use std::time::Duration;
 
@@ -631,7 +631,7 @@ mod tests {
     use super::*;
     use crate::models::{CrawlReport, CrawlSummary, IssueType, OpenGraphTags, SeoIssue};
     use crate::runtime::ProgressSnapshot;
-    use ratatui::{backend::TestBackend, Terminal};
+    use ratatui::{Terminal, backend::TestBackend};
     use std::collections::HashMap;
 
     fn sample_page() -> PageInfo {
