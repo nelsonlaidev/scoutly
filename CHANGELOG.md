@@ -2,7 +2,46 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.3.0](https://github.com/nelsonlaidev/scoutly/compare/v0.2.0..v0.3.0) - 2026-04-02
+## [Unreleased]
+
+### Features
+
+- Surface newer Scoutly releases before scans start - ([c982c95](https://github.com/nelsonlaidev/scoutly/commit/c982c9500b1531c96dbb7fdcbac641ec2779201d))
+- Enable env-driven debug logging for update checks - ([cd2c54c](https://github.com/nelsonlaidev/scoutly/commit/cd2c54c811d4028a3da969f9c6e25d838f6377db))
+- Make the TUI's primary panes feel focused - ([bca160e](https://github.com/nelsonlaidev/scoutly/commit/bca160e2ddd6690e868fab77b916785fe6f0a8d7))
+- Polish the crawl progress panel for live scans - ([0643eba](https://github.com/nelsonlaidev/scoutly/commit/0643eba3ae1820f1bfad3b445633dfce039b6637))
+- Add aarch64-pc-windows-msvc target to build configurations - ([c558a17](https://github.com/nelsonlaidev/scoutly/commit/c558a17e9773424c90a8c37a096719d806f3d4c8))
+
+### Bug Fixes
+
+- Prevent media assets from polluting crawl results - ([e1630f5](https://github.com/nelsonlaidev/scoutly/commit/e1630f51cf30e34815de2cafcd04dca528a8b813))
+- Prevent special-scheme links from breaking scans - ([f249acd](https://github.com/nelsonlaidev/scoutly/commit/f249acdc23e7d2845b54e1b8713b3de99cca9e1b))
+- Remove black background from URL input field - ([cefb487](https://github.com/nelsonlaidev/scoutly/commit/cefb487edeeeb8724653712df6c8313967556ca5))
+
+### Chores
+
+- Update cliff config - ([a1b7a86](https://github.com/nelsonlaidev/scoutly/commit/a1b7a86e204c346587f0568f273ea0dd5890b131))
+
+### Documentation
+
+- Add flowchart to illustrate the crawling and analysis process - ([c235d27](https://github.com/nelsonlaidev/scoutly/commit/c235d27dd4cb3e6b1b8531e4548aa634624c2d43))
+- Update release guide - ([9afa460](https://github.com/nelsonlaidev/scoutly/commit/9afa4604a116a42c2c8fc310969089a73d0e8b63))
+
+### Refactor
+
+- Remove the word of "classic" - ([054bba5](https://github.com/nelsonlaidev/scoutly/commit/054bba5834139f67778c54e686620a5c468029e3))
+
+### Styling
+
+- Format - ([a09eaf8](https://github.com/nelsonlaidev/scoutly/commit/a09eaf8d0d4981c4b9cb1c3c9afba6278b387638))
+
+### Testing
+
+- Improve integration test parallelism and reliability - ([4438454](https://github.com/nelsonlaidev/scoutly/commit/443845478b443758abaa9bfc16f030c609e18bbf))
+- Improve launch mode resolution test coverage - ([8421cfb](https://github.com/nelsonlaidev/scoutly/commit/8421cfbbe4654adc9a5c5b4f4a49998a80b7b029))
+- Keep integration tests stable under low file-descriptor limits - ([756bc76](https://github.com/nelsonlaidev/scoutly/commit/756bc76e8cc8d152800713037ab80a0cc685faaf))
+
+## [0.3.0](https://github.com/nelsonlaidev/scoutly/compare/v0.2.0...v0.3.0) - 2026-04-02
 
 ### Features
 
@@ -10,19 +49,24 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
+- Update comment in .gitignore for clarity - ([49cc975](https://github.com/nelsonlaidev/scoutly/commit/49cc97515735d720144fe7a15adf3ea3ff948508))
 - Surface the most severe issues first in the TUI details panel - ([3e024da](https://github.com/nelsonlaidev/scoutly/commit/3e024dac7668d49067c02b01d395ddec4e26512c))
 - Prevent silent waits during crawl feedback - ([54abb49](https://github.com/nelsonlaidev/scoutly/commit/54abb496fe335260a3c9ff0301d5acaa06dad829))
-
-### Refactor
-
-- Harden Scoutly runtime config and crawl result handling - ([194720e](https://github.com/nelsonlaidev/scoutly/commit/194720e197f222c216063267644f53293652bac6))
+- Regenerate cargo-dist release workflow - ([13de210](https://github.com/nelsonlaidev/scoutly/commit/13de21010d15f9e993f85af949d0434c31523c41))
 
 ### Chores
 
-- Add AGENTS.md - ([a9cabab](https://github.com/nelsonlaidev/scoutly/commit/a9cababbb60a62f339be1047fb4f02f473ca17e6))
-- Update comment in .gitignore for clarity - ([49cc975](https://github.com/nelsonlaidev/scoutly/commit/49cc975b679a497a812d82800f861fe9b661e211))
+- Add AGENTS.md - ([a9cabab](https://github.com/nelsonlaidev/scoutly/commit/a9cabab5065fb76b62de70446e65ae9658877551))
 
-## [0.2.0](https://github.com/nelsonlaidev/scoutly/compare/v0.1.1..v0.2.0) - 2025-11-20
+### Documentation
+
+- Update readme - ([d648400](https://github.com/nelsonlaidev/scoutly/commit/d648400113eaae4e8b456166c7279f438a1fed45))
+
+### Refactor
+
+- Harden Scoutly runtime config and crawl result handling - ([194720e](https://github.com/nelsonlaidev/scoutly/commit/194720ee1ced174ae5cb6119caab8c5bdf172d8d))
+
+## [0.2.0](https://github.com/nelsonlaidev/scoutly/compare/v0.1.1...v0.2.0) - 2025-11-20
 
 ### Features
 
@@ -65,7 +109,7 @@ All notable changes to this project will be documented in this file.
 - Add tests for content-type validation, rate limiting, concurrency - ([acef227](https://github.com/nelsonlaidev/scoutly/commit/acef227a50cb60e5feb2a220c6110d07c9d84b67))
 - Increase test coverage (#7) - ([6cc3594](https://github.com/nelsonlaidev/scoutly/commit/6cc3594bbfb3320415261112e83f3c47728859eb))
 
-## [0.1.1](https://github.com/nelsonlaidev/scoutly/compare/v0.1.0..v0.1.1) - 2025-11-09
+## [0.1.1](https://github.com/nelsonlaidev/scoutly/compare/v0.1.0...v0.1.1) - 2025-11-09
 
 ### Bug Fixes
 
@@ -130,4 +174,5 @@ All notable changes to this project will be documented in this file.
 
 - Coverage (#1) - ([979e6eb](https://github.com/nelsonlaidev/scoutly/commit/979e6eb0dba070dd7a7b85f73d38a92f0873bf88))
 - More coverage (#2) - ([3290f46](https://github.com/nelsonlaidev/scoutly/commit/3290f465ffc706eada1c44a34b073a11daf6960b))
+
 
