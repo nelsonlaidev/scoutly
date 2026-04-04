@@ -9,6 +9,7 @@ use futures::{
 };
 use indicatif::{ProgressBar, ProgressStyle};
 use std::collections::HashMap;
+use url::Url;
 
 const DEFAULT_CONCURRENT_CHECKS: usize = 20;
 
@@ -18,6 +19,7 @@ enum LinkCheckOutcome {
         status_code: u16,
         redirected_url: Option<String>,
     },
+    SkippedUnsupportedScheme,
     TransportFailure {
         error: String,
     },
@@ -182,6 +184,11 @@ impl LinkChecker {
                     });
                 }
             }
+            LinkCheckOutcome::SkippedUnsupportedScheme => {
+                link.status_code = None;
+                link.redirected_url = None;
+                link.check_error = None;
+            }
             LinkCheckOutcome::TransportFailure { error } => {
                 link.status_code = None;
                 link.redirected_url = None;
@@ -199,6 +206,12 @@ impl LinkChecker {
     }
 
     async fn check_link(&self, url: &str) -> LinkCheckOutcome {
+        if let Ok(parsed_url) = Url::parse(url)
+            && !matches!(parsed_url.scheme(), "http" | "https")
+        {
+            return LinkCheckOutcome::SkippedUnsupportedScheme;
+        }
+
         match self.client.get(url).send().await {
             Ok(response) => {
                 let status = response.status().as_u16();

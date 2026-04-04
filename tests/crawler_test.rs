@@ -989,6 +989,57 @@ async fn test_crawler() {
 
 #[tokio::test]
 #[serial_test::serial]
+async fn test_crawler_keeps_special_scheme_links_without_crawling_them() {
+    let start_url = format!("{}/links-special-schemes.html", get_test_server_url().await);
+
+    let mut crawler = Crawler::new(
+        &start_url,
+        CrawlerConfig {
+            max_depth: 2,
+            max_pages: 10,
+            follow_external: true,
+            keep_fragments: false,
+            requests_per_second: None,
+            concurrent_requests: 1,
+            respect_robots_txt: false,
+        },
+    )
+    .expect("Failed to create crawler");
+
+    crawler.crawl().await.expect("Crawl failed");
+
+    assert_eq!(
+        crawler.pages.len(),
+        1,
+        "Special-scheme links should not be enqueued as crawl targets"
+    );
+
+    let page = crawler
+        .pages
+        .get(&start_url)
+        .expect("links-special-schemes.html should be present");
+
+    let extracted_urls: Vec<_> = page.links.iter().map(|link| link.url.as_str()).collect();
+    assert!(
+        extracted_urls.contains(&"mailto:team@example.com"),
+        "mailto links should still be extracted"
+    );
+    assert!(
+        extracted_urls.contains(&"tel:+15551234567"),
+        "tel links should still be extracted"
+    );
+    assert!(
+        extracted_urls.contains(&"javascript:void(0)"),
+        "javascript links should still be extracted"
+    );
+    assert!(
+        extracted_urls.contains(&"ftp://example.com/files/report.csv"),
+        "Other non-HTTP schemes should still be extracted"
+    );
+}
+
+#[tokio::test]
+#[serial_test::serial]
 async fn test_robots_txt_fetch_failure_warning() {
     use scoutly::crawler::{Crawler, CrawlerConfig};
 

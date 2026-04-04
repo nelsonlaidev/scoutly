@@ -92,14 +92,11 @@ impl Crawler {
         let base_url = Url::parse(start_url).context("Invalid URL")?;
 
         // Validate URL scheme - only allow http and https
-        match base_url.scheme() {
-            "http" | "https" => {}
-            scheme => {
-                return Err(anyhow!(
-                    "Invalid URL scheme '{}': only http and https are supported",
-                    scheme
-                ));
-            }
+        if !Self::has_supported_web_scheme(&base_url) {
+            return Err(anyhow!(
+                "Invalid URL scheme '{}': only http and https are supported",
+                base_url.scheme()
+            ));
         }
 
         let mut to_visit = VecDeque::new();
@@ -516,18 +513,22 @@ impl Crawler {
     }
 
     fn should_crawl_discovered_url(url: &str) -> bool {
-        !Self::is_known_non_html_resource_url(url)
+        let Ok(parsed_url) = Url::parse(url) else {
+            return false;
+        };
+
+        Self::has_supported_web_scheme(&parsed_url)
+            && !Self::is_known_non_html_resource_url(&parsed_url)
     }
 
-    fn is_known_non_html_resource_url(url: &str) -> bool {
-        let Some(extension) = Url::parse(url)
-            .ok()
-            .and_then(|parsed| {
-                parsed
-                    .path_segments()
-                    .and_then(|segments| segments.filter(|segment| !segment.is_empty()).next_back())
-                    .map(str::to_owned)
-            })
+    fn has_supported_web_scheme(url: &Url) -> bool {
+        matches!(url.scheme(), "http" | "https")
+    }
+
+    fn is_known_non_html_resource_url(url: &Url) -> bool {
+        let Some(extension) = url
+            .path_segments()
+            .and_then(|segments| segments.filter(|segment| !segment.is_empty()).next_back())
             .and_then(|segment| {
                 segment
                     .rsplit_once('.')

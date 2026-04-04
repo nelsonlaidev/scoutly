@@ -447,6 +447,72 @@ async fn test_link_checker() {
 
 #[tokio::test]
 #[serial_test::serial]
+async fn test_link_checker_skips_special_scheme_links() {
+    let start_url = format!("{}/links-special-schemes.html", get_test_server_url().await);
+
+    let mut crawler = Crawler::new(
+        &start_url,
+        CrawlerConfig {
+            max_depth: 0,
+            max_pages: 10,
+            follow_external: true,
+            keep_fragments: false,
+            requests_per_second: None,
+            concurrent_requests: 1,
+            respect_robots_txt: false,
+        },
+    )
+    .expect("Failed to create crawler");
+
+    crawler.crawl().await.expect("Crawl failed");
+
+    LinkChecker::new()
+        .check_all_links(&mut crawler.pages, false)
+        .await
+        .expect("Link checking failed");
+
+    let page = crawler
+        .pages
+        .get(&start_url)
+        .expect("links-special-schemes.html not found");
+
+    for url in [
+        "mailto:team@example.com",
+        "tel:+15551234567",
+        "javascript:void(0)",
+        "ftp://example.com/files/report.csv",
+    ] {
+        let link = page
+            .links
+            .iter()
+            .find(|link| link.url == url)
+            .unwrap_or_else(|| panic!("Expected special-scheme link {url} to be present"));
+
+        assert_eq!(
+            link.status_code, None,
+            "Special-scheme links should be skipped instead of fetched"
+        );
+        assert_eq!(
+            link.redirected_url, None,
+            "Skipped special-scheme links should not report redirects"
+        );
+        assert_eq!(
+            link.check_error, None,
+            "Skipped special-scheme links should not report transport failures"
+        );
+    }
+
+    assert!(
+        page.issues.iter().all(|issue| !matches!(
+            issue.issue_type,
+            IssueType::BrokenLink | IssueType::Redirect
+        )),
+        "Special-scheme links should not generate broken-link or redirect issues"
+    );
+}
+
+#[tokio::test]
+#[serial_test::serial]
 async fn test_link_checker_emits_live_progress_with_current_url() {
     start_link_test_server().await;
 
