@@ -19,12 +19,16 @@ https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
 
 {%- if version %}\
     {% if previous.version %}\
-    ## [{{ version | trim_start_matches(pat="v") }}]({{ self::remote_url() }}/compare/{{ previous.version }}..{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}\n
+    ## [{{ version | trim_start_matches(pat="v") }}]({{ self::remote_url() }}/compare/{{ previous.version }}...{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}\n
     {% else %}\
     ## [{{ version | trim_start_matches(pat="v") }}]({{ self::remote_url() }}/tree/{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}\n
     {% endif %}\
 {% else %}\
-    ## [unreleased]\n
+    ## [Unreleased]\n
+{% endif -%}
+
+{%- if message %}
+{{ message }}\n
 {% endif -%}
 
 {%- for group, commits in commits | group_by(attribute="group") %}\
