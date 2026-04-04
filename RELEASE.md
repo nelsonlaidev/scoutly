@@ -21,66 +21,64 @@ The repository does not currently automate `cargo publish` to crates.io.
 
 Release artifacts are intentionally limited to mainstream targets that are practical to support:
 
+- `aarch64-apple-darwin`
+- `aarch64-unknown-linux-gnu`
+- `aarch64-pc-windows-msvc`
+- `x86_64-apple-darwin`
 - `x86_64-unknown-linux-gnu`
 - `x86_64-unknown-linux-musl`
-- `aarch64-unknown-linux-gnu`
-- `x86_64-apple-darwin`
-- `aarch64-apple-darwin`
 - `x86_64-pc-windows-msvc`
-
-## Pre-release Checklist
-
-1. Confirm `main` is green in CI.
-2. Update `Cargo.toml` version.
-3. Add a new section to `CHANGELOG.md`.
-4. Run:
-
-```bash
-cargo fmt --all -- --check
-cargo clippy --locked --all-targets --all-features -- -D warnings
-cargo test --locked
-```
-
-5. Verify installer and packaging config changes if release infrastructure was touched.
 
 ## Release Steps
 
-1. Commit the version bump and changelog update.
-2. Create an annotated tag that matches the Cargo version:
+1. Run tests
 
 ```bash
-git tag -a v0.2.1 -m "Release v0.2.1"
+cargo test
+cargo fmt --check
+cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-3. Push the branch and tag:
+2. Update the version in `Cargo.toml` (e.g., from `0.2.0` to `0.2.1`).
+
+3. Create an annotated tag with release notes
+
+```bash
+git tag v0.2.1 -m "Highlights:
+- Added GitHub OAuth
+- Improved search ranking
+- Breaking: renamed config file from scoutly.json to scoutly.toml"
+```
+
+3. Push the branch and tag
 
 ```bash
 git push origin main
 git push origin v0.2.1
 ```
 
-4. Wait for the `Release` workflow to finish.
-5. Verify:
+4. Generate release notes
+
+```bash
+git cliff -o CHANGELOG.md
+```
+
+5. Commit the changelog and version changes
+
+```bash
+git add CHANGELOG.md Cargo.toml Cargo.lock
+git commit -m "chore(release): prepare v0.2.1"
+```
+
+5. Push the branch and the tag
+
+```bash
+git push
+git push --tags
+```
+
+6. Wait for the `Release` workflow to finish.
+7. Verify:
    - GitHub Release exists and contains archives/installers
    - Homebrew tap was updated
    - npm package was published
-
-## After Release
-
-- Smoke-test at least one install path:
-
-```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/nelsonlaidev/scoutly/releases/download/v0.2.1/scoutly-installer.sh | sh
-```
-
-- Validate the binary:
-
-```bash
-scoutly --help
-```
-
-## Troubleshooting
-
-- If tag and `Cargo.toml` version do not match, `cargo-dist` planning may fail.
-- If Homebrew publish fails, confirm `HOMEBREW_TAP_TOKEN` can push to the tap repo.
-- If npm publish fails, confirm the package version is new and `NPM_TOKEN` can publish to `@nelsonlaidev`.
