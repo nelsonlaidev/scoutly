@@ -1,9 +1,9 @@
 use ratatui::{
-    Frame,
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Block, Cell, Padding, Paragraph, Row, Table, Wrap},
+    Frame,
 };
 use std::time::Duration;
 
@@ -264,14 +264,12 @@ fn render_url_input(frame: &mut Frame, app: &App, area: Rect) {
                 .add_modifier(Modifier::BOLD),
         ))
     };
-    let input = Paragraph::new(input_value)
-        .block(
-            Block::bordered()
-                .title(" URL ")
-                .border_style(Style::default().fg(input_border))
-                .padding(Padding::horizontal(1)),
-        )
-        .style(Style::default().bg(Color::Black));
+    let input = Paragraph::new(input_value).block(
+        Block::bordered()
+            .title(" URL ")
+            .border_style(Style::default().fg(input_border))
+            .padding(Padding::horizontal(1)),
+    );
     frame.render_widget(input, input_area);
 
     let mut detail_lines = vec![Line::styled(
@@ -633,7 +631,7 @@ mod tests {
     use super::*;
     use crate::models::{CrawlReport, CrawlSummary, IssueType, OpenGraphTags, SeoIssue};
     use crate::runtime::ProgressSnapshot;
-    use ratatui::{Terminal, backend::TestBackend};
+    use ratatui::{backend::TestBackend, Terminal};
     use std::collections::HashMap;
 
     fn sample_page() -> PageInfo {
