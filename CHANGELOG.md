@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.4.0](https://github.com/nelsonlaidev/scoutly/compare/v0.3.0...v0.4.0) - 2026-04-05
 
 ### Features
 
@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Make the TUI's primary panes feel focused - ([bca160e](https://github.com/nelsonlaidev/scoutly/commit/bca160e2ddd6690e868fab77b916785fe6f0a8d7))
 - Polish the crawl progress panel for live scans - ([0643eba](https://github.com/nelsonlaidev/scoutly/commit/0643eba3ae1820f1bfad3b445633dfce039b6637))
 - Add aarch64-pc-windows-msvc target to build configurations - ([c558a17](https://github.com/nelsonlaidev/scoutly/commit/c558a17e9773424c90a8c37a096719d806f3d4c8))
+- Make crawl results easier to inspect across page and link slices - ([d092c46](https://github.com/nelsonlaidev/scoutly/commit/d092c46e4d72b565080a1c720335d7851723d23e))
 
 ### Bug Fixes
 
@@ -21,11 +22,13 @@ All notable changes to this project will be documented in this file.
 ### Chores
 
 - Update cliff config - ([a1b7a86](https://github.com/nelsonlaidev/scoutly/commit/a1b7a86e204c346587f0568f273ea0dd5890b131))
+- Update cargo-dist-version to 0.31.0 - ([ca82ec9](https://github.com/nelsonlaidev/scoutly/commit/ca82ec9f28909a1d7236b53243cd269d43e95c82))
 
 ### Documentation
 
 - Add flowchart to illustrate the crawling and analysis process - ([c235d27](https://github.com/nelsonlaidev/scoutly/commit/c235d27dd4cb3e6b1b8531e4548aa634624c2d43))
 - Update release guide - ([9afa460](https://github.com/nelsonlaidev/scoutly/commit/9afa4604a116a42c2c8fc310969089a73d0e8b63))
+- Update release guide - ([29c3152](https://github.com/nelsonlaidev/scoutly/commit/29c3152c0d6131855658e51d650eba6baf3e7db8))
 
 ### Refactor
 
