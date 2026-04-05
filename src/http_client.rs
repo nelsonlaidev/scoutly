@@ -1,5 +1,6 @@
 use anyhow::Result;
-use reqwest::{Client, ClientBuilder, header};
+use reqwest::header::HeaderValue;
+use reqwest::{header, Client, ClientBuilder};
 use std::time::Duration;
 
 /// Common HTTP headers used for all requests
@@ -20,9 +21,15 @@ pub fn build_api_client(timeout_secs: u64) -> Result<Client> {
 
 fn build_client(timeout_secs: u64, accept: &str) -> Result<Client> {
     let mut headers = header::HeaderMap::new();
-    headers.insert(header::ACCEPT, accept.parse().unwrap());
-    headers.insert(header::ACCEPT_LANGUAGE, ACCEPT_LANGUAGE.parse().unwrap());
-    headers.insert(header::CONNECTION, CONNECTION.parse().unwrap());
+    headers.insert(
+        header::ACCEPT,
+        HeaderValue::from_str(accept).expect("accept header should be valid"),
+    );
+    headers.insert(
+        header::ACCEPT_LANGUAGE,
+        HeaderValue::from_static(ACCEPT_LANGUAGE),
+    );
+    headers.insert(header::CONNECTION, HeaderValue::from_static(CONNECTION));
 
     let client = ClientBuilder::new()
         .user_agent(USER_AGENT)

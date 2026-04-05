@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use url::Url;
 
 /// Represents a robots.txt rule (either Allow or Disallow)
@@ -17,7 +17,7 @@ pub struct RobotsTxt {
     /// Sitemap URLs grouped by domain
     sitemaps: HashMap<String, Vec<String>>,
     /// Cache of fetched robots.txt per domain
-    cache: HashMap<String, bool>,
+    cache: HashSet<String>,
 }
 
 impl Default for RobotsTxt {
@@ -31,17 +31,17 @@ impl RobotsTxt {
         Self {
             rules: HashMap::new(),
             sitemaps: HashMap::new(),
-            cache: HashMap::new(),
+            cache: HashSet::new(),
         }
     }
 
     /// Fetches and parses robots.txt for a given URL
     pub async fn fetch(&mut self, client: &reqwest::Client, base_url: &Url) -> Result<()> {
         let robots_url = self.get_robots_url(base_url)?;
-        let domain_key = self.get_domain_key(base_url);
+        let key = domain_key(base_url);
 
         // Check if already fetched
-        if self.cache.contains_key(&domain_key) {
+        if self.cache.contains(&key) {
             return Ok(());
         }
 
@@ -51,9 +51,9 @@ impl RobotsTxt {
             Err(_) => {
                 // If robots.txt doesn't exist or can't be fetched, allow all
                 tracing::info!(url = %robots_url, "robots.txt not found, allowing all paths");
-                self.cache.insert(domain_key.clone(), true);
-                self.rules.insert(domain_key, vec![]);
-                self.sitemaps.entry(base_url_origin(base_url)).or_default();
+                self.cache.insert(key.clone());
+                self.rules.insert(key, vec![]);
+                self.sitemaps.entry(domain_key(base_url)).or_default();
                 return Ok(());
             }
         };
@@ -65,15 +65,15 @@ impl RobotsTxt {
                 status = %response.status(),
                 "robots.txt not found, allowing all paths"
             );
-            self.cache.insert(domain_key.clone(), true);
-            self.rules.insert(domain_key, vec![]);
-            self.sitemaps.entry(base_url_origin(base_url)).or_default();
+            self.cache.insert(key.clone());
+            self.rules.insert(key, vec![]);
+            self.sitemaps.entry(domain_key(base_url)).or_default();
             return Ok(());
         }
 
         let content = response.text().await?;
-        self.parse(&domain_key, &content);
-        self.cache.insert(domain_key, true);
+        self.parse(&key, &content);
+        self.cache.insert(key);
 
         Ok(())
     }
@@ -146,17 +146,17 @@ impl RobotsTxt {
 
     /// Checks if a URL is allowed to be crawled
     pub fn is_allowed(&self, url: &Url, user_agent: &str) -> bool {
-        let domain_key = self.get_domain_key(url);
+        let key = domain_key(url);
         let path = url.path();
 
         // Check for user-agent-specific rules
-        let specific_key = format!("{}:{}", domain_key, user_agent.to_lowercase());
+        let specific_key = format!("{}:{}", key, user_agent.to_lowercase());
         if let Some(rules) = self.rules.get(&specific_key) {
             return self.check_rules(rules, path);
         }
 
         // Check for wildcard (*) rules
-        let wildcard_key = format!("{}:*", domain_key);
+        let wildcard_key = format!("{}:*", key);
         if let Some(rules) = self.rules.get(&wildcard_key) {
             return self.check_rules(rules, path);
         }
@@ -167,7 +167,7 @@ impl RobotsTxt {
 
     pub fn sitemap_urls(&self, url: &Url) -> Vec<String> {
         self.sitemaps
-            .get(&self.get_domain_key(url))
+            .get(&domain_key(url))
             .cloned()
             .unwrap_or_default()
     }
@@ -269,16 +269,6 @@ impl RobotsTxt {
         Ok(url.to_string())
     }
 
-    /// Gets a unique key for a domain (host + port)
-    fn get_domain_key(&self, url: &Url) -> String {
-        format!(
-            "{}://{}{}",
-            url.scheme(),
-            url.host_str().unwrap_or(""),
-            url.port().map(|p| format!(":{}", p)).unwrap_or_default()
-        )
-    }
-
     fn save_rules(&mut self, domain_key: &str, agents: &[String], rules: &[Rule]) {
         if agents.is_empty() || rules.is_empty() {
             return;
@@ -291,16 +281,13 @@ impl RobotsTxt {
     }
 }
 
-fn base_url_origin(base_url: &Url) -> String {
-    let mut key = format!(
-        "{}://{}",
-        base_url.scheme(),
-        base_url.host_str().unwrap_or_default()
-    );
-    if let Some(port) = base_url.port() {
-        key.push_str(&format!(":{port}"));
-    }
-    key
+fn domain_key(url: &Url) -> String {
+    format!(
+        "{}://{}{}",
+        url.scheme(),
+        url.host_str().unwrap_or(""),
+        url.port().map(|p| format!(":{}", p)).unwrap_or_default()
+    )
 }
 
 #[cfg(test)]
@@ -462,10 +449,10 @@ Allow: /private/public
         let mut robots = RobotsTxt::new();
 
         // Simulate that robots.txt was already fetched for a domain
-        robots.cache.insert("http://example.com".to_string(), true);
+        robots.cache.insert("http://example.com".to_string());
 
         // Verify cache contains the entry
-        assert!(robots.cache.contains_key("http://example.com"));
+        assert!(robots.cache.contains("http://example.com"));
     }
 
     #[test]
@@ -479,25 +466,23 @@ Allow: /private/public
     }
 
     #[test]
-    fn test_get_domain_key() {
-        let robots = RobotsTxt::new();
-
+    fn test_domain_key() {
         // Test without explicit port
         let url1 = Url::parse("http://example.com/path").unwrap();
-        assert_eq!(robots.get_domain_key(&url1), "http://example.com");
+        assert_eq!(domain_key(&url1), "http://example.com");
 
         // Test with non-default port
         let url2 = Url::parse("https://example.com:8080/path").unwrap();
-        assert_eq!(robots.get_domain_key(&url2), "https://example.com:8080");
+        assert_eq!(domain_key(&url2), "https://example.com:8080");
 
         // Test with explicit default port - Url library normalizes and drops it
         let url3 = Url::parse("http://example.com:80/path").unwrap();
         // Note: Url::parse normalizes default ports, so :80 is dropped
-        assert_eq!(robots.get_domain_key(&url3), "http://example.com");
+        assert_eq!(domain_key(&url3), "http://example.com");
 
         // Test HTTPS default port - also normalized
         let url4 = Url::parse("https://example.com:443/path").unwrap();
-        assert_eq!(robots.get_domain_key(&url4), "https://example.com");
+        assert_eq!(domain_key(&url4), "https://example.com");
     }
 
     #[test]

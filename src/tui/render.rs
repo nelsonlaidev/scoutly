@@ -1,9 +1,9 @@
 use ratatui::{
-    Frame,
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Block, Cell, Padding, Paragraph, Row, Table, Wrap},
+    Frame,
 };
 use std::time::Duration;
 
@@ -49,7 +49,7 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
         .block(
             Block::bordered()
                 .title("Run")
-                .border_style(Style::default().fg(Color::Red)),
+                .border_style(Style::default().fg(Color::Cyan)),
         )
         .wrap(Wrap { trim: true });
     frame.render_widget(header, area);
@@ -86,7 +86,7 @@ fn render_metrics(frame: &mut Frame, app: &App, area: Rect) {
     .block(
         Block::bordered()
             .title("Live summary")
-            .border_style(Style::default().fg(Color::Red)),
+            .border_style(Style::default().fg(Color::Blue)),
     )
     .wrap(Wrap { trim: true });
     frame.render_widget(message, area);
@@ -111,7 +111,7 @@ fn render_main(frame: &mut Frame, app: &App, area: Rect) {
         .block(
             Block::bordered()
                 .title("Ready to crawl")
-                .border_style(Style::default().fg(Color::Red)),
+                .border_style(Style::default().fg(Color::Cyan)),
         )
         .wrap(Wrap { trim: true });
         frame.render_widget(waiting, area);
@@ -187,7 +187,7 @@ fn render_scan_in_progress(frame: &mut Frame, app: &App, area: Rect) {
     let spinner = spinner_frame(elapsed);
     let section = Block::bordered()
         .title("Crawl in progress")
-        .border_style(Style::default().fg(Color::Red));
+        .border_style(Style::default().fg(Color::Yellow));
     let inner = section.inner(area);
     frame.render_widget(section, area);
 
@@ -262,7 +262,7 @@ fn render_scan_in_progress(frame: &mut Frame, app: &App, area: Rect) {
 fn render_url_input(frame: &mut Frame, app: &App, area: Rect) {
     let section = Block::bordered()
         .title("Start crawl")
-        .border_style(Style::default().fg(Color::Red));
+        .border_style(Style::default().fg(Color::Cyan));
     let inner = section.inner(area);
     frame.render_widget(section, area);
 
@@ -888,7 +888,7 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         .block(
             Block::bordered()
                 .title("Keys")
-                .border_style(Style::default().fg(Color::Red)),
+                .border_style(Style::default().fg(Color::Green)),
         )
         .wrap(Wrap { trim: true });
     frame.render_widget(footer, area);
@@ -983,7 +983,7 @@ fn stage_label(app: &App) -> &'static str {
 
 fn spinner_frame(elapsed: Duration) -> &'static str {
     const FRAMES: [&str; 4] = ["-", "\\", "|", "/"];
-    let frame = ((elapsed.as_millis() / 120) as usize) % FRAMES.len();
+    let frame = ((elapsed.as_secs() * 1000 / 120) as usize) % FRAMES.len();
     FRAMES[frame]
 }
 
@@ -1146,7 +1146,7 @@ mod tests {
         CrawlReport, CrawlSummary, IssueType, Link, OpenGraphTags, SeoIssue, SitemapEntry,
     };
     use crate::runtime::ProgressSnapshot;
-    use ratatui::{Terminal, backend::TestBackend};
+    use ratatui::{backend::TestBackend, Terminal};
     use std::collections::HashMap;
 
     fn sample_page() -> PageInfo {

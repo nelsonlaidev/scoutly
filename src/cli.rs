@@ -28,11 +28,11 @@ pub struct Cli {
     pub url: Option<String>,
 
     /// Maximum crawl depth (default: 5)
-    #[arg(short, long)]
+    #[arg(short = 'd', long)]
     pub depth: Option<usize>,
 
     /// Maximum number of pages to crawl (default: 200)
-    #[arg(short, long)]
+    #[arg(short = 'm', long)]
     pub max_pages: Option<usize>,
 
     /// CLI output format: text or json

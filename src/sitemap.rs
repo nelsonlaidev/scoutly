@@ -2,21 +2,21 @@ use crate::http_client::build_http_client;
 use crate::models::{PageInfo, SitemapEntry};
 use crate::robots::RobotsTxt;
 use anyhow::Result;
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use scraper::{ElementRef, Html, Selector};
 use std::collections::{HashMap, HashSet, VecDeque};
 use url::Url;
 
-static URL_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("url").expect("url selector should be valid"));
-static SITEMAP_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("sitemap").expect("sitemap selector should be valid"));
-static LOC_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("loc").expect("loc selector should be valid"));
-static PRIORITY_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("priority").expect("priority selector should be valid"));
-static CHANGEFREQ_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("changefreq").expect("changefreq selector should be valid"));
+static URL_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("url").expect("url selector should be valid"));
+static SITEMAP_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("sitemap").expect("sitemap selector should be valid"));
+static LOC_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("loc").expect("loc selector should be valid"));
+static PRIORITY_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("priority").expect("priority selector should be valid"));
+static CHANGEFREQ_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("changefreq").expect("changefreq selector should be valid"));
 
 pub async fn collect_sitemap_entries(
     start_url: &str,
@@ -120,9 +120,14 @@ fn parse_sitemap_document(base_sitemap_url: &str, content: &str) -> ParsedSitema
 
     for sitemap in document.select(&SITEMAP_SELECTOR) {
         if let Some(loc) = selected_text(&sitemap, &LOC_SELECTOR) {
-            parsed
-                .nested_sitemaps
-                .push(resolve_url(base_sitemap_url, &loc).unwrap_or(loc));
+            let resolved_loc = match resolve_url(base_sitemap_url, &loc) {
+                Some(resolved) => resolved,
+                None => {
+                    tracing::warn!(loc = %loc, "Failed to resolve relative URL in sitemap");
+                    loc
+                }
+            };
+            parsed.nested_sitemaps.push(resolved_loc);
         }
     }
 
@@ -131,8 +136,16 @@ fn parse_sitemap_document(base_sitemap_url: &str, content: &str) -> ParsedSitema
             continue;
         };
 
+        let resolved_loc = match resolve_url(base_sitemap_url, &loc) {
+            Some(resolved) => resolved,
+            None => {
+                tracing::warn!(loc = %loc, "Failed to resolve relative URL in sitemap");
+                loc
+            }
+        };
+
         parsed.urls.push(ParsedUrlEntry {
-            loc: resolve_url(base_sitemap_url, &loc).unwrap_or(loc),
+            loc: resolved_loc,
             priority: selected_text(&url, &PRIORITY_SELECTOR),
             change_frequency: selected_text(&url, &CHANGEFREQ_SELECTOR),
         });

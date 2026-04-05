@@ -28,6 +28,11 @@ struct LatestReleaseResponse {
 }
 
 pub async fn check_for_update() -> Option<UpdateNotice> {
+    if REPOSITORY_URL.is_empty() {
+        tracing::debug!("No repository URL configured, skipping update check");
+        return None;
+    }
+
     let endpoint = std::env::var(UPDATE_API_URL_ENV)
         .ok()
         .or_else(|| latest_release_api_url(REPOSITORY_URL))?;

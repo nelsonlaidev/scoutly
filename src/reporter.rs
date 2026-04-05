@@ -8,21 +8,21 @@ use std::io::Write;
 pub struct Reporter;
 
 impl Reporter {
-    pub fn generate_report(start_url: &str, pages: &HashMap<String, PageInfo>) -> CrawlReport {
+    pub fn generate_report(start_url: &str, pages: HashMap<String, PageInfo>) -> CrawlReport {
         Self::generate_report_with_sitemap(start_url, pages, Vec::new())
     }
 
     pub fn generate_report_with_sitemap(
         start_url: &str,
-        pages: &HashMap<String, PageInfo>,
+        pages: HashMap<String, PageInfo>,
         sitemap: Vec<SitemapEntry>,
     ) -> CrawlReport {
-        let summary = Self::summarize_pages(pages);
+        let summary = Self::summarize_pages(&pages);
         let timestamp = chrono::Utc::now().to_rfc3339();
 
         CrawlReport {
             start_url: start_url.to_string(),
-            pages: pages.clone(),
+            pages,
             sitemap,
             summary,
             timestamp,
@@ -66,67 +66,85 @@ impl Reporter {
         }
     }
 
-    pub fn print_text_report(report: &CrawlReport) {
-        println!("\n{}", "=".repeat(80).bright_blue());
-        println!("{}", "Scoutly - Crawl Report".bright_cyan().bold());
-        println!("{}", "=".repeat(80).bright_blue());
-        println!();
+    pub fn print_text_report(report: &CrawlReport, mut out: impl std::io::Write) {
+        writeln!(out, "\n{}", "=".repeat(80).bright_blue()).unwrap();
+        writeln!(out, "{}", "Scoutly - Crawl Report".bright_cyan().bold()).unwrap();
+        writeln!(out, "{}", "=".repeat(80).bright_blue()).unwrap();
+        writeln!(out).unwrap();
 
-        println!(
+        writeln!(
+            out,
             "{}: {}",
             "Start URL".bright_white().bold(),
             report.start_url
-        );
-        println!(
+        )
+        .unwrap();
+        writeln!(
+            out,
             "{}: {}",
             "Timestamp".bright_white().bold(),
             report.timestamp
-        );
-        println!();
+        )
+        .unwrap();
+        writeln!(out).unwrap();
 
         // Summary
-        println!("{}", "Summary".bright_yellow().bold().underline());
-        println!(
+        writeln!(out, "{}", "Summary".bright_yellow().bold().underline()).unwrap();
+        writeln!(
+            out,
             "  Total Pages Crawled: {}",
             report.summary.total_pages.to_string().bright_green()
-        );
-        println!(
+        )
+        .unwrap();
+        writeln!(
+            out,
             "  Total Links Found:   {}",
             report.summary.total_links.to_string().bright_green()
-        );
-        println!(
+        )
+        .unwrap();
+        writeln!(
+            out,
             "  Broken Links:        {}",
             if report.summary.broken_links > 0 {
                 report.summary.broken_links.to_string().bright_red()
             } else {
                 report.summary.broken_links.to_string().bright_green()
             }
-        );
-        println!(
+        )
+        .unwrap();
+        writeln!(
+            out,
             "  Errors:              {}",
             if report.summary.errors > 0 {
                 report.summary.errors.to_string().bright_red()
             } else {
                 report.summary.errors.to_string().bright_green()
             }
-        );
-        println!(
+        )
+        .unwrap();
+        writeln!(
+            out,
             "  Warnings:            {}",
             if report.summary.warnings > 0 {
                 report.summary.warnings.to_string().yellow()
             } else {
                 report.summary.warnings.to_string().bright_green()
             }
-        );
-        println!(
+        )
+        .unwrap();
+        writeln!(
+            out,
             "  Info:                {}",
             report.summary.infos.to_string().bright_cyan()
-        );
-        println!(
+        )
+        .unwrap();
+        writeln!(
+            out,
             "  Sitemap Entries:     {}",
             report.sitemap.len().to_string().bright_green()
-        );
-        println!();
+        )
+        .unwrap();
+        writeln!(out).unwrap();
 
         // Pages with issues
         let mut pages_with_issues: Vec<_> = report
@@ -137,11 +155,17 @@ impl Reporter {
         pages_with_issues.sort_by_key(|page| page.crawl_depth);
 
         if !pages_with_issues.is_empty() {
-            println!("{}", "Pages with Issues".bright_yellow().bold().underline());
+            writeln!(
+                out,
+                "{}",
+                "Pages with Issues".bright_yellow().bold().underline()
+            )
+            .unwrap();
             for page in pages_with_issues {
-                println!();
-                println!("  {} {}", "URL:".bright_white().bold(), page.url);
-                println!(
+                writeln!(out).unwrap();
+                writeln!(out, "  {} {}", "URL:".bright_white().bold(), page.url).unwrap();
+                writeln!(
+                    out,
                     "    Status: {}",
                     page.status_code
                         .map(|code| {
@@ -154,11 +178,12 @@ impl Reporter {
                             }
                         })
                         .unwrap_or_else(|| "N/A".dimmed())
-                );
-                println!("    Depth:  {}", page.crawl_depth);
+                )
+                .unwrap();
+                writeln!(out, "    Depth:  {}", page.crawl_depth).unwrap();
 
                 if let Some(title) = &page.title {
-                    println!("    Title:  {}", title.bright_white());
+                    writeln!(out, "    Title:  {}", title.bright_white()).unwrap();
                 }
 
                 // Display Open Graph information if present
@@ -168,59 +193,63 @@ impl Reporter {
                     || page.open_graph.og_url.is_some()
                     || page.open_graph.og_type.is_some()
                 {
-                    println!("    Open Graph:");
+                    writeln!(out, "    Open Graph:").unwrap();
                     if let Some(og_title) = &page.open_graph.og_title {
-                        println!("      og:title:       {}", og_title.bright_white());
+                        writeln!(out, "      og:title:       {}", og_title.bright_white()).unwrap();
                     }
                     if let Some(og_desc) = &page.open_graph.og_description {
-                        println!("      og:description: {}", og_desc.bright_white());
+                        writeln!(out, "      og:description: {}", og_desc.bright_white()).unwrap();
                     }
                     if let Some(og_image) = &page.open_graph.og_image {
-                        println!("      og:image:       {}", og_image.bright_white());
+                        writeln!(out, "      og:image:       {}", og_image.bright_white()).unwrap();
                     }
                     if let Some(og_url) = &page.open_graph.og_url {
-                        println!("      og:url:         {}", og_url.bright_white());
+                        writeln!(out, "      og:url:         {}", og_url.bright_white()).unwrap();
                     }
                     if let Some(og_type) = &page.open_graph.og_type {
-                        println!("      og:type:        {}", og_type.bright_white());
+                        writeln!(out, "      og:type:        {}", og_type.bright_white()).unwrap();
                     }
                     if let Some(og_site_name) = &page.open_graph.og_site_name {
-                        println!("      og:site_name:   {}", og_site_name.bright_white());
+                        writeln!(out, "      og:site_name:   {}", og_site_name.bright_white())
+                            .unwrap();
                     }
                     if let Some(og_locale) = &page.open_graph.og_locale {
-                        println!("      og:locale:      {}", og_locale.bright_white());
+                        writeln!(out, "      og:locale:      {}", og_locale.bright_white())
+                            .unwrap();
                     }
                 }
 
-                println!("    Issues:");
+                writeln!(out, "    Issues:").unwrap();
                 for issue in &page.issues {
                     let severity_str = match issue.severity {
                         IssueSeverity::Error => "ERROR".bright_red(),
                         IssueSeverity::Warning => "WARN ".yellow(),
                         IssueSeverity::Info => "INFO ".bright_cyan(),
                     };
-                    println!("      [{}] {}", severity_str, issue.message);
+                    writeln!(out, "      [{}] {}", severity_str, issue.message).unwrap();
                 }
             }
         }
 
         if !report.sitemap.is_empty() {
-            println!();
-            println!("{}", "Sitemap".bright_yellow().bold().underline());
+            writeln!(out).unwrap();
+            writeln!(out, "{}", "Sitemap".bright_yellow().bold().underline()).unwrap();
             for entry in &report.sitemap {
-                println!();
-                println!("  {} {}", "URL:".bright_white().bold(), entry.url);
-                println!("    Title:             {}", entry.title.bright_white());
-                println!("    Priority:          {}", entry.display_priority());
-                println!(
+                writeln!(out).unwrap();
+                writeln!(out, "  {} {}", "URL:".bright_white().bold(), entry.url).unwrap();
+                writeln!(out, "    Title:             {}", entry.title.bright_white()).unwrap();
+                writeln!(out, "    Priority:          {}", entry.display_priority()).unwrap();
+                writeln!(
+                    out,
                     "    Change frequency:  {}",
                     entry.display_change_frequency()
-                );
+                )
+                .unwrap();
             }
         }
 
-        println!();
-        println!("{}", "=".repeat(80).bright_blue());
+        writeln!(out).unwrap();
+        writeln!(out, "{}", "=".repeat(80).bright_blue()).unwrap();
     }
 
     pub fn save_json_report(report: &CrawlReport, filename: &str) -> Result<()> {
@@ -298,7 +327,7 @@ mod tests {
     #[test]
     fn test_generate_report_empty_pages() {
         let pages = HashMap::new();
-        let report = Reporter::generate_report("https://example.com", &pages);
+        let report = Reporter::generate_report("https://example.com", pages);
 
         assert_eq!(report.start_url, "https://example.com");
         assert_eq!(report.summary.total_pages, 0);
@@ -338,7 +367,7 @@ mod tests {
 
         pages.insert("https://example.com".to_string(), page);
 
-        let report = Reporter::generate_report("https://example.com", &pages);
+        let report = Reporter::generate_report("https://example.com", pages);
 
         assert_eq!(report.summary.total_pages, 1);
         assert_eq!(report.summary.total_links, 3);
@@ -401,7 +430,7 @@ mod tests {
         pages.insert("https://example.com/page2".to_string(), page2);
         pages.insert("https://example.com/page3".to_string(), page3);
 
-        let report = Reporter::generate_report("https://example.com", &pages);
+        let report = Reporter::generate_report("https://example.com", pages);
 
         assert_eq!(report.summary.total_pages, 3);
         assert_eq!(report.summary.total_links, 3);
@@ -427,7 +456,7 @@ mod tests {
         let page = create_test_page("https://example.com", Some(200), None, vec![], links, 0);
         pages.insert("https://example.com".to_string(), page);
 
-        let report = Reporter::generate_report("https://example.com", &pages);
+        let report = Reporter::generate_report("https://example.com", pages);
 
         assert_eq!(report.summary.total_links, 6);
         assert_eq!(report.summary.broken_links, 3);
@@ -446,7 +475,7 @@ mod tests {
         let page = create_test_page("https://example.com", Some(200), None, vec![], links, 0);
         pages.insert("https://example.com".to_string(), page);
 
-        let report = Reporter::generate_report("https://example.com", &pages);
+        let report = Reporter::generate_report("https://example.com", pages);
 
         assert_eq!(report.summary.total_links, 3);
         assert_eq!(report.summary.broken_links, 1);
@@ -464,7 +493,7 @@ mod tests {
         let page = create_test_page("https://example.com", Some(200), None, vec![], links, 0);
         pages.insert("https://example.com".to_string(), page);
 
-        let report = Reporter::generate_report("https://example.com", &pages);
+        let report = Reporter::generate_report("https://example.com", pages);
 
         assert_eq!(report.summary.total_links, 2);
         assert_eq!(report.summary.broken_links, 1);
@@ -524,9 +553,9 @@ mod tests {
         pages.insert("https://example.com/page3".to_string(), page3);
         pages.insert("https://example.com/page4".to_string(), page4);
 
-        let report = Reporter::generate_report("https://example.com", &pages);
+        let report = Reporter::generate_report("https://example.com", pages);
 
-        Reporter::print_text_report(&report);
+        Reporter::print_text_report(&report, std::io::stdout());
     }
 
     #[test]
@@ -544,9 +573,9 @@ mod tests {
 
         pages.insert("https://example.com".to_string(), page);
 
-        let report = Reporter::generate_report("https://example.com", &pages);
+        let report = Reporter::generate_report("https://example.com", pages);
 
-        Reporter::print_text_report(&report);
+        Reporter::print_text_report(&report, std::io::stdout());
     }
 
     #[test]
@@ -566,11 +595,11 @@ mod tests {
 
         pages.insert("https://example.com".to_string(), page);
 
-        let report = Reporter::generate_report("https://example.com", &pages);
+        let report = Reporter::generate_report("https://example.com", pages);
 
         assert_eq!(report.summary.broken_links, 1);
 
-        Reporter::print_text_report(&report);
+        Reporter::print_text_report(&report, std::io::stdout());
     }
 
     #[test]
@@ -595,9 +624,9 @@ mod tests {
 
         pages.insert("https://example.com".to_string(), page);
 
-        let report = Reporter::generate_report("https://example.com", &pages);
+        let report = Reporter::generate_report("https://example.com", pages);
 
-        Reporter::print_text_report(&report);
+        Reporter::print_text_report(&report, std::io::stdout());
     }
 
     #[test]
@@ -617,7 +646,7 @@ mod tests {
 
         pages.insert("https://example.com".to_string(), page);
 
-        let report = Reporter::generate_report("https://example.com", &pages);
+        let report = Reporter::generate_report("https://example.com", pages);
 
         let temp_dir = tempfile::tempdir().unwrap();
         let file_path = temp_dir.path().join("test_report.json");
@@ -641,7 +670,7 @@ mod tests {
     fn test_generate_report_with_sitemap_entries() {
         let report = Reporter::generate_report_with_sitemap(
             "https://example.com",
-            &HashMap::new(),
+            HashMap::new(),
             vec![SitemapEntry {
                 url: "https://example.com/about".to_string(),
                 title: "About".to_string(),
@@ -670,7 +699,7 @@ mod tests {
 
         pages.insert("https://example.com".to_string(), page);
 
-        let report = Reporter::generate_report("https://example.com", &pages);
+        let report = Reporter::generate_report("https://example.com", pages);
 
         assert_eq!(report.pages.len(), 1);
         assert!(report.pages.contains_key("https://example.com"));
@@ -707,9 +736,9 @@ mod tests {
 
         pages.insert("https://example.com/og-page".to_string(), page);
 
-        let report = Reporter::generate_report("https://example.com", &pages);
+        let report = Reporter::generate_report("https://example.com", pages);
 
-        Reporter::print_text_report(&report);
+        Reporter::print_text_report(&report, std::io::stdout());
     }
 
     #[test]
@@ -743,8 +772,8 @@ mod tests {
 
         pages.insert("https://example.com/partial-og".to_string(), page);
 
-        let report = Reporter::generate_report("https://example.com", &pages);
+        let report = Reporter::generate_report("https://example.com", pages);
 
-        Reporter::print_text_report(&report);
+        Reporter::print_text_report(&report, std::io::stdout());
     }
 }

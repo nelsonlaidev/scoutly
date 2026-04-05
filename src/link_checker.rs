@@ -45,7 +45,7 @@ impl LinkChecker {
 
     pub fn with_concurrency(concurrent_checks: usize) -> Self {
         Self {
-            client: build_http_client(10).expect("Failed to build HTTP client"),
+            client: build_http_client(10).unwrap_or_else(|_| reqwest::Client::new()),
             progress_bar: None,
             concurrent_checks: concurrent_checks.max(1),
             progress_sender: None,

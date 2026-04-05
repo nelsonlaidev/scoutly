@@ -9,10 +9,12 @@ use governor::{
     Quota, RateLimiter, clock::DefaultClock, state::InMemoryState, state::direct::NotKeyed,
 };
 use indicatif::{ProgressBar, ProgressStyle};
-use once_cell::sync::Lazy;
 use scraper::{Html, Selector};
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::num::NonZeroU32;
+use std::sync::Arc;
+use std::sync::LazyLock;
 use url::Url;
 
 /// Configuration for the crawler
@@ -26,43 +28,43 @@ pub struct CrawlerConfig {
     pub respect_robots_txt: bool,
 }
 
-// Cached selectors to avoid repeated parsing and eliminate unwrap() calls
-static TITLE_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("title").expect("title selector should be valid"));
-static META_DESC_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+/// Cached selectors to avoid repeated parsing and eliminate unwrap() calls
+static TITLE_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("title").expect("title selector should be valid"));
+static META_DESC_SELECTOR: LazyLock<Selector> = LazyLock::new(|| {
     Selector::parse("meta[name='description']").expect("meta description selector should be valid")
 });
-static H1_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("h1").expect("h1 selector should be valid"));
-static IMG_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("img[src]").expect("img[src] selector should be valid"));
+static H1_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("h1").expect("h1 selector should be valid"));
+static IMG_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("img[src]").expect("img[src] selector should be valid"));
 
 // Open Graph meta tag selectors
-static OG_TITLE_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+static OG_TITLE_SELECTOR: LazyLock<Selector> = LazyLock::new(|| {
     Selector::parse("meta[property='og:title']").expect("og:title selector should be valid")
 });
-static OG_DESCRIPTION_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+static OG_DESCRIPTION_SELECTOR: LazyLock<Selector> = LazyLock::new(|| {
     Selector::parse("meta[property='og:description']")
         .expect("og:description selector should be valid")
 });
-static OG_IMAGE_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+static OG_IMAGE_SELECTOR: LazyLock<Selector> = LazyLock::new(|| {
     Selector::parse("meta[property='og:image']").expect("og:image selector should be valid")
 });
-static OG_URL_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+static OG_URL_SELECTOR: LazyLock<Selector> = LazyLock::new(|| {
     Selector::parse("meta[property='og:url']").expect("og:url selector should be valid")
 });
-static OG_TYPE_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+static OG_TYPE_SELECTOR: LazyLock<Selector> = LazyLock::new(|| {
     Selector::parse("meta[property='og:type']").expect("og:type selector should be valid")
 });
-static OG_SITE_NAME_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+static OG_SITE_NAME_SELECTOR: LazyLock<Selector> = LazyLock::new(|| {
     Selector::parse("meta[property='og:site_name']").expect("og:site_name selector should be valid")
 });
-static OG_LOCALE_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+static OG_LOCALE_SELECTOR: LazyLock<Selector> = LazyLock::new(|| {
     Selector::parse("meta[property='og:locale']").expect("og:locale selector should be valid")
 });
 
 // Unified selector for all link-bearing elements (single DOM pass optimization)
-static LINK_ELEMENTS_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+static LINK_ELEMENTS_SELECTOR: LazyLock<Selector> = LazyLock::new(|| {
     Selector::parse(
         "a[href], iframe[src], video[src], source[src], audio[src], embed[src], object[data]",
     )
@@ -79,7 +81,7 @@ pub struct Crawler {
     visited: HashSet<String>,
     to_visit: VecDeque<(String, usize)>,
     pub pages: HashMap<String, PageInfo>,
-    rate_limiter: Option<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
+    rate_limiter: Option<Arc<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>>,
     concurrent_requests: usize,
     respect_robots_txt: bool,
     robots_txt: RobotsTxt,
@@ -103,9 +105,12 @@ impl Crawler {
         to_visit.push_back((start_url.to_string(), 0));
 
         // Initialize rate limiter if requests_per_second is specified
-        let rate_limiter = config.requests_per_second.map(|rps| {
-            let quota = Quota::per_second(NonZeroU32::new(rps.ceil() as u32).unwrap());
-            RateLimiter::direct(quota)
+        let rate_limiter = config.requests_per_second.and_then(|rps| {
+            let capped = rps.ceil() as u32;
+            NonZeroU32::new(capped).map(|nz| {
+                let quota = Quota::per_second(nz);
+                Arc::new(RateLimiter::direct(quota))
+            })
         });
 
         Ok(Self {
@@ -156,20 +161,17 @@ impl Crawler {
         snapshot.total_links = snapshot.links_discovered;
         snapshot.summary = Reporter::summarize_pages(&self.pages);
 
-        let _ = sender.send(RunEvent::Progress(snapshot));
+        if sender.send(RunEvent::Progress(snapshot)).is_err() {
+            tracing::debug!("Progress event dropped, receiver disconnected");
+        }
     }
 
     /// Normalizes a URL by optionally removing fragment identifiers
-    fn normalize_url(&self, url: &str) -> String {
+    fn normalize_url<'a>(&self, url: &'a str) -> Cow<'a, str> {
         if self.keep_fragments {
-            url.to_string()
+            Cow::Borrowed(url)
         } else {
-            // Strip fragment identifier if present
-            if let Some(pos) = url.find('#') {
-                url[..pos].to_string()
-            } else {
-                url.to_string()
-            }
+            Cow::Borrowed(url.split('#').next().unwrap_or(url))
         }
     }
 
@@ -198,7 +200,7 @@ impl Crawler {
                 let normalized_url = self.normalize_url(&url);
 
                 // Check if already visited or depth exceeded before processing
-                if self.visited.contains(&normalized_url) || depth > self.max_depth {
+                if self.visited.contains(normalized_url.as_ref()) || depth > self.max_depth {
                     continue;
                 }
 
@@ -208,7 +210,8 @@ impl Crawler {
                     && !self.robots_txt.is_allowed(&parsed_url, "scoutly")
                 {
                     tracing::info!(url = %url, "Skipping URL disallowed by robots.txt");
-                    self.visited.insert(normalized_url.clone());
+                    let owned = normalized_url.into_owned();
+                    self.visited.insert(owned);
                     continue;
                 }
 
@@ -217,8 +220,9 @@ impl Crawler {
                     break;
                 }
 
-                self.visited.insert(normalized_url.clone());
-                batch.push((url, depth, normalized_url));
+                let owned = normalized_url.into_owned();
+                self.visited.insert(owned.clone());
+                batch.push((url, depth, owned));
 
                 // Stop if we've reached the batch size
                 if batch.len() >= self.concurrent_requests {
@@ -254,7 +258,7 @@ impl Crawler {
                                 }
 
                                 let normalized_link_url = self.normalize_url(&link.url);
-                                if !self.visited.contains(&normalized_link_url) {
+                                if !self.visited.contains(normalized_link_url.as_ref()) {
                                     self.to_visit.push_back((link.url.clone(), depth + 1));
                                 }
                             }

@@ -270,7 +270,7 @@ impl App {
 
         Self {
             url: initial_url.clone(),
-            url_input: initial_url.clone().unwrap_or_default(),
+            url_input: initial_url.as_ref().cloned().unwrap_or_default(),
             depth: runtime.depth,
             max_pages: runtime.max_pages,
             mode,

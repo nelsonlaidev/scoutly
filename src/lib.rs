@@ -145,7 +145,8 @@ pub(crate) async fn execute_scan(
             Vec::new()
         }
     };
-    let report = Reporter::generate_report_with_sitemap(url, &crawler.pages, sitemap);
+    let pages = std::mem::take(&mut crawler.pages);
+    let report = Reporter::generate_report_with_sitemap(url, pages, sitemap);
 
     let mut complete = ProgressSnapshot::new(RunStage::Completed, "Report ready");
     complete.pages_crawled = report.summary.total_pages;
@@ -347,7 +348,7 @@ fn output_report(report: &CrawlReport, output_format: OutputFormat) -> Result<()
             let json = serde_json::to_string_pretty(report)?;
             println!("{}", json);
         }
-        OutputFormat::Text => Reporter::print_text_report(report),
+        OutputFormat::Text => Reporter::print_text_report(report, std::io::stdout()),
     }
 
     Ok(())

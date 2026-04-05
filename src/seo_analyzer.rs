@@ -17,10 +17,12 @@ pub struct SeoAnalyzer;
 impl SeoAnalyzer {
     pub fn analyze_pages(pages: &mut HashMap<String, PageInfo>) {
         for page in pages.values_mut() {
-            // Only analyze SEO for HTML pages
-            if let Some(content_type) = &page.content_type
-                && content_type.to_lowercase().contains("text/html")
-            {
+            // Only analyze SEO for HTML pages (or pages without a content type header)
+            let is_html = page
+                .content_type
+                .as_deref()
+                .is_none_or(|ct| ct.to_lowercase().contains("text/html"));
+            if is_html {
                 Self::analyze_page(page);
             }
         }
@@ -79,7 +81,7 @@ impl SeoAnalyzer {
             )];
         };
 
-        let value_len = value.len();
+        let value_len = value.chars().count();
         if value_len < rule.min_length {
             return vec![Self::issue(
                 IssueSeverity::Warning,

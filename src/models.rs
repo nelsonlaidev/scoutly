@@ -39,17 +39,13 @@ impl PageInfo {
         })
     }
 
-    fn resource_name_from_url(url: &str) -> Option<String> {
+    pub fn title_fallback_from_url(url: &str) -> Option<String> {
         Url::parse(url)
             .ok()?
             .path_segments()?
             .filter(|segment| !segment.is_empty())
             .next_back()
             .map(|segment| segment.to_string())
-    }
-
-    pub fn title_fallback_from_url(url: &str) -> Option<String> {
-        Self::resource_name_from_url(url)
     }
 }
 
