@@ -4,13 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [0.4.0](https://github.com/nelsonlaidev/scoutly/compare/v0.3.0...v0.4.0) - 2026-04-05
 
+### Highlights
+
+- Added an update checker
+- Redesigned the crawl progress UI
+- Results can now be viewed by page or link URL
+
 ### Features
 
 - Surface newer Scoutly releases before scans start - ([c982c95](https://github.com/nelsonlaidev/scoutly/commit/c982c9500b1531c96dbb7fdcbac641ec2779201d))
 - Enable env-driven debug logging for update checks - ([cd2c54c](https://github.com/nelsonlaidev/scoutly/commit/cd2c54c811d4028a3da969f9c6e25d838f6377db))
 - Make the TUI's primary panes feel focused - ([bca160e](https://github.com/nelsonlaidev/scoutly/commit/bca160e2ddd6690e868fab77b916785fe6f0a8d7))
 - Polish the crawl progress panel for live scans - ([0643eba](https://github.com/nelsonlaidev/scoutly/commit/0643eba3ae1820f1bfad3b445633dfce039b6637))
-- Add aarch64-pc-windows-msvc target to build configurations - ([c558a17](https://github.com/nelsonlaidev/scoutly/commit/c558a17e9773424c90a8c37a096719d806f3d4c8))
 - Make crawl results easier to inspect across page and link slices - ([d092c46](https://github.com/nelsonlaidev/scoutly/commit/d092c46e4d72b565080a1c720335d7851723d23e))
 
 ### Bug Fixes
@@ -177,5 +182,3 @@ All notable changes to this project will be documented in this file.
 
 - Coverage (#1) - ([979e6eb](https://github.com/nelsonlaidev/scoutly/commit/979e6eb0dba070dd7a7b85f73d38a92f0873bf88))
 - More coverage (#2) - ([3290f46](https://github.com/nelsonlaidev/scoutly/commit/3290f465ffc706eada1c44a34b073a11daf6960b))
-
-
