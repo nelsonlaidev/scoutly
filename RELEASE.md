@@ -23,7 +23,6 @@ Release artifacts are intentionally limited to mainstream targets that are pract
 
 - `aarch64-apple-darwin`
 - `aarch64-unknown-linux-gnu`
-- `aarch64-pc-windows-msvc`
 - `x86_64-apple-darwin`
 - `x86_64-unknown-linux-gnu`
 - `x86_64-unknown-linux-musl`
@@ -47,31 +46,38 @@ cargo clippy --all-targets --all-features -- -D warnings
 git cliff --tag v0.2.1 -o CHANGELOG.md
 ```
 
-4. Commit the release changes
+4. Manually update the changelog if needed
+
+```markdown
+### Highlights
+
+- Added GitHub OAuth
+- Improved search ranking
+- Breaking: renamed config file from scoutly.json to scoutly.toml
+```
+
+5. Commit the release changes
 
 ```bash
 git add CHANGELOG.md Cargo.toml Cargo.lock
 git commit -m "chore(release): prepare v0.2.1"
 ```
 
-5. Create an annotated tag with release notes
+6. Create an annotated tag with release notes
 
 ```bash
-git tag v0.2.1 -m "Highlights:
-- Added GitHub OAuth
-- Improved search ranking
-- Breaking: renamed config file from scoutly.json to scoutly.toml"
+git tag v0.2.1
 ```
 
-6. Push the branch and tag
+7. Push the branch and tag
 
 ```bash
 git push origin main
 git push origin v0.2.1
 ```
 
-7. Wait for the `Release` workflow to finish.
-8. Verify:
+8. Wait for the `Release` workflow to finish.
+9. Verify:
    - GitHub Release exists and contains archives/installers
    - Homebrew tap was updated
    - npm package was published
