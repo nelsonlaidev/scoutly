@@ -8,6 +8,7 @@ pub mod reporter;
 pub mod robots;
 pub mod runtime;
 pub mod seo_analyzer;
+pub mod sitemap;
 pub mod tui;
 pub mod update;
 
@@ -24,6 +25,7 @@ use runtime::{
     resolve_launch_mode,
 };
 use seo_analyzer::SeoAnalyzer;
+use sitemap::collect_sitemap_entries;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -136,7 +138,14 @@ pub(crate) async fn execute_scan(
             unique_links.len(),
         ),
     );
-    let report = Reporter::generate_report(url, &crawler.pages);
+    let sitemap = match collect_sitemap_entries(url, &crawler.pages, runtime.keep_fragments).await {
+        Ok(entries) => entries,
+        Err(error) => {
+            tracing::warn!(error = %error, url = %url, "Failed to collect sitemap data");
+            Vec::new()
+        }
+    };
+    let report = Reporter::generate_report_with_sitemap(url, &crawler.pages, sitemap);
 
     let mut complete = ProgressSnapshot::new(RunStage::Completed, "Report ready");
     complete.pages_crawled = report.summary.total_pages;

@@ -1,24 +1,48 @@
 mod server;
 
 use actix_web::{App, HttpResponse, HttpServer, web};
-use scoutly::update::check_for_update_with_endpoint;
+use scoutly::update::{CURRENT_VERSION, check_for_update_with_endpoint};
 use server::{get_test_server_url, start_link_test_server};
 use std::net::TcpListener;
 use std::process::Command;
 use std::time::Duration;
 
+fn next_patch_version() -> String {
+    let mut parts = CURRENT_VERSION.split('.');
+    let major = parts
+        .next()
+        .and_then(|part| part.parse::<u64>().ok())
+        .expect("current version major should parse");
+    let minor = parts
+        .next()
+        .and_then(|part| part.parse::<u64>().ok())
+        .expect("current version minor should parse");
+    let patch = parts
+        .next()
+        .and_then(|part| part.parse::<u64>().ok())
+        .expect("current version patch should parse");
+
+    format!("{major}.{minor}.{}", patch + 1)
+}
+
 async fn start_update_server() -> String {
+    let next_version = format!("v{}", next_patch_version());
     let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind update test server");
     let base_url = format!("http://{}", listener.local_addr().unwrap());
 
-    let server = HttpServer::new(|| {
+    let server = HttpServer::new(move || {
+        let next_version = next_version.clone();
         App::new()
+            .app_data(web::Data::new(next_version.clone()))
             .route(
                 "/latest",
-                web::get().to(|| async {
+                web::get().to(|next_version: web::Data<String>| async move {
                     HttpResponse::Ok().json(serde_json::json!({
-                        "tag_name": "v0.4.0",
-                        "html_url": "https://github.com/nelsonlaidev/scoutly/releases/tag/v0.4.0"
+                        "tag_name": next_version.get_ref(),
+                        "html_url": format!(
+                            "https://github.com/nelsonlaidev/scoutly/releases/tag/{}",
+                            next_version.get_ref()
+                        )
                     }))
                 }),
             )
@@ -40,11 +64,14 @@ async fn start_update_server() -> String {
             )
             .route(
                 "/slow",
-                web::get().to(|| async {
+                web::get().to(|next_version: web::Data<String>| async move {
                     tokio::time::sleep(Duration::from_millis(750)).await;
                     HttpResponse::Ok().json(serde_json::json!({
-                        "tag_name": "v0.4.0",
-                        "html_url": "https://github.com/nelsonlaidev/scoutly/releases/tag/v0.4.0"
+                        "tag_name": next_version.get_ref(),
+                        "html_url": format!(
+                            "https://github.com/nelsonlaidev/scoutly/releases/tag/{}",
+                            next_version.get_ref()
+                        )
                     }))
                 }),
             )
@@ -72,14 +99,17 @@ async fn start_update_server() -> String {
 #[serial_test::serial]
 async fn direct_update_check_returns_notice_for_newer_release() {
     let base_url = start_update_server().await;
+    let latest_version = next_patch_version();
 
     let notice = check_for_update_with_endpoint("0.3.0", &format!("{base_url}/latest")).await;
 
     assert_eq!(
         notice,
         Some(scoutly::update::UpdateNotice {
-            latest_version: "0.4.0".to_string(),
-            release_url: "https://github.com/nelsonlaidev/scoutly/releases/tag/v0.4.0".to_string(),
+            latest_version: latest_version.clone(),
+            release_url: format!(
+                "https://github.com/nelsonlaidev/scoutly/releases/tag/v{latest_version}"
+            ),
         })
     );
 }
@@ -145,7 +175,7 @@ async fn binary_json_output_stays_valid_when_update_is_available() {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("Update available:"));
-    assert!(stderr.contains("v0.4.0"));
+    assert!(stderr.contains(&format!("v{}", next_patch_version())));
 }
 
 #[tokio::test]

@@ -107,7 +107,7 @@ The default TUI is keyboard-first and intentionally close to tools like `llmfit`
 | Key                        | Action                 |
 | -------------------------- | ---------------------- |
 | `j` / `k` or `Up` / `Down` | Move within active section |
-| `Tab` / `Shift-Tab`        | Switch result section  |
+| `Tab` / `Shift-Tab`        | Switch result section (`By Page`, `By Link URL`, `By Status`, `Sitemap`, `All Links`) |
 | `/`                        | Enter search mode      |
 | `f`                        | Cycle severity filter (`By Page`) |
 | `s`                        | Cycle sort mode (`By Page`) |
@@ -242,10 +242,10 @@ Running `scoutly https://example.com` in an interactive terminal opens the Ratat
 
 - a live status/header bar
 - pages / links / error / warning counters
-- four result sections: By Page, By Link URL, By Status, and All Links
-- searchable browsing across the active section
+- five result sections: By Page, By Link URL, By Status, Sitemap, and All Links
+- searchable browsing across the active section, including sitemap URL/title/priority/frequency rows
 - page-only severity/sort controls in the By Page section
-- a detail pane for the selected page, link URL group, status bucket, or individual link
+- a detail pane for the selected page, link URL group, status bucket, sitemap row, or individual link
 - a footer showing the active mode and available keys
 
 ### Text Report
@@ -361,12 +361,12 @@ Scoutly extracts links from multiple HTML elements:
 - No JavaScript rendering (only parses initial HTML)
 - Basic content analysis (no detailed text analysis)
 - No authentication support
-- No sitemap generation (planned for future versions)
+- No sitemap export/generation yet
 
 ## Future Enhancements
 
 - JavaScript rendering with headless browser support
-- Sitemap generation (XML)
+- Sitemap export/generation (XML)
 - Authentication support
 - More advanced SEO checks (keyword density, structured data)
 - Additional TUI views and filters

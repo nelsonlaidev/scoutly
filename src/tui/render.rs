@@ -8,7 +8,7 @@ use ratatui::{
 use std::time::Duration;
 
 use super::app::{App, LinkOccurrence, LinkStatusBucket, LinkUrlGroup, ResultSection, UiMode};
-use crate::models::{IssueSeverity, PageInfo, SeoIssue};
+use crate::models::{IssueSeverity, PageInfo, SeoIssue, SitemapEntry};
 use crate::update::format_tui_update_message;
 
 pub fn render(frame: &mut Frame, app: &App) {
@@ -153,6 +153,18 @@ fn render_main(frame: &mut Frame, app: &App, area: Rect) {
                 render_status_detail_pane(frame, app, &buckets, detail_area);
             } else {
                 render_status_table(frame, app, &buckets, area);
+            }
+        }
+        ResultSection::Sitemap => {
+            let entries = app.visible_sitemap_entries();
+            if app.show_details {
+                let [table_area, detail_area] =
+                    Layout::horizontal([Constraint::Percentage(58), Constraint::Percentage(42)])
+                        .areas(area);
+                render_sitemap_table(frame, app, &entries, table_area);
+                render_sitemap_detail_pane(frame, app, &entries, detail_area);
+            } else {
+                render_sitemap_table(frame, app, &entries, area);
             }
         }
         ResultSection::AllLinks => {
@@ -459,6 +471,48 @@ fn render_status_table(frame: &mut Frame, app: &App, buckets: &[LinkStatusBucket
     frame.render_stateful_widget(table, area, &mut state);
 }
 
+fn render_sitemap_table(frame: &mut Frame, app: &App, entries: &[&SitemapEntry], area: Rect) {
+    let rows = entries.iter().map(|entry| {
+        Row::new(vec![
+            Cell::from(trimmed(&entry.url, 42)),
+            Cell::from(trimmed(&entry.title, 22)),
+            Cell::from(entry.display_priority()),
+            Cell::from(trimmed(entry.display_change_frequency(), 16)),
+        ])
+    });
+
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Min(24),
+            Constraint::Length(24),
+            Constraint::Length(10),
+            Constraint::Length(18),
+        ],
+    )
+    .header(
+        Row::new(["URL", "Title", "Priority", "Change frequency"]).style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+    )
+    .row_highlight_style(
+        Style::default()
+            .bg(Color::DarkGray)
+            .add_modifier(Modifier::BOLD),
+    )
+    .highlight_symbol("▶ ")
+    .block(
+        Block::bordered()
+            .title(section_title(app, entries.len()))
+            .border_style(Style::default().fg(Color::Red)),
+    );
+
+    let mut state = ratatui::widgets::TableState::default().with_selected(Some(app.selected_index));
+    frame.render_stateful_widget(table, area, &mut state);
+}
+
 fn render_all_links_table(
     frame: &mut Frame,
     app: &App,
@@ -633,6 +687,47 @@ fn render_link_url_detail_pane(frame: &mut Frame, app: &App, groups: &[LinkUrlGr
                 .border_style(Style::default().fg(Color::Red)),
         )
         .wrap(Wrap { trim: true });
+    frame.render_widget(details, area);
+}
+
+fn render_sitemap_detail_pane(frame: &mut Frame, app: &App, entries: &[&SitemapEntry], area: Rect) {
+    let Some(entry) = app.selected_sitemap_entry(entries) else {
+        let empty = Paragraph::new("No sitemap entry matches the current search.").block(
+            Block::bordered()
+                .title("Details")
+                .border_style(Style::default().fg(Color::Red)),
+        );
+        frame.render_widget(empty, area);
+        return;
+    };
+
+    let details = Paragraph::new(Text::from(vec![
+        Line::from(vec![
+            Span::styled("URL: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(entry.url.clone()),
+        ]),
+        Line::from(vec![
+            Span::styled("Title: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(entry.title.clone()),
+        ]),
+        Line::from(vec![
+            Span::styled("Priority: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(entry.display_priority().to_string()),
+        ]),
+        Line::from(vec![
+            Span::styled(
+                "Change frequency: ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(entry.display_change_frequency().to_string()),
+        ]),
+    ]))
+    .block(
+        Block::bordered()
+            .title("Details")
+            .border_style(Style::default().fg(Color::Red)),
+    )
+    .wrap(Wrap { trim: true });
     frame.render_widget(details, area);
 }
 
@@ -842,6 +937,7 @@ fn section_title(app: &App, item_count: usize) -> String {
         ResultSection::ByPage,
         ResultSection::ByLinkUrl,
         ResultSection::ByStatus,
+        ResultSection::Sitemap,
         ResultSection::AllLinks,
     ]
     .into_iter()
@@ -1046,7 +1142,9 @@ fn trimmed(value: &str, max_len: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{CrawlReport, CrawlSummary, IssueType, Link, OpenGraphTags, SeoIssue};
+    use crate::models::{
+        CrawlReport, CrawlSummary, IssueType, Link, OpenGraphTags, SeoIssue, SitemapEntry,
+    };
     use crate::runtime::ProgressSnapshot;
     use ratatui::{Terminal, backend::TestBackend};
     use std::collections::HashMap;
@@ -1147,6 +1245,12 @@ mod tests {
         app.report = Some(CrawlReport {
             start_url: "https://example.com".to_string(),
             pages,
+            sitemap: vec![SitemapEntry {
+                url: "https://example.com/about".to_string(),
+                title: "About".to_string(),
+                priority: Some("0.8".to_string()),
+                change_frequency: Some("weekly".to_string()),
+            }],
             summary: CrawlSummary {
                 total_pages: 1,
                 total_links: 2,
@@ -1177,6 +1281,7 @@ mod tests {
         assert!(content.contains("About"));
         assert!(content.contains("By Page"));
         assert!(content.contains("By Link URL"));
+        assert!(content.contains("Sitemap"));
         assert!(content.contains("All Links"));
     }
 
@@ -1207,6 +1312,12 @@ mod tests {
         app.report = Some(CrawlReport {
             start_url: "https://example.com".to_string(),
             pages,
+            sitemap: vec![SitemapEntry {
+                url: "https://example.com/about".to_string(),
+                title: "About".to_string(),
+                priority: Some("0.8".to_string()),
+                change_frequency: Some("weekly".to_string()),
+            }],
             summary: CrawlSummary {
                 total_pages: 1,
                 total_links: 1,
@@ -1236,6 +1347,70 @@ mod tests {
         assert!(content.contains("Source Page"));
         assert!(content.contains("Destination URL"));
         assert!(content.contains("https://example.com/contact"));
+    }
+
+    #[test]
+    fn render_sitemap_section_shows_sitemap_columns() {
+        let runtime = crate::config::RuntimeOptions {
+            url: Some("https://example.com".to_string()),
+            depth: 2,
+            max_pages: 10,
+            output: None,
+            save: None,
+            cli: false,
+            external: false,
+            verbose: false,
+            ignore_redirects: false,
+            keep_fragments: false,
+            rate_limit: None,
+            concurrency: 5,
+            respect_robots_txt: true,
+            tui: false,
+            config: None,
+        };
+        let mut app = App::new(runtime);
+        let page = sample_page();
+        let mut pages = HashMap::new();
+        pages.insert(page.url.clone(), page);
+        app.progress = ProgressSnapshot::new(crate::runtime::RunStage::Completed, "Report ready");
+        app.report = Some(CrawlReport {
+            start_url: "https://example.com".to_string(),
+            pages,
+            sitemap: vec![SitemapEntry {
+                url: "https://example.com/about".to_string(),
+                title: "About".to_string(),
+                priority: Some("0.8".to_string()),
+                change_frequency: Some("weekly".to_string()),
+            }],
+            summary: CrawlSummary {
+                total_pages: 1,
+                total_links: 1,
+                broken_links: 0,
+                errors: 0,
+                warnings: 1,
+                infos: 0,
+            },
+            timestamp: "2026-04-02T00:00:00Z".to_string(),
+        });
+        app.result_section = ResultSection::Sitemap;
+        app.scan_in_progress = false;
+        app.scan_started_at = None;
+
+        let backend = TestBackend::new(120, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(frame, &app)).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(content.contains("Sitemap"));
+        assert!(content.contains("Priority"));
+        assert!(content.contains("Change frequency"));
+        assert!(content.contains("weekly"));
     }
 
     #[test]

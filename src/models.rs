@@ -26,7 +26,7 @@ impl PageInfo {
             .map(ToOwned::to_owned)
             .or_else(|| {
                 (!Self::is_html_content_type(self.content_type.as_deref()))
-                    .then(|| Self::resource_name_from_url(&self.url))
+                    .then(|| Self::title_fallback_from_url(&self.url))
                     .flatten()
             })
             .unwrap_or_else(|| "(untitled)".to_string())
@@ -46,6 +46,28 @@ impl PageInfo {
             .filter(|segment| !segment.is_empty())
             .next_back()
             .map(|segment| segment.to_string())
+    }
+
+    pub fn title_fallback_from_url(url: &str) -> Option<String> {
+        Self::resource_name_from_url(url)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SitemapEntry {
+    pub url: String,
+    pub title: String,
+    pub priority: Option<String>,
+    pub change_frequency: Option<String>,
+}
+
+impl SitemapEntry {
+    pub fn display_priority(&self) -> &str {
+        self.priority.as_deref().unwrap_or("-")
+    }
+
+    pub fn display_change_frequency(&self) -> &str {
+        self.change_frequency.as_deref().unwrap_or("-")
     }
 }
 
@@ -115,6 +137,8 @@ pub enum IssueType {
 pub struct CrawlReport {
     pub start_url: String,
     pub pages: HashMap<String, PageInfo>,
+    #[serde(default)]
+    pub sitemap: Vec<SitemapEntry>,
     pub summary: CrawlSummary,
     pub timestamp: String,
 }
@@ -169,5 +193,26 @@ mod tests {
         );
 
         assert_eq!(page.display_title(), "(untitled)");
+    }
+
+    #[test]
+    fn title_fallback_from_url_uses_resource_name() {
+        assert_eq!(
+            PageInfo::title_fallback_from_url("https://example.com/sitemaps/news.xml"),
+            Some("news.xml".to_string())
+        );
+    }
+
+    #[test]
+    fn sitemap_entry_display_values_fall_back_to_dash() {
+        let entry = SitemapEntry {
+            url: "https://example.com/about".to_string(),
+            title: "About".to_string(),
+            priority: None,
+            change_frequency: None,
+        };
+
+        assert_eq!(entry.display_priority(), "-");
+        assert_eq!(entry.display_change_frequency(), "-");
     }
 }

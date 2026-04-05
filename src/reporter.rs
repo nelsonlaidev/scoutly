@@ -1,4 +1,4 @@
-use crate::models::{CrawlReport, CrawlSummary, IssueSeverity, PageInfo};
+use crate::models::{CrawlReport, CrawlSummary, IssueSeverity, PageInfo, SitemapEntry};
 use anyhow::Result;
 use colored::*;
 use std::collections::HashMap;
@@ -9,12 +9,21 @@ pub struct Reporter;
 
 impl Reporter {
     pub fn generate_report(start_url: &str, pages: &HashMap<String, PageInfo>) -> CrawlReport {
+        Self::generate_report_with_sitemap(start_url, pages, Vec::new())
+    }
+
+    pub fn generate_report_with_sitemap(
+        start_url: &str,
+        pages: &HashMap<String, PageInfo>,
+        sitemap: Vec<SitemapEntry>,
+    ) -> CrawlReport {
         let summary = Self::summarize_pages(pages);
         let timestamp = chrono::Utc::now().to_rfc3339();
 
         CrawlReport {
             start_url: start_url.to_string(),
             pages: pages.clone(),
+            sitemap,
             summary,
             timestamp,
         }
@@ -113,6 +122,10 @@ impl Reporter {
             "  Info:                {}",
             report.summary.infos.to_string().bright_cyan()
         );
+        println!(
+            "  Sitemap Entries:     {}",
+            report.sitemap.len().to_string().bright_green()
+        );
         println!();
 
         // Pages with issues
@@ -188,6 +201,21 @@ impl Reporter {
                     };
                     println!("      [{}] {}", severity_str, issue.message);
                 }
+            }
+        }
+
+        if !report.sitemap.is_empty() {
+            println!();
+            println!("{}", "Sitemap".bright_yellow().bold().underline());
+            for entry in &report.sitemap {
+                println!();
+                println!("  {} {}", "URL:".bright_white().bold(), entry.url);
+                println!("    Title:             {}", entry.title.bright_white());
+                println!("    Priority:          {}", entry.display_priority());
+                println!(
+                    "    Change frequency:  {}",
+                    entry.display_change_frequency()
+                );
             }
         }
 

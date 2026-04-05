@@ -14,6 +14,8 @@ struct Rule {
 pub struct RobotsTxt {
     /// Rules grouped by user-agent (lowercased)
     rules: HashMap<String, Vec<Rule>>,
+    /// Sitemap URLs grouped by domain
+    sitemaps: HashMap<String, Vec<String>>,
     /// Cache of fetched robots.txt per domain
     cache: HashMap<String, bool>,
 }
@@ -28,6 +30,7 @@ impl RobotsTxt {
     pub fn new() -> Self {
         Self {
             rules: HashMap::new(),
+            sitemaps: HashMap::new(),
             cache: HashMap::new(),
         }
     }
@@ -50,6 +53,7 @@ impl RobotsTxt {
                 tracing::info!(url = %robots_url, "robots.txt not found, allowing all paths");
                 self.cache.insert(domain_key.clone(), true);
                 self.rules.insert(domain_key, vec![]);
+                self.sitemaps.entry(base_url_origin(base_url)).or_default();
                 return Ok(());
             }
         };
@@ -63,6 +67,7 @@ impl RobotsTxt {
             );
             self.cache.insert(domain_key.clone(), true);
             self.rules.insert(domain_key, vec![]);
+            self.sitemaps.entry(base_url_origin(base_url)).or_default();
             return Ok(());
         }
 
@@ -122,8 +127,16 @@ impl RobotsTxt {
                         });
                     }
                 }
+                "sitemap" => {
+                    if !value.is_empty() {
+                        self.sitemaps
+                            .entry(domain_key.to_string())
+                            .or_default()
+                            .push(value.to_string());
+                    }
+                }
                 _ => {
-                    // Ignore other directives (Crawl-delay, Sitemap, etc.)
+                    // Ignore other directives such as Crawl-delay
                 }
             }
         }
@@ -150,6 +163,13 @@ impl RobotsTxt {
 
         // If no rules found, allow by default
         true
+    }
+
+    pub fn sitemap_urls(&self, url: &Url) -> Vec<String> {
+        self.sitemaps
+            .get(&self.get_domain_key(url))
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// Checks if a path matches any rules
@@ -269,6 +289,18 @@ impl RobotsTxt {
             self.rules.insert(key, rules.to_vec());
         }
     }
+}
+
+fn base_url_origin(base_url: &Url) -> String {
+    let mut key = format!(
+        "{}://{}",
+        base_url.scheme(),
+        base_url.host_str().unwrap_or_default()
+    );
+    if let Some(port) = base_url.port() {
+        key.push_str(&format!(":{port}"));
+    }
+    key
 }
 
 #[cfg(test)]
@@ -491,7 +523,16 @@ Disallow: /secret
         let wildcard_rules = robots.rules.get("http://example.com:*").unwrap();
         assert_eq!(wildcard_rules.len(), 2); // Disallow /admin and Allow /public
 
-        // Check that googlebot rules were parsed (ignoring Sitemap and Crawl-delay)
+        assert_eq!(
+            robots
+                .sitemaps
+                .get("http://example.com")
+                .cloned()
+                .unwrap_or_default(),
+            vec!["https://example.com/sitemap.xml".to_string()]
+        );
+
+        // Check that googlebot rules were parsed (ignoring Crawl-delay)
         let google_rules = robots.rules.get("http://example.com:googlebot").unwrap();
         assert_eq!(google_rules.len(), 1); // Only Disallow /secret
     }

@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use crate::config::RuntimeOptions;
-use crate::models::{CrawlReport, IssueSeverity, PageInfo};
+use crate::models::{CrawlReport, IssueSeverity, PageInfo, SitemapEntry};
 use crate::runtime::{ProgressSnapshot, RunEvent, RunStage};
 use crate::update::UpdateNotice;
 
@@ -93,6 +93,7 @@ pub enum ResultSection {
     ByPage,
     ByLinkUrl,
     ByStatus,
+    Sitemap,
     AllLinks,
 }
 
@@ -102,6 +103,7 @@ impl ResultSection {
             Self::ByPage => "By Page",
             Self::ByLinkUrl => "By Link URL",
             Self::ByStatus => "By Status",
+            Self::Sitemap => "Sitemap",
             Self::AllLinks => "All Links",
         }
     }
@@ -110,7 +112,8 @@ impl ResultSection {
         match self {
             Self::ByPage => Self::ByLinkUrl,
             Self::ByLinkUrl => Self::ByStatus,
-            Self::ByStatus => Self::AllLinks,
+            Self::ByStatus => Self::Sitemap,
+            Self::Sitemap => Self::AllLinks,
             Self::AllLinks => Self::ByPage,
         }
     }
@@ -120,7 +123,8 @@ impl ResultSection {
             Self::ByPage => Self::AllLinks,
             Self::ByLinkUrl => Self::ByPage,
             Self::ByStatus => Self::ByLinkUrl,
-            Self::AllLinks => Self::ByStatus,
+            Self::Sitemap => Self::ByStatus,
+            Self::AllLinks => Self::Sitemap,
         }
     }
 }
@@ -401,6 +405,19 @@ impl App {
             .collect()
     }
 
+    pub fn visible_sitemap_entries(&self) -> Vec<&SitemapEntry> {
+        let Some(report) = &self.report else {
+            return Vec::new();
+        };
+
+        let query = self.search_query.trim().to_lowercase();
+        report
+            .sitemap
+            .iter()
+            .filter(|entry| self.matches_sitemap_entry(entry, &query))
+            .collect()
+    }
+
     pub fn visible_status_buckets(&self) -> Vec<LinkStatusBucket> {
         let query = self.search_query.trim().to_lowercase();
         let mut groups = BTreeMap::<LinkStatusBucketKey, Vec<LinkOccurrence>>::new();
@@ -447,6 +464,13 @@ impl App {
         buckets: &'a [LinkStatusBucket],
     ) -> Option<&'a LinkStatusBucket> {
         buckets.get(self.selected_index)
+    }
+
+    pub fn selected_sitemap_entry<'a>(
+        &'a self,
+        entries: &'a [&'a SitemapEntry],
+    ) -> Option<&'a SitemapEntry> {
+        entries.get(self.selected_index).copied()
     }
 
     pub fn status_label(&self) -> &'static str {
@@ -713,6 +737,7 @@ impl App {
             ResultSection::ByPage => self.visible_pages().len(),
             ResultSection::ByLinkUrl => self.visible_link_url_groups().len(),
             ResultSection::ByStatus => self.visible_status_buckets().len(),
+            ResultSection::Sitemap => self.visible_sitemap_entries().len(),
             ResultSection::AllLinks => self.visible_link_occurrences().len(),
         }
     }
@@ -773,6 +798,27 @@ impl App {
                 .occurrences
                 .iter()
                 .any(|occurrence| self.matches_link_occurrence(occurrence, query))
+    }
+
+    fn matches_sitemap_entry(&self, entry: &SitemapEntry, query: &str) -> bool {
+        if query.is_empty() {
+            return true;
+        }
+
+        entry.url.to_lowercase().contains(query)
+            || entry.title.to_lowercase().contains(query)
+            || entry
+                .priority
+                .as_deref()
+                .unwrap_or_default()
+                .to_lowercase()
+                .contains(query)
+            || entry
+                .change_frequency
+                .as_deref()
+                .unwrap_or_default()
+                .to_lowercase()
+                .contains(query)
     }
 
     fn status_bucket_key(occurrence: &LinkOccurrence) -> LinkStatusBucketKey {
@@ -968,6 +1014,20 @@ mod tests {
         let report = CrawlReport {
             start_url: runtime.url.clone().unwrap(),
             pages,
+            sitemap: vec![
+                SitemapEntry {
+                    url: "https://example.com/".to_string(),
+                    title: "Home".to_string(),
+                    priority: Some("1.0".to_string()),
+                    change_frequency: Some("daily".to_string()),
+                },
+                SitemapEntry {
+                    url: "https://example.com/about".to_string(),
+                    title: "About".to_string(),
+                    priority: Some("0.8".to_string()),
+                    change_frequency: Some("weekly".to_string()),
+                },
+            ],
             summary: CrawlSummary {
                 total_pages: 2,
                 total_links: 4,
@@ -1093,8 +1153,25 @@ mod tests {
         app.handle_key(KeyEvent::from(KeyCode::Tab));
         assert_eq!(app.result_section, ResultSection::ByLinkUrl);
 
+        app.handle_key(KeyEvent::from(KeyCode::Tab));
+        assert_eq!(app.result_section, ResultSection::ByStatus);
+
+        app.handle_key(KeyEvent::from(KeyCode::Tab));
+        assert_eq!(app.result_section, ResultSection::Sitemap);
+
         app.handle_key(KeyEvent::from(KeyCode::BackTab));
-        assert_eq!(app.result_section, ResultSection::ByPage);
+        assert_eq!(app.result_section, ResultSection::ByStatus);
+    }
+
+    #[test]
+    fn search_filters_sitemap_entries() {
+        let mut app = app_with_report();
+        app.result_section = ResultSection::Sitemap;
+        app.search_query = "daily".to_string();
+
+        let entries = app.visible_sitemap_entries();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].url, "https://example.com/");
     }
 
     #[test]

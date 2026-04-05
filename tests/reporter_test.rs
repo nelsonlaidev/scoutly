@@ -1,5 +1,5 @@
 use scoutly::models::{
-    CrawlReport, IssueSeverity, IssueType, Link, OpenGraphTags, PageInfo, SeoIssue,
+    CrawlReport, IssueSeverity, IssueType, Link, OpenGraphTags, PageInfo, SeoIssue, SitemapEntry,
 };
 use scoutly::reporter::Reporter;
 use std::collections::HashMap;
@@ -75,6 +75,7 @@ fn test_generate_report_empty_pages() {
     assert_eq!(report.summary.errors, 0);
     assert_eq!(report.summary.warnings, 0);
     assert_eq!(report.summary.infos, 0);
+    assert!(report.sitemap.is_empty());
     assert!(!report.timestamp.is_empty());
 }
 
@@ -416,6 +417,25 @@ fn test_save_json_report() {
     assert_eq!(deserialized.start_url, "https://example.com");
     assert_eq!(deserialized.summary.total_pages, 1);
     assert_eq!(deserialized.summary.errors, 1);
+    assert!(deserialized.sitemap.is_empty());
+}
+
+#[test]
+fn test_generate_report_with_sitemap_entries() {
+    let report = Reporter::generate_report_with_sitemap(
+        "https://example.com",
+        &HashMap::new(),
+        vec![SitemapEntry {
+            url: "https://example.com/about".to_string(),
+            title: "About".to_string(),
+            priority: Some("0.8".to_string()),
+            change_frequency: Some("weekly".to_string()),
+        }],
+    );
+
+    assert_eq!(report.sitemap.len(), 1);
+    assert_eq!(report.sitemap[0].title, "About");
+    assert_eq!(report.sitemap[0].display_priority(), "0.8");
 }
 
 #[test]
