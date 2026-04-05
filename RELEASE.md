@@ -41,7 +41,20 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 2. Update the version in `Cargo.toml` (e.g., from `0.2.0` to `0.2.1`).
 
-3. Create an annotated tag with release notes
+3. Update the changelog for the new version
+
+```bash
+git cliff --tag v0.2.1 -o CHANGELOG.md
+```
+
+4. Commit the release changes
+
+```bash
+git add CHANGELOG.md Cargo.toml Cargo.lock
+git commit -m "chore(release): prepare v0.2.1"
+```
+
+5. Create an annotated tag with release notes
 
 ```bash
 git tag v0.2.1 -m "Highlights:
@@ -50,35 +63,15 @@ git tag v0.2.1 -m "Highlights:
 - Breaking: renamed config file from scoutly.json to scoutly.toml"
 ```
 
-3. Push the branch and tag
+6. Push the branch and tag
 
 ```bash
 git push origin main
 git push origin v0.2.1
 ```
 
-4. Generate release notes
-
-```bash
-git cliff -o CHANGELOG.md
-```
-
-5. Commit the changelog and version changes
-
-```bash
-git add CHANGELOG.md Cargo.toml Cargo.lock
-git commit -m "chore(release): prepare v0.2.1"
-```
-
-5. Push the branch and the tag
-
-```bash
-git push
-git push --tags
-```
-
-6. Wait for the `Release` workflow to finish.
-7. Verify:
+7. Wait for the `Release` workflow to finish.
+8. Verify:
    - GitHub Release exists and contains archives/installers
    - Homebrew tap was updated
    - npm package was published
