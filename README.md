@@ -104,15 +104,15 @@ scoutly https://example.com --cli --depth 4 --max-pages 200 --verbose --ignore-r
 
 The default TUI is keyboard-first and intentionally close to tools like `llmfit`. If you launch `scoutly` without a URL, the TUI opens a URL input first:
 
-| Key                        | Action                 |
-| -------------------------- | ---------------------- |
-| `j` / `k` or `Up` / `Down` | Move within active section |
+| Key                        | Action                                                                                |
+| -------------------------- | ------------------------------------------------------------------------------------- |
+| `j` / `k` or `Up` / `Down` | Move within active section                                                            |
 | `Tab` / `Shift-Tab`        | Switch result section (`By Page`, `By Link URL`, `By Status`, `Sitemap`, `All Links`) |
-| `/`                        | Enter search mode      |
-| `f`                        | Cycle severity filter (`By Page`) |
-| `s`                        | Cycle sort mode (`By Page`) |
-| `Enter`                    | Toggle the detail pane |
-| `q` / `Esc`                | Quit                   |
+| `/`                        | Enter search mode                                                                     |
+| `f`                        | Cycle severity filter (`By Page`)                                                     |
+| `s`                        | Cycle sort mode (`By Page`)                                                           |
+| `Enter`                    | Toggle the detail pane                                                                |
+| `q` / `Esc`                | Quit                                                                                  |
 
 When Scoutly is not attached to an interactive terminal, it automatically falls back to the CLI unless you explicitly pass `--tui`.
 

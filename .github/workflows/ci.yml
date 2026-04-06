@@ -2,8 +2,8 @@ name: Continuous Integration
 
 on:
   push:
-    branches: ["**"]
-    tags-ignore: ["v*"]
+    branches: ['**']
+    tags-ignore: ['v*']
   pull_request:
     branches: [main]
   workflow_dispatch:

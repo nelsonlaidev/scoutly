@@ -10,9 +10,9 @@ coverage:
         threshold: 1%
 
 ignore:
-  - "./src/main.rs"
+  - './src/main.rs'
 
 comment:
-  layout: "header, diff, flags, files"
+  layout: 'header, diff, flags, files'
   behavior: default
   require_changes: false
