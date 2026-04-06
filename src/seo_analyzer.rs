@@ -203,3 +203,79 @@ impl SeoAnalyzer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{Image, Link, OpenGraphTags};
+
+    fn page() -> PageInfo {
+        PageInfo {
+            url: "https://example.com".to_string(),
+            status_code: Some(200),
+            content_type: Some("text/html".to_string()),
+            title: Some("Helpful example homepage title with enough SEO characters".to_string()),
+            meta_description: Some(
+                "This example description is intentionally sized to stay within the recommended SEO range while still describing the page clearly and naturally for users.".to_string(),
+            ),
+            h1_tags: vec!["Home".to_string()],
+            links: vec![
+                Link {
+                    url: "https://example.com/about".to_string(),
+                    text: "About".to_string(),
+                    is_external: false,
+                    status_code: Some(200),
+                    redirected_url: None,
+                    check_error: None,
+                },
+                Link {
+                    url: "https://example.com/contact".to_string(),
+                    text: "Contact".to_string(),
+                    is_external: false,
+                    status_code: Some(200),
+                    redirected_url: None,
+                    check_error: None,
+                },
+            ],
+            images: vec![
+                Image {
+                    src: "/hero.jpg".to_string(),
+                    alt: Some("Hero".to_string()),
+                },
+                Image {
+                    src: "/thumb.jpg".to_string(),
+                    alt: Some("Thumb".to_string()),
+                },
+                Image {
+                    src: "/extra.jpg".to_string(),
+                    alt: Some("Extra".to_string()),
+                },
+            ],
+            open_graph: OpenGraphTags {
+                og_title: Some("Home".to_string()),
+                og_description: Some("A concise description".to_string()),
+                og_image: Some("https://example.com/hero.jpg".to_string()),
+                og_url: Some("https://example.com".to_string()),
+                og_type: Some("website".to_string()),
+                og_site_name: None,
+                og_locale: None,
+            },
+            issues: vec![],
+            crawl_depth: 0,
+        }
+    }
+
+    #[test]
+    fn validators_return_empty_when_content_is_in_range() {
+        let page = page();
+
+        assert!(SeoAnalyzer::validate_title(page.title.as_deref()).is_empty());
+        assert!(
+            SeoAnalyzer::validate_meta_description(page.meta_description.as_deref()).is_empty()
+        );
+        assert!(SeoAnalyzer::validate_h1_tags(&page.h1_tags).is_empty());
+        assert!(SeoAnalyzer::validate_images(&page).is_empty());
+        assert!(SeoAnalyzer::validate_thin_content(&page).is_empty());
+        assert!(SeoAnalyzer::validate_open_graph(&page).is_empty());
+    }
+}

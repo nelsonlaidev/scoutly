@@ -18,7 +18,7 @@ use colored::*;
 use config::{Config, RuntimeOptions};
 use crawler::{Crawler, CrawlerConfig};
 use link_checker::LinkChecker;
-use models::{CrawlReport, PageInfo};
+use models::{CrawlReport, PageInfo, SitemapEntry};
 use reporter::Reporter;
 use runtime::{
     LaunchMode, ProgressSnapshot, RunEvent, RunEventSender, RunStage, TerminalSupport,
@@ -27,6 +27,7 @@ use runtime::{
 use seo_analyzer::SeoAnalyzer;
 use sitemap::collect_sitemap_entries;
 use std::collections::{HashMap, HashSet};
+use std::future::Future;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -36,27 +37,38 @@ pub async fn run(args: Cli) -> Result<()> {
 
 #[doc(hidden)]
 pub async fn run_with_terminal(args: Cli, terminal: TerminalSupport) -> Result<()> {
+    run_with_terminal_and_tui_runner(args, terminal, tui::run).await
+}
+
+async fn run_with_terminal_and_tui_runner<F, Fut>(
+    args: Cli,
+    terminal: TerminalSupport,
+    run_tui: F,
+) -> Result<()>
+where
+    F: FnOnce(RuntimeOptions) -> Fut,
+    Fut: Future<Output = Result<()>>,
+{
     let loaded_config = load_config(&args)?;
     let runtime = RuntimeOptions::from_cli_and_config(&args, loaded_config.config());
 
     let launch_mode = resolve_launch_mode(&runtime, terminal)?;
 
-    match launch_mode {
-        LaunchMode::Tui => {
-            if let Some(url) = runtime.url.as_deref() {
-                validate_url(url)?;
-            }
-            tui::run(runtime).await
+    if matches!(launch_mode, LaunchMode::Tui) {
+        if let Some(url) = runtime.url.as_deref() {
+            validate_url(url)?;
         }
-        LaunchMode::Text => {
-            validate_required_url(&runtime, "CLI mode")?;
-            run_cli(runtime, loaded_config, OutputFormat::Text).await
-        }
-        LaunchMode::Json => {
-            validate_required_url(&runtime, "JSON output mode")?;
-            run_cli(runtime, loaded_config, OutputFormat::Json).await
-        }
+        return run_tui(runtime).await;
     }
+
+    let (mode_name, output_format) = if matches!(launch_mode, LaunchMode::Json) {
+        ("JSON output mode", OutputFormat::Json)
+    } else {
+        ("CLI mode", OutputFormat::Text)
+    };
+
+    validate_required_url(&runtime, mode_name)?;
+    run_cli(runtime, loaded_config, output_format).await
 }
 
 pub(crate) async fn execute_scan(
@@ -138,13 +150,11 @@ pub(crate) async fn execute_scan(
             unique_links.len(),
         ),
     );
-    let sitemap = match collect_sitemap_entries(url, &crawler.pages, runtime.keep_fragments).await {
-        Ok(entries) => entries,
-        Err(error) => {
-            tracing::warn!(error = %error, url = %url, "Failed to collect sitemap data");
-            Vec::new()
-        }
-    };
+    let sitemap = collect_sitemap_entries_or_log_error(
+        url,
+        collect_sitemap_entries(url, &crawler.pages, runtime.keep_fragments),
+    )
+    .await;
     let pages = std::mem::take(&mut crawler.pages);
     let report = Reporter::generate_report_with_sitemap(url, pages, sitemap);
 
@@ -158,6 +168,16 @@ pub(crate) async fn execute_scan(
     emit_event(&event_sender, RunEvent::ReportReady(report.clone()));
 
     Ok(report)
+}
+
+async fn collect_sitemap_entries_or_log_error<Fut>(url: &str, future: Fut) -> Vec<SitemapEntry>
+where
+    Fut: Future<Output = Result<Vec<SitemapEntry>>>,
+{
+    future.await.unwrap_or_else(|error| {
+        tracing::warn!(error = %error, url = %url, "Failed to collect sitemap data");
+        Vec::new()
+    })
 }
 
 async fn run_cli(
@@ -383,5 +403,317 @@ fn emit_blank_line(output_format: OutputFormat) {
         eprintln!();
     } else {
         println!();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{IssueSeverity, IssueType, Link, OpenGraphTags, SeoIssue};
+    use actix_web::{App, HttpResponse, HttpServer, web};
+    use std::net::TcpListener;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+    use std::time::Duration;
+    use tokio::sync::mpsc::unbounded_channel;
+
+    fn page(url: &str) -> PageInfo {
+        PageInfo {
+            url: url.to_string(),
+            status_code: Some(200),
+            content_type: Some("text/html".to_string()),
+            title: Some("Page".to_string()),
+            meta_description: None,
+            h1_tags: vec![],
+            links: vec![Link {
+                url: format!("{url}/child"),
+                text: "child".to_string(),
+                is_external: false,
+                status_code: Some(404),
+                redirected_url: None,
+                check_error: None,
+            }],
+            images: vec![],
+            open_graph: OpenGraphTags::default(),
+            issues: vec![SeoIssue {
+                severity: IssueSeverity::Warning,
+                issue_type: IssueType::MissingMetaDescription,
+                message: "warn".to_string(),
+            }],
+            crawl_depth: 0,
+        }
+    }
+
+    fn runtime(url: Option<&str>) -> RuntimeOptions {
+        RuntimeOptions {
+            url: url.map(str::to_string),
+            depth: 1,
+            max_pages: 8,
+            output: None,
+            save: None,
+            cli: false,
+            external: false,
+            verbose: false,
+            ignore_redirects: false,
+            keep_fragments: false,
+            rate_limit: None,
+            concurrency: 1,
+            respect_robots_txt: false,
+            tui: false,
+            config: None,
+        }
+    }
+
+    async fn start_scan_server() -> String {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind scan server");
+        let base_url = format!("http://{}", listener.local_addr().unwrap());
+        let server = HttpServer::new({
+            let base_url = base_url.clone();
+            move || {
+                let base_url = base_url.clone();
+                App::new()
+                    .app_data(web::Data::new(base_url))
+                    .route(
+                        "/robots.txt",
+                        web::get().to(|| async {
+                            HttpResponse::Ok()
+                                .content_type("text/plain")
+                                .body("User-agent: *\nDisallow:\n")
+                        }),
+                    )
+                    .route(
+                        "/sitemap.xml",
+                        web::get().to(|base_url: web::Data<String>| async move {
+                            HttpResponse::Ok()
+                                .content_type("application/xml")
+                                .body(format!(
+                                    r#"<?xml version="1.0" encoding="UTF-8"?>
+                                <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+                                  <url><loc>{}/</loc></url>
+                                  <url><loc>{}/about</loc></url>
+                                </urlset>"#,
+                                    base_url.get_ref(),
+                                    base_url.get_ref()
+                                ))
+                        }),
+                    )
+                    .route(
+                        "/",
+                        web::get().to(|| async {
+                            HttpResponse::Ok().content_type("text/html").body(
+                                r#"<html>
+                                    <head>
+                                      <title>Home</title>
+                                      <meta name="description" content="Home page">
+                                    </head>
+                                    <body>
+                                      <h1>Home</h1>
+                                      <a href="/about">About</a>
+                                    </body>
+                                  </html>"#,
+                            )
+                        }),
+                    )
+                    .route(
+                        "/about",
+                        web::get().to(|| async {
+                            HttpResponse::Ok().content_type("text/html").body(
+                                r#"<html>
+                                    <head>
+                                      <title>About</title>
+                                      <meta name="description" content="About page">
+                                    </head>
+                                    <body>
+                                      <h1>About</h1>
+                                      <a href="/">Home</a>
+                                    </body>
+                                  </html>"#,
+                            )
+                        }),
+                    )
+            }
+        })
+        .workers(1)
+        .listen(listener)
+        .expect("listen scan server")
+        .run();
+
+        tokio::spawn(async move {
+            let _ = server.await;
+        });
+
+        for _ in 0..20 {
+            if reqwest::get(format!("{base_url}/")).await.is_ok() {
+                return base_url;
+            }
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+
+        panic!("scan server failed to start at {base_url}");
+    }
+
+    #[test]
+    fn snapshot_and_emit_helpers_cover_sender_and_no_sender_paths() {
+        let pages = HashMap::from([(
+            "https://example.com".to_string(),
+            page("https://example.com"),
+        )]);
+        let snapshot = snapshot_from_pages(
+            RunStage::CheckingLinks,
+            "checking".to_string(),
+            &pages,
+            1,
+            2,
+        );
+        assert_eq!(snapshot.pages_crawled, 1);
+        assert_eq!(snapshot.links_discovered, 1);
+        assert_eq!(snapshot.links_checked, 1);
+        assert_eq!(snapshot.total_links, 2);
+        assert_eq!(snapshot.summary.broken_links, 1);
+
+        let (sender, mut receiver) = unbounded_channel();
+        emit_progress(&Some(sender.clone()), snapshot.clone());
+        match receiver.try_recv().expect("progress event") {
+            RunEvent::Progress(received) => {
+                assert_eq!(received.message, "checking");
+                assert_eq!(received.links_checked, 1);
+            }
+            other => panic!("expected progress event, got {other:?}"),
+        }
+
+        emit_event(&Some(sender), RunEvent::Error("boom".to_string()));
+        match receiver.try_recv().expect("error event") {
+            RunEvent::Error(error) => assert_eq!(error, "boom"),
+            other => panic!("expected error event, got {other:?}"),
+        }
+
+        emit_event(&None, RunEvent::Error("ignored".to_string()));
+        emit_progress(&None, snapshot);
+    }
+
+    #[tokio::test]
+    async fn collect_sitemap_entries_or_log_error_returns_empty_on_failure() {
+        let entries = collect_sitemap_entries_or_log_error("https://example.com", async {
+            Err(anyhow::anyhow!("boom"))
+        })
+        .await;
+
+        assert!(entries.is_empty());
+    }
+
+    #[tokio::test]
+    async fn execute_scan_emits_events_when_sender_is_present() {
+        let base_url = start_scan_server().await;
+        let (sender, mut receiver) = unbounded_channel();
+
+        let report = execute_scan(&runtime(Some(&base_url)), Some(sender), false)
+            .await
+            .expect("scan should succeed");
+
+        let mut stages = Vec::new();
+        let mut saw_report_ready = false;
+        while let Ok(event) = receiver.try_recv() {
+            match event {
+                RunEvent::Progress(snapshot) => stages.push(snapshot.stage),
+                RunEvent::ReportReady(emitted_report) => {
+                    saw_report_ready = true;
+                    assert_eq!(emitted_report.start_url, base_url);
+                }
+                RunEvent::UpdateAvailable(_) | RunEvent::Error(_) => {}
+            }
+        }
+
+        assert!(stages.contains(&RunStage::LoadingConfig));
+        assert!(stages.contains(&RunStage::Completed));
+        assert!(saw_report_ready);
+        assert_eq!(report.start_url, base_url);
+        assert_eq!(report.summary.total_pages, 2);
+        assert_eq!(report.sitemap.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn run_with_terminal_uses_injected_tui_runner_for_interactive_sessions() {
+        let args = Cli {
+            url: Some("https://example.com".to_string()),
+            depth: None,
+            max_pages: None,
+            output: None,
+            cli: false,
+            tui: false,
+            save: None,
+            external: false,
+            verbose: false,
+            ignore_redirects: false,
+            keep_fragments: false,
+            rate_limit: None,
+            concurrency: None,
+            respect_robots_txt: Some(false),
+            config: None,
+        };
+        let called = Arc::new(AtomicBool::new(false));
+        let called_in_runner = called.clone();
+
+        let result = run_with_terminal_and_tui_runner(
+            args,
+            TerminalSupport {
+                stdin_is_terminal: true,
+                stdout_is_terminal: true,
+            },
+            move |runtime| async move {
+                called_in_runner.store(true, Ordering::SeqCst);
+                assert_eq!(runtime.url.as_deref(), Some("https://example.com"));
+                Ok(())
+            },
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert!(called.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn run_with_terminal_validates_tui_urls_before_launching() {
+        let args = Cli {
+            url: Some("not-a-url".to_string()),
+            depth: None,
+            max_pages: None,
+            output: None,
+            cli: false,
+            tui: false,
+            save: None,
+            external: false,
+            verbose: false,
+            ignore_redirects: false,
+            keep_fragments: false,
+            rate_limit: None,
+            concurrency: None,
+            respect_robots_txt: Some(false),
+            config: None,
+        };
+        let called = Arc::new(AtomicBool::new(false));
+        let called_in_runner = called.clone();
+
+        let error = run_with_terminal_and_tui_runner(
+            args,
+            TerminalSupport {
+                stdin_is_terminal: true,
+                stdout_is_terminal: true,
+            },
+            move |_| async move {
+                called_in_runner.store(true, Ordering::SeqCst);
+                Ok(())
+            },
+        )
+        .await
+        .expect_err("invalid tui url should fail");
+
+        assert!(
+            error
+                .to_string()
+                .contains("URL must start with http:// or https://")
+        );
+        assert!(!called.load(Ordering::SeqCst));
     }
 }

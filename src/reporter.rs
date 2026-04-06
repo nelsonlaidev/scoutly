@@ -72,20 +72,13 @@ impl Reporter {
         writeln!(out, "{}", "=".repeat(80).bright_blue()).unwrap();
         writeln!(out).unwrap();
 
-        writeln!(
-            out,
-            "{}: {}",
-            "Start URL".bright_white().bold(),
-            report.start_url
-        )
-        .unwrap();
-        writeln!(
-            out,
-            "{}: {}",
-            "Timestamp".bright_white().bold(),
-            report.timestamp
-        )
-        .unwrap();
+        let start_url = report.start_url.as_str();
+        let start_url_line = format!("{}: {}", "Start URL".bright_white().bold(), start_url);
+        writeln!(out, "{start_url_line}").unwrap();
+
+        let timestamp = report.timestamp.as_str();
+        let timestamp_line = format!("{}: {}", "Timestamp".bright_white().bold(), timestamp);
+        writeln!(out, "{timestamp_line}").unwrap();
         writeln!(out).unwrap();
 
         // Summary
@@ -775,5 +768,43 @@ mod tests {
         let report = Reporter::generate_report("https://example.com", pages);
 
         Reporter::print_text_report(&report, std::io::stdout());
+    }
+
+    #[test]
+    fn text_report_includes_header_timestamp_and_sitemap_section() {
+        let report = Reporter::generate_report_with_sitemap(
+            "https://example.com",
+            HashMap::from([(
+                "https://example.com/page".to_string(),
+                create_test_page(
+                    "https://example.com/page",
+                    Some(200),
+                    Some("Page"),
+                    vec![create_test_issue(IssueSeverity::Info, "redirected")],
+                    vec![create_test_link("https://example.com/next", Some(200))],
+                    1,
+                ),
+            )]),
+            vec![SitemapEntry {
+                url: "https://example.com/page".to_string(),
+                title: "Page".to_string(),
+                priority: Some("0.8".to_string()),
+                change_frequency: Some("weekly".to_string()),
+            }],
+        );
+
+        let mut out = Vec::new();
+        Reporter::print_text_report(&report, &mut out);
+        let output = String::from_utf8(out).expect("report output should be utf8");
+
+        assert!(output.contains("Scoutly - Crawl Report"));
+        assert!(output.contains("Start URL"));
+        assert!(output.contains("https://example.com"));
+        assert!(output.contains("Timestamp"));
+        assert!(output.contains(&report.timestamp));
+        assert!(output.contains("Sitemap"));
+        assert!(output.contains("Priority"));
+        assert!(output.contains("Change frequency"));
+        assert!(output.contains("weekly"));
     }
 }

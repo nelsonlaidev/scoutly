@@ -1,9 +1,9 @@
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Block, Cell, Padding, Paragraph, Row, Table, Wrap},
-    Frame,
 };
 use std::time::Duration;
 
@@ -1146,8 +1146,71 @@ mod tests {
         CrawlReport, CrawlSummary, IssueType, Link, OpenGraphTags, SeoIssue, SitemapEntry,
     };
     use crate::runtime::ProgressSnapshot;
-    use ratatui::{backend::TestBackend, Terminal};
+    use ratatui::{Terminal, backend::TestBackend};
     use std::collections::HashMap;
+
+    fn runtime(url: Option<&str>) -> crate::config::RuntimeOptions {
+        crate::config::RuntimeOptions {
+            url: url.map(str::to_string),
+            depth: 2,
+            max_pages: 10,
+            output: None,
+            save: None,
+            cli: false,
+            external: false,
+            verbose: false,
+            ignore_redirects: false,
+            keep_fragments: false,
+            rate_limit: None,
+            concurrency: 5,
+            respect_robots_txt: true,
+            tui: false,
+            config: None,
+        }
+    }
+
+    fn rendered_content(app: &App, width: u16, height: u16) -> String {
+        let backend = TestBackend::new(width, height);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| render(frame, app)).unwrap();
+        terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>()
+    }
+
+    fn report_app() -> App {
+        let mut app = App::new(runtime(Some("https://example.com")));
+        let page = sample_page();
+        let mut pages = HashMap::new();
+        pages.insert(page.url.clone(), page);
+        app.progress = ProgressSnapshot::new(crate::runtime::RunStage::Completed, "Report ready");
+        app.report = Some(CrawlReport {
+            start_url: "https://example.com".to_string(),
+            pages,
+            sitemap: vec![SitemapEntry {
+                url: "https://example.com/about".to_string(),
+                title: "About".to_string(),
+                priority: Some("0.8".to_string()),
+                change_frequency: Some("weekly".to_string()),
+            }],
+            summary: CrawlSummary {
+                total_pages: 1,
+                total_links: 2,
+                broken_links: 0,
+                errors: 0,
+                warnings: 1,
+                infos: 0,
+            },
+            timestamp: "2026-04-02T00:00:00Z".to_string(),
+        });
+        app.scan_in_progress = false;
+        app.scan_started_at = None;
+        app
+    }
 
     fn sample_page() -> PageInfo {
         PageInfo {
@@ -1220,60 +1283,8 @@ mod tests {
 
     #[test]
     fn render_outputs_core_labels_to_test_backend() {
-        let runtime = crate::config::RuntimeOptions {
-            url: Some("https://example.com".to_string()),
-            depth: 2,
-            max_pages: 10,
-            output: None,
-            save: None,
-            cli: false,
-            external: false,
-            verbose: false,
-            ignore_redirects: false,
-            keep_fragments: false,
-            rate_limit: None,
-            concurrency: 5,
-            respect_robots_txt: true,
-            tui: false,
-            config: None,
-        };
-        let mut app = App::new(runtime);
-        let page = sample_page();
-        let mut pages = HashMap::new();
-        pages.insert(page.url.clone(), page);
-        app.progress = ProgressSnapshot::new(crate::runtime::RunStage::Completed, "Report ready");
-        app.report = Some(CrawlReport {
-            start_url: "https://example.com".to_string(),
-            pages,
-            sitemap: vec![SitemapEntry {
-                url: "https://example.com/about".to_string(),
-                title: "About".to_string(),
-                priority: Some("0.8".to_string()),
-                change_frequency: Some("weekly".to_string()),
-            }],
-            summary: CrawlSummary {
-                total_pages: 1,
-                total_links: 2,
-                broken_links: 0,
-                errors: 0,
-                warnings: 1,
-                infos: 0,
-            },
-            timestamp: "2026-04-02T00:00:00Z".to_string(),
-        });
-        app.scan_in_progress = false;
-        app.scan_started_at = None;
-
-        let backend = TestBackend::new(120, 30);
-        let mut terminal = Terminal::new(backend).unwrap();
-        terminal.draw(|frame| render(frame, &app)).unwrap();
-
-        let buffer = terminal.backend().buffer();
-        let content = buffer
-            .content
-            .iter()
-            .map(|cell| cell.symbol())
-            .collect::<String>();
+        let app = report_app();
+        let content = rendered_content(&app, 120, 30);
 
         assert!(content.contains("Scoutly"));
         assert!(content.contains("Pages"));
@@ -1287,61 +1298,9 @@ mod tests {
 
     #[test]
     fn render_all_links_section_shows_link_columns() {
-        let runtime = crate::config::RuntimeOptions {
-            url: Some("https://example.com".to_string()),
-            depth: 2,
-            max_pages: 10,
-            output: None,
-            save: None,
-            cli: false,
-            external: false,
-            verbose: false,
-            ignore_redirects: false,
-            keep_fragments: false,
-            rate_limit: None,
-            concurrency: 5,
-            respect_robots_txt: true,
-            tui: false,
-            config: None,
-        };
-        let mut app = App::new(runtime);
-        let page = sample_page();
-        let mut pages = HashMap::new();
-        pages.insert(page.url.clone(), page);
-        app.progress = ProgressSnapshot::new(crate::runtime::RunStage::Completed, "Report ready");
-        app.report = Some(CrawlReport {
-            start_url: "https://example.com".to_string(),
-            pages,
-            sitemap: vec![SitemapEntry {
-                url: "https://example.com/about".to_string(),
-                title: "About".to_string(),
-                priority: Some("0.8".to_string()),
-                change_frequency: Some("weekly".to_string()),
-            }],
-            summary: CrawlSummary {
-                total_pages: 1,
-                total_links: 1,
-                broken_links: 0,
-                errors: 0,
-                warnings: 1,
-                infos: 0,
-            },
-            timestamp: "2026-04-02T00:00:00Z".to_string(),
-        });
+        let mut app = report_app();
         app.result_section = ResultSection::AllLinks;
-        app.scan_in_progress = false;
-        app.scan_started_at = None;
-
-        let backend = TestBackend::new(120, 30);
-        let mut terminal = Terminal::new(backend).unwrap();
-        terminal.draw(|frame| render(frame, &app)).unwrap();
-
-        let buffer = terminal.backend().buffer();
-        let content = buffer
-            .content
-            .iter()
-            .map(|cell| cell.symbol())
-            .collect::<String>();
+        let content = rendered_content(&app, 120, 30);
 
         assert!(content.contains("All Links"));
         assert!(content.contains("Source Page"));
@@ -1351,61 +1310,9 @@ mod tests {
 
     #[test]
     fn render_sitemap_section_shows_sitemap_columns() {
-        let runtime = crate::config::RuntimeOptions {
-            url: Some("https://example.com".to_string()),
-            depth: 2,
-            max_pages: 10,
-            output: None,
-            save: None,
-            cli: false,
-            external: false,
-            verbose: false,
-            ignore_redirects: false,
-            keep_fragments: false,
-            rate_limit: None,
-            concurrency: 5,
-            respect_robots_txt: true,
-            tui: false,
-            config: None,
-        };
-        let mut app = App::new(runtime);
-        let page = sample_page();
-        let mut pages = HashMap::new();
-        pages.insert(page.url.clone(), page);
-        app.progress = ProgressSnapshot::new(crate::runtime::RunStage::Completed, "Report ready");
-        app.report = Some(CrawlReport {
-            start_url: "https://example.com".to_string(),
-            pages,
-            sitemap: vec![SitemapEntry {
-                url: "https://example.com/about".to_string(),
-                title: "About".to_string(),
-                priority: Some("0.8".to_string()),
-                change_frequency: Some("weekly".to_string()),
-            }],
-            summary: CrawlSummary {
-                total_pages: 1,
-                total_links: 1,
-                broken_links: 0,
-                errors: 0,
-                warnings: 1,
-                infos: 0,
-            },
-            timestamp: "2026-04-02T00:00:00Z".to_string(),
-        });
+        let mut app = report_app();
         app.result_section = ResultSection::Sitemap;
-        app.scan_in_progress = false;
-        app.scan_started_at = None;
-
-        let backend = TestBackend::new(120, 30);
-        let mut terminal = Terminal::new(backend).unwrap();
-        terminal.draw(|frame| render(frame, &app)).unwrap();
-
-        let buffer = terminal.backend().buffer();
-        let content = buffer
-            .content
-            .iter()
-            .map(|cell| cell.symbol())
-            .collect::<String>();
+        let content = rendered_content(&app, 120, 30);
 
         assert!(content.contains("Sitemap"));
         assert!(content.contains("Priority"));
@@ -1415,24 +1322,7 @@ mod tests {
 
     #[test]
     fn render_shows_explicit_loading_state_while_scan_is_running() {
-        let runtime = crate::config::RuntimeOptions {
-            url: Some("https://example.com".to_string()),
-            depth: 2,
-            max_pages: 10,
-            output: None,
-            save: None,
-            cli: false,
-            external: false,
-            verbose: false,
-            ignore_redirects: false,
-            keep_fragments: false,
-            rate_limit: None,
-            concurrency: 5,
-            respect_robots_txt: true,
-            tui: false,
-            config: None,
-        };
-        let mut app = App::new(runtime);
+        let mut app = App::new(runtime(Some("https://example.com")));
         app.progress = ProgressSnapshot::new(
             crate::runtime::RunStage::Crawling,
             "Crawling https://example.com".to_string(),
@@ -1441,17 +1331,7 @@ mod tests {
         app.progress.links_discovered = 12;
         app.progress.total_links = 12;
         app.scan_in_progress = true;
-
-        let backend = TestBackend::new(120, 30);
-        let mut terminal = Terminal::new(backend).unwrap();
-        terminal.draw(|frame| render(frame, &app)).unwrap();
-
-        let buffer = terminal.backend().buffer();
-        let content = buffer
-            .content
-            .iter()
-            .map(|cell| cell.symbol())
-            .collect::<String>();
+        let content = rendered_content(&app, 120, 30);
 
         assert!(content.contains("Crawl in progress"));
         assert!(content.contains("Crawling pages"));
@@ -1463,40 +1343,235 @@ mod tests {
 
     #[test]
     fn render_footer_shows_update_notice_when_available() {
-        let runtime = crate::config::RuntimeOptions {
-            url: None,
-            depth: 2,
-            max_pages: 10,
-            output: None,
-            save: None,
-            cli: false,
-            external: false,
-            verbose: false,
-            ignore_redirects: false,
-            keep_fragments: false,
-            rate_limit: None,
-            concurrency: 5,
-            respect_robots_txt: true,
-            tui: false,
-            config: None,
-        };
-        let mut app = App::new(runtime);
+        let mut app = App::new(runtime(None));
         app.update_notice = Some(crate::update::UpdateNotice {
             latest_version: "0.4.0".to_string(),
             release_url: "https://github.com/nelsonlaidev/scoutly/releases/tag/v0.4.0".to_string(),
         });
-
-        let backend = TestBackend::new(140, 30);
-        let mut terminal = Terminal::new(backend).unwrap();
-        terminal.draw(|frame| render(frame, &app)).unwrap();
-
-        let buffer = terminal.backend().buffer();
-        let content = buffer
-            .content
-            .iter()
-            .map(|cell| cell.symbol())
-            .collect::<String>();
+        let content = rendered_content(&app, 140, 30);
 
         assert!(content.contains("update v0.4.0 available"));
+    }
+
+    #[test]
+    fn render_url_input_and_ready_states_cover_empty_branches() {
+        let mut app = App::new(runtime(None));
+        let ready = rendered_content(&app, 120, 30);
+        assert!(ready.contains("Start crawl"));
+        assert!(ready.contains("https://example.com"));
+        assert!(ready.contains("Press Enter to begin crawling."));
+
+        app.error = Some("invalid url".to_string());
+        app.report = Some(CrawlReport {
+            start_url: "https://example.com".to_string(),
+            pages: HashMap::new(),
+            sitemap: vec![],
+            summary: CrawlSummary {
+                total_pages: 0,
+                total_links: 0,
+                broken_links: 0,
+                errors: 0,
+                warnings: 0,
+                infos: 0,
+            },
+            timestamp: "2026-04-02T00:00:00Z".to_string(),
+        });
+        let with_error = rendered_content(&app, 120, 30);
+        assert!(with_error.contains("invalid url"));
+        assert!(with_error.contains("Press Esc to return to the current report"));
+
+        let mut ready_to_crawl = App::new(runtime(Some("https://example.com")));
+        ready_to_crawl.mode = UiMode::Normal;
+        ready_to_crawl.scan_in_progress = false;
+        ready_to_crawl.report = None;
+        let no_report = rendered_content(&ready_to_crawl, 120, 30);
+        assert!(no_report.contains("Ready to crawl"));
+        assert!(no_report.contains("No crawl report is loaded yet."));
+    }
+
+    #[test]
+    fn render_other_sections_and_empty_detail_panes_cover_branchy_layouts() {
+        let mut app = report_app();
+        app.result_section = ResultSection::ByLinkUrl;
+        let link_url_content = rendered_content(&app, 120, 30);
+        assert!(link_url_content.contains("Destination URL"));
+        assert!(link_url_content.contains("Occurrences"));
+
+        app.show_details = false;
+        let link_url_no_details = rendered_content(&app, 120, 30);
+        assert!(!link_url_no_details.contains("Occurrences"));
+
+        app.show_details = true;
+        app.result_section = ResultSection::ByStatus;
+        let by_status = rendered_content(&app, 120, 30);
+        assert!(by_status.contains("Matching links"));
+        assert!(by_status.contains("Status"));
+
+        app.result_section = ResultSection::ByPage;
+        app.search_query = "zzzz".to_string();
+        let empty_page_detail = rendered_content(&app, 120, 30);
+        assert!(empty_page_detail.contains("No page matches the current search/filter."));
+
+        app.result_section = ResultSection::ByLinkUrl;
+        let empty_link_detail = rendered_content(&app, 120, 30);
+        assert!(empty_link_detail.contains("No link URL matches the current search."));
+
+        app.result_section = ResultSection::Sitemap;
+        let empty_sitemap_detail = rendered_content(&app, 120, 30);
+        assert!(empty_sitemap_detail.contains("No sitemap entry matches the current search."));
+
+        app.result_section = ResultSection::ByStatus;
+        let empty_status_detail = rendered_content(&app, 120, 30);
+        assert!(empty_status_detail.contains("No status bucket matches the current search."));
+
+        app.result_section = ResultSection::AllLinks;
+        let empty_all_links_detail = rendered_content(&app, 120, 30);
+        assert!(empty_all_links_detail.contains("No link matches the current search."));
+    }
+
+    #[test]
+    fn remaining_render_branches_cover_no_detail_input_footer_and_detail_states() {
+        let mut app = report_app();
+        app.show_details = false;
+        app.result_section = ResultSection::ByPage;
+        let by_page = rendered_content(&app, 120, 30);
+        assert!(by_page.contains("Title"));
+        assert!(!by_page.contains("No issues on this page."));
+
+        app.result_section = ResultSection::ByStatus;
+        let by_status = rendered_content(&app, 120, 30);
+        assert!(by_status.contains("Links"));
+
+        app.result_section = ResultSection::Sitemap;
+        let by_sitemap = rendered_content(&app, 120, 30);
+        assert!(by_sitemap.contains("Change frequency"));
+
+        app.result_section = ResultSection::AllLinks;
+        let by_all_links = rendered_content(&app, 120, 30);
+        assert!(by_all_links.contains("Destination URL"));
+
+        let mut url_input = App::new(runtime(None));
+        url_input.url_input = "https://example.com/very/long/path".to_string();
+        let content = rendered_content(&url_input, 80, 20);
+        assert!(content.contains("https://example.com"));
+
+        let mut detail_app = report_app();
+        if let Some(report) = &mut detail_app.report {
+            let only_page = report.pages.get_mut("https://example.com/about").unwrap();
+            only_page.issues.clear();
+            only_page.links[0].redirected_url = Some("https://example.com/final".to_string());
+            only_page.links[0].check_error = Some("timeout".to_string());
+            only_page.links[0].status_code = None;
+        }
+        detail_app.error = Some("boom".to_string());
+        detail_app.result_section = ResultSection::ByPage;
+        let details = rendered_content(&detail_app, 120, 30);
+        assert!(details.contains("No issues on this page."));
+        assert!(details.contains("boom"));
+
+        detail_app.result_section = ResultSection::AllLinks;
+        let all_link_details = rendered_content(&detail_app, 120, 30);
+        assert!(all_link_details.contains("Redirected to:"));
+        assert!(all_link_details.contains("Error:"));
+
+        let mut search_app = report_app();
+        search_app.mode = UiMode::Search;
+        search_app.search_input = "shared".to_string();
+        let search_footer = rendered_content(&search_app, 140, 20);
+        assert!(search_footer.contains("search=shared"));
+    }
+
+    #[test]
+    fn formatting_and_summary_helpers_cover_remaining_renderer_utilities() {
+        let mut app = report_app();
+        app.error = Some("boom".to_string());
+        app.mode = UiMode::Search;
+        app.search_input = "shared".to_string();
+        app.search_query = "shared".to_string();
+        app.result_section = ResultSection::ByPage;
+
+        assert_eq!(stage_label(&app), "Report ready");
+        app.progress.stage = crate::runtime::RunStage::LoadingConfig;
+        assert_eq!(stage_label(&app), "Setting up crawl");
+        app.progress.stage = crate::runtime::RunStage::CheckingLinks;
+        assert_eq!(stage_label(&app), "Checking links");
+        app.progress.stage = crate::runtime::RunStage::AnalyzingSeo;
+        assert_eq!(stage_label(&app), "Analyzing SEO");
+        app.progress.stage = crate::runtime::RunStage::GeneratingReport;
+        assert_eq!(stage_label(&app), "Generating report");
+        app.progress.stage = crate::runtime::RunStage::Failed;
+        assert_eq!(stage_label(&app), "Crawl failed");
+
+        assert_eq!(spinner_frame(Duration::from_millis(0)), "-");
+        assert_eq!(spinner_frame(Duration::from_millis(120)), "-");
+        assert_eq!(format_duration(Duration::from_secs(59)), "00:59");
+        assert_eq!(format_duration(Duration::from_secs(3661)), "01:01:01");
+
+        let status_content = status_span(&app).content;
+        assert_eq!(status_content, "FAILED");
+        assert_eq!(severity_span(IssueSeverity::Error).content, "[ERROR]");
+        assert_eq!(severity_span(IssueSeverity::Warning).content, "[WARN]");
+        assert_eq!(severity_span(IssueSeverity::Info).content, "[INFO]");
+        assert_eq!(
+            metric_span("Pages", "2".to_string(), Color::Green).content,
+            "Pages: 2"
+        );
+
+        assert!(footer_help(&app).contains("f severity"));
+        app.result_section = ResultSection::ByStatus;
+        assert!(!footer_help(&app).contains("f severity"));
+
+        app.result_section = ResultSection::ByPage;
+        let section = section_title(&app, 4);
+        assert!(section.contains("[By Page]"));
+        assert!(section.contains("filter=All severities"));
+        assert!(section.contains("sort=Severity"));
+        assert!(section.contains("search=\"shared\""));
+
+        app.result_section = ResultSection::ByStatus;
+        let section = section_title(&app, 2);
+        assert!(section.contains("[By Status]"));
+        assert!(!section.contains("filter="));
+
+        assert_eq!(
+            center_rect(Rect::new(0, 0, 10, 4), 20, 10),
+            Rect::new(0, 0, 10, 4)
+        );
+        assert_eq!(visible_input_value("abcdef", 0), "");
+        assert_eq!(visible_input_value("abcdef", 6), "abcdef");
+        assert_eq!(visible_input_value("abcdefghijkl", 6), "…hijkl");
+        assert_eq!(trimmed("short", 10), "short");
+        assert_eq!(trimmed("abcdefgh", 5), "abcd…");
+
+        let occurrence = LinkOccurrence {
+            source_page_url: "https://example.com/a".to_string(),
+            source_page_title: "A".to_string(),
+            source_page_depth: 0,
+            destination_url: "https://example.com/b".to_string(),
+            link_text: "".to_string(),
+            is_external: false,
+            status_code: Some(200),
+            redirected_url: None,
+            check_error: None,
+        };
+        assert!(link_occurrence_summary(&occurrence).contains("HTTP 200"));
+        let with_text = LinkOccurrence {
+            link_text: "Click".to_string(),
+            ..occurrence.clone()
+        };
+        assert!(link_occurrence_summary(&with_text).contains("text=\"Click\""));
+
+        assert_eq!(issue_summary(&sample_page()), "E:0 W:1 I:0");
+        assert_eq!(
+            unique_source_pages(&[
+                occurrence.clone(),
+                with_text,
+                LinkOccurrence {
+                    source_page_url: "https://example.com/c".to_string(),
+                    ..occurrence
+                },
+            ]),
+            2
+        );
     }
 }

@@ -1237,4 +1237,477 @@ mod tests {
         app.apply_run_event(RunEvent::ReportReady(report));
         assert!(app.report.is_some());
     }
+
+    #[test]
+    fn enum_labels_and_cycles_cover_all_variants() {
+        assert_eq!(UiMode::UrlInput.label(), "URL");
+        assert_eq!(UiMode::Normal.label(), "NORMAL");
+        assert_eq!(UiMode::Search.label(), "SEARCH");
+
+        assert_eq!(SeverityFilter::All.label(), "All severities");
+        assert_eq!(SeverityFilter::Error.label(), "Errors only");
+        assert_eq!(SeverityFilter::Warning.label(), "Warnings only");
+        assert_eq!(SeverityFilter::Info.label(), "Infos only");
+        assert_eq!(SeverityFilter::All.next(), SeverityFilter::Error);
+        assert_eq!(SeverityFilter::Error.next(), SeverityFilter::Warning);
+        assert_eq!(SeverityFilter::Warning.next(), SeverityFilter::Info);
+        assert_eq!(SeverityFilter::Info.next(), SeverityFilter::All);
+
+        assert_eq!(SortMode::Severity.label(), "Severity");
+        assert_eq!(SortMode::Issues.label(), "Issue count");
+        assert_eq!(SortMode::Status.label(), "HTTP status");
+        assert_eq!(SortMode::Depth.label(), "Crawl depth");
+        assert_eq!(SortMode::Url.label(), "URL");
+        assert_eq!(SortMode::Severity.next(), SortMode::Issues);
+        assert_eq!(SortMode::Issues.next(), SortMode::Status);
+        assert_eq!(SortMode::Status.next(), SortMode::Depth);
+        assert_eq!(SortMode::Depth.next(), SortMode::Url);
+        assert_eq!(SortMode::Url.next(), SortMode::Severity);
+
+        assert_eq!(ResultSection::ByPage.label(), "By Page");
+        assert_eq!(ResultSection::ByLinkUrl.label(), "By Link URL");
+        assert_eq!(ResultSection::ByStatus.label(), "By Status");
+        assert_eq!(ResultSection::Sitemap.label(), "Sitemap");
+        assert_eq!(ResultSection::AllLinks.label(), "All Links");
+        assert_eq!(ResultSection::ByPage.next(), ResultSection::ByLinkUrl);
+        assert_eq!(ResultSection::ByLinkUrl.next(), ResultSection::ByStatus);
+        assert_eq!(ResultSection::ByStatus.next(), ResultSection::Sitemap);
+        assert_eq!(ResultSection::Sitemap.next(), ResultSection::AllLinks);
+        assert_eq!(ResultSection::AllLinks.next(), ResultSection::ByPage);
+        assert_eq!(ResultSection::ByPage.previous(), ResultSection::AllLinks);
+        assert_eq!(ResultSection::ByLinkUrl.previous(), ResultSection::ByPage);
+        assert_eq!(ResultSection::ByStatus.previous(), ResultSection::ByLinkUrl);
+        assert_eq!(ResultSection::Sitemap.previous(), ResultSection::ByStatus);
+        assert_eq!(ResultSection::AllLinks.previous(), ResultSection::Sitemap);
+    }
+
+    #[test]
+    fn link_helpers_cover_status_and_summary_variants() {
+        let failed = LinkOccurrence {
+            source_page_url: "https://example.com/source".to_string(),
+            source_page_title: "Source".to_string(),
+            source_page_depth: 1,
+            destination_url: "https://example.com/fail".to_string(),
+            link_text: "Broken".to_string(),
+            is_external: false,
+            status_code: None,
+            redirected_url: None,
+            check_error: Some("timeout".to_string()),
+        };
+        assert_eq!(failed.status_label(), "Check failed");
+        assert_eq!(failed.result_summary(), "Check failed: timeout");
+
+        let redirected = LinkOccurrence {
+            status_code: Some(301),
+            redirected_url: Some("https://example.com/final".to_string()),
+            check_error: None,
+            ..failed.clone()
+        };
+        assert_eq!(redirected.status_label(), "301");
+        assert_eq!(
+            redirected.result_summary(),
+            "HTTP 301 → https://example.com/final"
+        );
+
+        let ok = LinkOccurrence {
+            status_code: Some(200),
+            redirected_url: None,
+            check_error: None,
+            ..failed.clone()
+        };
+        assert_eq!(ok.result_summary(), "HTTP 200");
+
+        let unknown = LinkOccurrence {
+            status_code: None,
+            redirected_url: None,
+            check_error: None,
+            ..failed
+        };
+        assert_eq!(unknown.status_label(), "Unknown");
+        assert_eq!(unknown.result_summary(), "Status unknown");
+
+        let mixed = LinkUrlGroup {
+            destination_url: "https://example.com/mixed".to_string(),
+            occurrences: vec![ok.clone(), redirected.clone()],
+        };
+        assert_eq!(mixed.occurrence_count(), 2);
+        assert_eq!(
+            mixed.referring_pages(),
+            vec!["https://example.com/source".to_string()]
+        );
+        assert_eq!(mixed.result_label(), "Mixed");
+
+        assert_eq!(LinkStatusBucketKey::CheckFailed.label(), "Check failed");
+        assert_eq!(LinkStatusBucketKey::Unknown.label(), "Unknown");
+        assert_eq!(LinkStatusBucketKey::Http(204).label(), "204");
+        assert_eq!(
+            LinkStatusBucket {
+                key: LinkStatusBucketKey::Http(200),
+                occurrences: vec![ok]
+            }
+            .label(),
+            "200"
+        );
+    }
+
+    #[test]
+    fn url_input_key_paths_cover_escape_clear_backspace_and_validation() {
+        let mut app = App::new(RuntimeOptions {
+            url: None,
+            depth: 5,
+            max_pages: 10,
+            output: None,
+            save: None,
+            cli: false,
+            external: false,
+            verbose: false,
+            ignore_redirects: false,
+            keep_fragments: false,
+            rate_limit: None,
+            concurrency: 5,
+            respect_robots_txt: true,
+            tui: false,
+            config: None,
+        });
+
+        assert_eq!(app.handle_key(KeyEvent::from(KeyCode::Enter)), None);
+        assert_eq!(
+            app.error.as_deref(),
+            Some("Enter a URL before starting a crawl")
+        );
+
+        app.handle_key(KeyEvent::from(KeyCode::Char('h')));
+        app.handle_key(KeyEvent::from(KeyCode::Char('i')));
+        assert_eq!(app.url_input, "hi");
+
+        app.handle_key(KeyEvent::from(KeyCode::Backspace));
+        assert_eq!(app.url_input, "h");
+
+        app.handle_key(KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL));
+        assert!(app.url_input.is_empty());
+
+        app.handle_key(KeyEvent::from(KeyCode::Esc));
+        assert!(app.should_quit);
+
+        let mut app = app_with_report();
+        app.mode = UiMode::UrlInput;
+        app.handle_key(KeyEvent::from(KeyCode::Esc));
+        assert_eq!(app.mode, UiMode::Normal);
+        assert!(!app.should_quit);
+    }
+
+    #[test]
+    fn normal_mode_keys_cover_navigation_search_filters_and_quit() {
+        let mut app = app_with_report();
+
+        app.handle_key(KeyEvent::from(KeyCode::Down));
+        assert_eq!(app.selected_index, 1);
+        app.handle_key(KeyEvent::from(KeyCode::Up));
+        assert_eq!(app.selected_index, 0);
+        app.handle_key(KeyEvent::from(KeyCode::Char('j')));
+        assert_eq!(app.selected_index, 1);
+        app.handle_key(KeyEvent::from(KeyCode::Char('k')));
+        assert_eq!(app.selected_index, 0);
+        app.handle_key(KeyEvent::from(KeyCode::PageDown));
+        assert_eq!(app.selected_index, 1);
+        app.handle_key(KeyEvent::from(KeyCode::PageUp));
+        assert_eq!(app.selected_index, 0);
+        app.handle_key(KeyEvent::from(KeyCode::Char('G')));
+        assert_eq!(
+            app.selected_index,
+            app.visible_row_count().saturating_sub(1)
+        );
+        app.handle_key(KeyEvent::from(KeyCode::Char('g')));
+        assert_eq!(app.selected_index, 0);
+
+        app.handle_key(KeyEvent::from(KeyCode::Char('/')));
+        assert_eq!(app.mode, UiMode::Search);
+        app.handle_key(KeyEvent::from(KeyCode::Esc));
+        assert_eq!(app.mode, UiMode::Normal);
+
+        app.handle_key(KeyEvent::from(KeyCode::Char('f')));
+        assert_eq!(app.severity_filter, SeverityFilter::Error);
+        app.handle_key(KeyEvent::from(KeyCode::Char('s')));
+        assert_eq!(app.sort_mode, SortMode::Issues);
+
+        app.handle_key(KeyEvent::from(KeyCode::Enter));
+        assert!(!app.show_details);
+
+        app.result_section = ResultSection::ByStatus;
+        app.handle_key(KeyEvent::from(KeyCode::Char('f')));
+        assert_eq!(app.severity_filter, SeverityFilter::Error);
+        app.handle_key(KeyEvent::from(KeyCode::Char('s')));
+        assert_eq!(app.sort_mode, SortMode::Issues);
+
+        app.handle_key(KeyEvent::from(KeyCode::Char('u')));
+        assert_eq!(app.mode, UiMode::UrlInput);
+        assert!(app.error.is_none());
+
+        app.mode = UiMode::Normal;
+        app.handle_key(KeyEvent::from(KeyCode::Char('q')));
+        assert!(app.should_quit);
+    }
+
+    #[test]
+    fn search_mode_keys_cover_commit_cancel_backspace_clear_and_typing() {
+        let mut app = app_with_report();
+        app.mode = UiMode::Search;
+        app.search_query = "shared".to_string();
+        app.search_input = app.search_query.clone();
+        app.selected_index = 1;
+
+        app.handle_key(KeyEvent::from(KeyCode::Backspace));
+        assert_eq!(app.search_input, "share");
+        assert_eq!(app.search_query, "share");
+        assert_eq!(app.selected_index, 0);
+
+        app.handle_key(KeyEvent::from(KeyCode::Char('d')));
+        assert_eq!(app.search_input, "shared");
+        assert_eq!(app.search_query, "shared");
+
+        app.handle_key(KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL));
+        assert!(app.search_input.is_empty());
+        assert!(app.search_query.is_empty());
+
+        app.search_input = "warn".to_string();
+        app.handle_key(KeyEvent::from(KeyCode::Enter));
+        assert_eq!(app.mode, UiMode::Normal);
+        assert_eq!(app.search_query, "warn");
+
+        app.mode = UiMode::Search;
+        app.search_input = "temp".to_string();
+        app.search_query = "shared".to_string();
+        app.handle_key(KeyEvent::from(KeyCode::Esc));
+        assert_eq!(app.mode, UiMode::Normal);
+        assert_eq!(app.search_input, "shared");
+    }
+
+    #[test]
+    fn progress_and_error_events_cover_status_transitions() {
+        let mut app = app_with_report();
+        app.scan_started_at = None;
+
+        let mut crawling = ProgressSnapshot::new(RunStage::Crawling, "Crawling".to_string());
+        crawling.pages_crawled = 1;
+        app.apply_run_event(RunEvent::Progress(crawling.clone()));
+        assert!(app.scan_in_progress);
+        assert!(app.scan_started_at.is_some());
+        assert_eq!(app.progress.message, "Crawling");
+
+        let complete = ProgressSnapshot::new(RunStage::Completed, "Done".to_string());
+        app.apply_run_event(RunEvent::Progress(complete));
+        assert!(!app.scan_in_progress);
+        assert!(app.scan_started_at.is_none());
+
+        app.report = None;
+        app.mode = UiMode::Normal;
+        app.apply_run_event(RunEvent::Error("boom".to_string()));
+        assert_eq!(app.mode, UiMode::UrlInput);
+        assert_eq!(app.progress.stage, RunStage::Failed);
+        assert_eq!(app.progress.message, "boom");
+    }
+
+    #[test]
+    fn row_counts_matching_and_sorting_cover_remaining_helpers() {
+        let mut app = app_with_report();
+
+        assert_eq!(app.visible_row_count(), 2);
+        app.result_section = ResultSection::ByLinkUrl;
+        assert_eq!(app.visible_row_count(), app.visible_link_url_groups().len());
+        app.result_section = ResultSection::ByStatus;
+        assert_eq!(app.visible_row_count(), app.visible_status_buckets().len());
+        app.result_section = ResultSection::Sitemap;
+        assert_eq!(app.visible_row_count(), app.visible_sitemap_entries().len());
+        app.result_section = ResultSection::AllLinks;
+        assert_eq!(
+            app.visible_row_count(),
+            app.visible_link_occurrences().len()
+        );
+
+        app.cycle_result_section(true);
+        assert_eq!(app.result_section, ResultSection::ByPage);
+        app.selected_index = 9;
+        app.cycle_result_section(false);
+        assert_eq!(app.result_section, ResultSection::AllLinks);
+        assert_eq!(app.selected_index, 0);
+
+        let occurrence = app.visible_link_occurrences().into_iter().next().unwrap();
+        assert!(app.matches_link_occurrence(&occurrence, "example.com"));
+        assert!(
+            app.matches_link_occurrence(&occurrence, &occurrence.status_label().to_lowercase())
+        );
+        assert!(!app.matches_link_occurrence(&occurrence, "nope"));
+
+        let group = app.visible_link_url_groups().into_iter().next().unwrap();
+        assert!(app.matches_link_url_group(&group, "example"));
+        assert!(!app.matches_link_url_group(&group, "zzzz"));
+
+        let bucket = app.visible_status_buckets().into_iter().next().unwrap();
+        assert!(app.matches_status_bucket(&bucket, &bucket.label().to_lowercase()));
+        assert!(!app.matches_status_bucket(&bucket, "zzzz"));
+
+        let entry = app
+            .visible_sitemap_entries()
+            .into_iter()
+            .next()
+            .unwrap()
+            .clone();
+        assert!(app.matches_sitemap_entry(&entry, "daily"));
+        assert!(!app.matches_sitemap_entry(&entry, "zzzz"));
+
+        let failed = LinkOccurrence {
+            source_page_url: "https://example.com/a".to_string(),
+            source_page_title: "A".to_string(),
+            source_page_depth: 0,
+            destination_url: "https://example.com/fail".to_string(),
+            link_text: "broken".to_string(),
+            is_external: false,
+            status_code: None,
+            redirected_url: None,
+            check_error: Some("timeout".to_string()),
+        };
+        let unknown = LinkOccurrence {
+            check_error: None,
+            ..failed.clone()
+        };
+        let ok = LinkOccurrence {
+            status_code: Some(204),
+            ..unknown.clone()
+        };
+        assert_eq!(
+            App::status_bucket_key(&failed),
+            LinkStatusBucketKey::CheckFailed
+        );
+        assert_eq!(
+            App::status_bucket_key(&unknown),
+            LinkStatusBucketKey::Unknown
+        );
+        assert_eq!(App::status_bucket_key(&ok), LinkStatusBucketKey::Http(204));
+        assert_eq!(
+            App::status_bucket_sort_key(&LinkStatusBucketKey::CheckFailed),
+            (0, 0)
+        );
+        assert_eq!(
+            App::status_bucket_sort_key(&LinkStatusBucketKey::Unknown),
+            (1, 0)
+        );
+        assert_eq!(
+            App::status_bucket_sort_key(&LinkStatusBucketKey::Http(204)),
+            (2, 204)
+        );
+
+        let pages = app
+            .visible_pages()
+            .into_iter()
+            .cloned()
+            .collect::<Vec<PageInfo>>();
+        app.sort_mode = SortMode::Severity;
+        assert!(matches!(
+            app.compare_pages(&pages[0], &pages[1]),
+            std::cmp::Ordering::Less | std::cmp::Ordering::Equal
+        ));
+        app.sort_mode = SortMode::Issues;
+        let _ = app.compare_pages(&pages[0], &pages[1]);
+        app.sort_mode = SortMode::Status;
+        let _ = app.compare_pages(&pages[0], &pages[1]);
+        app.sort_mode = SortMode::Depth;
+        let _ = app.compare_pages(&pages[0], &pages[1]);
+        app.sort_mode = SortMode::Url;
+        let _ = app.compare_pages(&pages[0], &pages[1]);
+
+        assert_eq!(App::severity_rank(&pages[0]), 3);
+        assert_eq!(App::severity_rank(&pages[1]), 2);
+        assert_eq!(
+            App::severity_rank(&page_with_links(
+                "https://example.com/ok",
+                vec![],
+                vec![],
+                2
+            )),
+            0
+        );
+        assert_eq!(
+            App::severity_rank(&page_with_links(
+                "https://example.com/info",
+                vec![issue(IssueSeverity::Info, "redirect")],
+                vec![],
+                2,
+            )),
+            1
+        );
+    }
+
+    #[test]
+    fn remaining_state_helpers_cover_empty_and_specific_status_paths() {
+        let mut empty = App::new(RuntimeOptions {
+            url: None,
+            depth: 5,
+            max_pages: 10,
+            output: None,
+            save: None,
+            cli: false,
+            external: false,
+            verbose: false,
+            ignore_redirects: false,
+            keep_fragments: false,
+            rate_limit: None,
+            concurrency: 5,
+            respect_robots_txt: true,
+            tui: false,
+            config: None,
+        });
+        assert!(empty.visible_sitemap_entries().is_empty());
+        assert!(empty.link_occurrences().is_empty());
+        assert_eq!(empty.status_label(), "READY");
+        assert!(!empty.is_finished());
+        empty.move_selection(1);
+        assert_eq!(empty.selected_index, 0);
+
+        let mut app = app_with_report();
+        app.report = None;
+        app.progress.stage = RunStage::CheckingLinks;
+        assert_eq!(app.status_label(), "CHECKING");
+        app.progress.stage = RunStage::AnalyzingSeo;
+        assert_eq!(app.status_label(), "ANALYZING");
+        app.progress.stage = RunStage::GeneratingReport;
+        assert_eq!(app.status_label(), "REPORTING");
+        app.progress.stage = RunStage::Completed;
+        assert_eq!(app.status_label(), "COMPLETE");
+        app.progress.stage = RunStage::Failed;
+        assert_eq!(app.status_label(), "FAILED");
+        app.error = Some("boom".to_string());
+        assert!(app.is_finished());
+
+        app.mode = UiMode::UrlInput;
+        assert_eq!(app.handle_key(KeyEvent::from(KeyCode::Left)), None);
+        app.mode = UiMode::Search;
+        assert_eq!(app.handle_key(KeyEvent::from(KeyCode::Left)), None);
+
+        app.report = app_with_report().report;
+        app.error = None;
+        app.selected_index = 999;
+        app.result_section = ResultSection::ByPage;
+        app.clamp_selection();
+        assert_eq!(app.selected_index, app.visible_row_count() - 1);
+
+        app.severity_filter = SeverityFilter::Warning;
+        let warning_page = app
+            .visible_pages()
+            .into_iter()
+            .find(|page| page.url.contains("warn"))
+            .unwrap()
+            .clone();
+        assert!(app.matches_severity(&warning_page));
+
+        app.severity_filter = SeverityFilter::Info;
+        let info_page = page_with_links(
+            "https://example.com/info",
+            vec![issue(IssueSeverity::Info, "redirect")],
+            vec![],
+            0,
+        );
+        assert!(app.matches_severity(&info_page));
+
+        assert!(app.matches_query(&warning_page, ""));
+    }
 }

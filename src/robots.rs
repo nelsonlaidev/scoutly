@@ -60,11 +60,7 @@ impl RobotsTxt {
 
         // Only parse if status is 200
         if !response.status().is_success() {
-            tracing::info!(
-                url = %robots_url,
-                status = %response.status(),
-                "robots.txt not found, allowing all paths"
-            );
+            tracing::info!(url = %robots_url, status = %response.status(), "robots.txt not found, allowing all paths");
             self.cache.insert(key.clone());
             self.rules.insert(key, vec![]);
             self.sitemaps.entry(domain_key(base_url)).or_default();
@@ -206,16 +202,6 @@ impl RobotsTxt {
             (pattern, false)
         };
 
-        // If pattern doesn't contain wildcard, just check prefix
-        if !pattern.contains('*') {
-            let matches = path.starts_with(pattern);
-            if must_end {
-                return path == pattern;
-            }
-            return matches;
-        }
-
-        // Convert pattern to regex-like matching
         let mut pattern_idx = 0;
         let mut path_idx = 0;
         let pattern_chars: Vec<char> = pattern.chars().collect();
@@ -249,15 +235,7 @@ impl RobotsTxt {
             }
         }
 
-        // Check if pattern is fully consumed
-        let pattern_consumed = pattern_idx == pattern_chars.len();
-        let path_consumed = path_idx == path_chars.len();
-
-        if must_end {
-            pattern_consumed && path_consumed
-        } else {
-            pattern_consumed
-        }
+        !must_end || path_idx == path_chars.len()
     }
 
     /// Gets the robots.txt URL for a base URL
@@ -293,6 +271,9 @@ fn domain_key(url: &Url) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use actix_web::{App, HttpResponse, HttpServer, web};
+    use std::net::TcpListener;
+    use std::time::Duration;
 
     #[test]
     fn test_default() {
@@ -327,6 +308,8 @@ mod tests {
         assert!(RobotsTxt::path_matches("/admin$", "/admin"));
         assert!(!RobotsTxt::path_matches("/admin$", "/admin/"));
         assert!(!RobotsTxt::path_matches("/admin$", "/admin/page"));
+        assert!(!RobotsTxt::path_matches("/admin/*$", "/admin/page/extra"));
+        assert!(!RobotsTxt::path_matches("/admin/*$", "/admin/page"));
     }
 
     #[test]
@@ -544,5 +527,52 @@ Disallow: /secret
         // Test cases where pattern is consumed and must_end is false
         assert!(RobotsTxt::path_matches("/api/v1", "/api/v1"));
         assert!(RobotsTxt::path_matches("/api/v1", "/api/v1/extra"));
+    }
+
+    async fn start_robots_server(status: actix_web::http::StatusCode) -> String {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind robots server");
+        let base_url = format!("http://{}", listener.local_addr().unwrap());
+        let server = HttpServer::new(move || {
+            App::new().route(
+                "/robots.txt",
+                web::get().to(move || async move { HttpResponse::build(status).finish() }),
+            )
+        })
+        .workers(1)
+        .listen(listener)
+        .expect("listen robots server")
+        .run();
+
+        tokio::spawn(async move {
+            let _ = server.await;
+        });
+
+        for _ in 0..20 {
+            if let Ok(response) = reqwest::get(format!("{base_url}/robots.txt")).await
+                && response.status().as_u16() == status.as_u16()
+            {
+                return base_url;
+            }
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+
+        panic!("robots test server failed to start at {base_url}");
+    }
+
+    #[tokio::test]
+    async fn fetch_non_success_status_allows_all_and_records_empty_sitemaps() {
+        let base_url = start_robots_server(actix_web::http::StatusCode::NOT_FOUND).await;
+        let client = reqwest::Client::new();
+        let mut robots = RobotsTxt::new();
+        let parsed = Url::parse(&base_url).unwrap();
+
+        robots.fetch(&client, &parsed).await.unwrap();
+
+        assert!(robots.is_allowed(
+            &Url::parse(&format!("{base_url}/anything")).unwrap(),
+            "scoutly"
+        ));
+        assert!(robots.sitemap_urls(&parsed).is_empty());
+        assert!(robots.cache.contains(&domain_key(&parsed)));
     }
 }

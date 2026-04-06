@@ -28,22 +28,25 @@ struct LatestReleaseResponse {
 }
 
 pub async fn check_for_update() -> Option<UpdateNotice> {
-    if REPOSITORY_URL.is_empty() {
+    check_for_update_for_repository(REPOSITORY_URL, CURRENT_VERSION).await
+}
+
+async fn check_for_update_for_repository(
+    repository_url: &str,
+    current_version: &str,
+) -> Option<UpdateNotice> {
+    if repository_url.is_empty() {
         tracing::debug!("No repository URL configured, skipping update check");
         return None;
     }
 
     let endpoint = std::env::var(UPDATE_API_URL_ENV)
         .ok()
-        .or_else(|| latest_release_api_url(REPOSITORY_URL))?;
+        .or_else(|| latest_release_api_url(repository_url))?;
 
-    tracing::debug!(
-        endpoint = %endpoint,
-        current_version = %CURRENT_VERSION,
-        "Checking for updates"
-    );
+    tracing::debug!(endpoint = %endpoint, current_version = %current_version, "Checking for updates");
 
-    check_for_update_with_endpoint(CURRENT_VERSION, &endpoint).await
+    check_for_update_with_endpoint(current_version, &endpoint).await
 }
 
 #[doc(hidden)]
@@ -78,11 +81,7 @@ async fn fetch_update_notice(
     tracing::debug!(endpoint = %endpoint, "Sending request to releases API");
     let response = client.get(endpoint).send().await?.error_for_status()?;
     let release: LatestReleaseResponse = response.json().await?;
-    tracing::debug!(
-        tag_name = ?release.tag_name,
-        html_url = ?release.html_url,
-        "Received release response"
-    );
+    tracing::debug!(tag_name = ?release.tag_name, html_url = ?release.html_url, "Received release response");
 
     let latest_version = release
         .tag_name
@@ -91,11 +90,7 @@ async fn fetch_update_notice(
         .filter(|latest_version| is_newer_version(current_version, latest_version))
         .map(str::to_string);
 
-    tracing::debug!(
-        current_version = %current_version,
-        latest_version = ?latest_version,
-        "Version comparison result"
-    );
+    tracing::debug!(current_version = %current_version, latest_version = ?latest_version, "Version comparison result");
 
     Ok(match (latest_version, release.html_url) {
         (Some(latest_version), Some(release_url)) => Some(UpdateNotice {
@@ -166,6 +161,43 @@ fn parse_version(version: &str) -> Option<Version> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use actix_web::{App, HttpResponse, HttpServer, web};
+    use serial_test::serial;
+    use std::net::TcpListener;
+    use std::time::Duration;
+
+    async fn start_update_server() -> String {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind update server");
+        let base_url = format!("http://{}", listener.local_addr().unwrap());
+        let server = HttpServer::new(|| {
+            App::new().route(
+                "/latest",
+                web::get().to(|| async {
+                    HttpResponse::Ok().json(serde_json::json!({
+                        "tag_name": "v9.9.9",
+                        "html_url": "https://example.com/releases/v9.9.9"
+                    }))
+                }),
+            )
+        })
+        .workers(1)
+        .listen(listener)
+        .expect("listen update server")
+        .run();
+
+        tokio::spawn(async move {
+            let _ = server.await;
+        });
+
+        for _ in 0..20 {
+            if reqwest::get(format!("{base_url}/latest")).await.is_ok() {
+                return base_url;
+            }
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+
+        panic!("update server failed to start at {base_url}");
+    }
 
     #[test]
     fn normalize_version_accepts_optional_v_prefix() {
@@ -197,6 +229,81 @@ mod tests {
         assert_eq!(
             latest_release_api_url("https://github.com/nelsonlaidev/scoutly"),
             Some("https://api.github.com/repos/nelsonlaidev/scoutly/releases/latest".to_string())
+        );
+    }
+
+    #[test]
+    fn latest_release_api_url_rejects_non_github_or_short_paths() {
+        assert_eq!(
+            latest_release_api_url("https://gitlab.com/nelson/scoutly"),
+            None
+        );
+        assert_eq!(
+            latest_release_api_url("https://github.com/nelsonlaidev"),
+            None
+        );
+        assert_eq!(latest_release_api_url("not a url"), None);
+        assert_eq!(
+            latest_release_api_url("https://github.com/nelsonlaidev/scoutly.git/"),
+            Some("https://api.github.com/repos/nelsonlaidev/scoutly/releases/latest".to_string())
+        );
+    }
+
+    #[test]
+    fn update_message_formatters_include_expected_versions() {
+        let notice = UpdateNotice {
+            latest_version: "9.9.9".to_string(),
+            release_url: "https://example.com/releases/v9.9.9".to_string(),
+        };
+
+        assert!(format_cli_update_message(&notice).contains(CURRENT_VERSION));
+        assert!(format_cli_update_message(&notice).contains("9.9.9"));
+        assert_eq!(
+            format_tui_update_message(&notice),
+            "update v9.9.9 available"
+        );
+    }
+
+    #[test]
+    fn parse_and_compare_versions_cover_invalid_inputs() {
+        assert_eq!(
+            parse_version("1.2.3"),
+            Some(Version {
+                major: 1,
+                minor: 2,
+                patch: 3,
+            })
+        );
+        assert_eq!(parse_version("1.2.3.4"), None);
+        assert_eq!(parse_version("1.two.3"), None);
+        assert!(!is_newer_version("invalid", "1.2.3"));
+        assert!(!is_newer_version("1.2.3", "invalid"));
+    }
+
+    #[tokio::test]
+    async fn empty_repository_url_skips_update_check() {
+        assert_eq!(check_for_update_for_repository("", "1.2.3").await, None);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn helper_uses_env_override_and_returns_notice() {
+        let base_url = start_update_server().await;
+        unsafe {
+            std::env::set_var(UPDATE_API_URL_ENV, format!("{base_url}/latest"));
+        }
+        let notice =
+            check_for_update_for_repository("https://github.com/example/scoutly", "0.1.0").await;
+        unsafe {
+            std::env::remove_var(UPDATE_API_URL_ENV);
+        }
+
+        assert_eq!(
+            notice,
+            Some(UpdateNotice {
+                latest_version: "9.9.9".to_string(),
+                release_url: "https://example.com/releases/v9.9.9".to_string(),
+            })
         );
     }
 }

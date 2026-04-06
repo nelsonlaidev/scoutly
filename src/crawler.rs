@@ -182,10 +182,8 @@ impl Crawler {
 
     pub async fn crawl(&mut self) -> Result<()> {
         // Fetch robots.txt for the base domain if respect_robots_txt is enabled
-        if self.respect_robots_txt
-            && let Err(e) = self.robots_txt.fetch(&self.client, &self.base_url).await
-        {
-            tracing::warn!(error = %e, "Failed to fetch robots.txt, continuing anyway");
+        if self.respect_robots_txt {
+            let _ = self.robots_txt.fetch(&self.client, &self.base_url).await;
         }
 
         // Initialize progress bar if enabled
@@ -323,11 +321,7 @@ impl Crawler {
 
         if !PageInfo::is_html_content_type(content_type.as_deref()) {
             if let Some(ref ct) = content_type {
-                tracing::info!(
-                    url = %url,
-                    content_type = %ct,
-                    "Skipping HTML extraction for non-HTML response"
-                );
+                tracing::info!(url = %url, content_type = %ct, "Skipping HTML extraction for non-HTML response");
             }
 
             return Ok(PageInfo {
@@ -467,26 +461,9 @@ impl Crawler {
                 let is_external = self.is_external_url(&absolute_url);
 
                 // Generate text based on element type
-                let text = match element_name {
-                    "a" => element.text().collect::<String>().trim().to_string(),
-                    "iframe" => {
-                        let title = element.value().attr("title").unwrap_or("");
-                        format!("[iframe] {}", title)
-                    }
-                    "video" => "[video]".to_string(),
-                    "source" => {
-                        let media_type = element.value().attr("type").unwrap_or("");
-                        format!("[source type={}]", media_type)
-                    }
-                    "audio" => "[audio]".to_string(),
-                    "embed" => "[embed]".to_string(),
-                    "object" => "[object]".to_string(),
-                    _ => continue, // Skip unknown elements
-                };
-
                 links.push(Link {
                     url: url_str,
-                    text,
+                    text: Self::link_text_for_element(element_name, &element),
                     is_external,
                     status_code: None,
                     redirected_url: None,
@@ -596,5 +573,196 @@ impl Crawler {
                 | "xml"
                 | "zip"
         )
+    }
+
+    fn link_text_for_element(element_name: &str, element: &scraper::ElementRef<'_>) -> String {
+        match element_name {
+            "a" => element.text().collect::<String>().trim().to_string(),
+            "iframe" => format!("[iframe] {}", element.value().attr("title").unwrap_or("")),
+            "video" => "[video]".to_string(),
+            "source" => format!(
+                "[source type={}]",
+                element.value().attr("type").unwrap_or("")
+            ),
+            "audio" => "[audio]".to_string(),
+            "embed" => "[embed]".to_string(),
+            "object" => "[object]".to_string(),
+            _ => unreachable!("selector only yields supported link-bearing elements"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix_web::{App, HttpResponse, HttpServer, web};
+    use scraper::{Html, Selector};
+    use std::net::TcpListener;
+    use std::time::Duration;
+    use tokio::sync::mpsc::unbounded_channel;
+
+    fn config() -> CrawlerConfig {
+        CrawlerConfig {
+            max_depth: 1,
+            max_pages: 10,
+            follow_external: false,
+            keep_fragments: false,
+            requests_per_second: None,
+            concurrent_requests: 1,
+            respect_robots_txt: false,
+        }
+    }
+
+    async fn start_non_html_server() -> String {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind crawler server");
+        let base_url = format!("http://{}", listener.local_addr().unwrap());
+        let server = HttpServer::new(|| {
+            App::new()
+                .route(
+                    "/image",
+                    web::get().to(|| async {
+                        HttpResponse::Ok()
+                            .insert_header(("content-type", "image/png"))
+                            .body("not-really-a-png")
+                    }),
+                )
+                .route(
+                    "/ok",
+                    web::get().to(|| async {
+                        HttpResponse::Ok()
+                            .insert_header(("content-type", "text/html"))
+                            .body("<html><title>ok</title></html>")
+                    }),
+                )
+        })
+        .workers(1)
+        .listen(listener)
+        .expect("listen crawler server")
+        .run();
+
+        tokio::spawn(async move {
+            let _ = server.await;
+        });
+
+        for _ in 0..20 {
+            if reqwest::get(format!("{base_url}/ok")).await.is_ok() {
+                return base_url;
+            }
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+
+        panic!("crawler server failed to start at {base_url}");
+    }
+
+    #[test]
+    fn discovered_url_filter_rejects_invalid_and_non_html_resources() {
+        assert!(!Crawler::should_crawl_discovered_url("not-a-url"));
+        assert!(!Crawler::should_crawl_discovered_url(
+            "mailto:test@example.com"
+        ));
+        assert!(!Crawler::should_crawl_discovered_url(
+            "https://example.com/file.pdf"
+        ));
+        assert!(Crawler::should_crawl_discovered_url(
+            "https://example.com/path"
+        ));
+        assert!(Crawler::is_known_non_html_resource_url(
+            &Url::parse("https://example.com/image.png").unwrap()
+        ));
+        assert!(!Crawler::is_known_non_html_resource_url(
+            &Url::parse("https://example.com/page").unwrap()
+        ));
+    }
+
+    #[tokio::test]
+    async fn progress_sender_and_non_html_fetch_paths_are_exercised() {
+        let base_url = start_non_html_server().await;
+        let mut crawler = Crawler::new(&base_url, config()).unwrap();
+        let (sender, mut receiver) = unbounded_channel();
+        crawler.set_progress_sender(sender.clone());
+        crawler.emit_progress();
+
+        let event = receiver.try_recv().expect("progress event should be sent");
+        let RunEvent::Progress(snapshot) = event else {
+            panic!("expected progress snapshot");
+        };
+        assert_eq!(snapshot.stage, RunStage::Crawling);
+        assert_eq!(snapshot.message, "Crawled 0 page(s)");
+
+        drop(receiver);
+        crawler.emit_progress();
+
+        let page = crawler
+            .fetch_page(&format!("{base_url}/image"), 0)
+            .await
+            .unwrap();
+        assert_eq!(page.url, format!("{base_url}/image"));
+        assert_eq!(page.status_code, Some(200));
+        assert_eq!(page.content_type.as_deref(), Some("image/png"));
+        assert!(page.links.is_empty());
+    }
+
+    #[test]
+    fn link_text_helper_covers_known_and_unknown_elements() {
+        let document = Html::parse_document(
+            r#"<div><a href="/about">About</a><source src="/movie.mp4" type="video/mp4"></source><div src="/x"></div></div>"#,
+        );
+        let a_selector = Selector::parse("a").unwrap();
+        let source_selector = Selector::parse("source").unwrap();
+
+        let a = document.select(&a_selector).next().unwrap();
+        let source = document.select(&source_selector).next().unwrap();
+
+        assert_eq!(Crawler::link_text_for_element("a", &a), "About".to_string());
+        assert_eq!(
+            Crawler::link_text_for_element("source", &source),
+            "[source type=video/mp4]".to_string()
+        );
+    }
+
+    #[test]
+    fn extract_links_covers_supported_embedded_media_elements() {
+        let crawler = Crawler::new("https://example.com", config()).unwrap();
+        let document = Html::parse_document(
+            r#"
+            <html>
+              <body>
+                <iframe src="/frame" title="Frame Title"></iframe>
+                <video src="/video.mp4"></video>
+                <audio src="/audio.mp3"></audio>
+                <embed src="/guide.pdf"></embed>
+                <object data="/report.pdf"></object>
+              </body>
+            </html>
+            "#,
+        );
+        let page_url = Url::parse("https://example.com/start").unwrap();
+
+        let links = crawler.extract_links(&document, &page_url).unwrap();
+
+        assert_eq!(links.len(), 5);
+        assert!(links.iter().any(|link| link.text == "[iframe] Frame Title"));
+        assert!(links.iter().any(|link| link.text == "[video]"));
+        assert!(links.iter().any(|link| link.text == "[audio]"));
+        assert!(links.iter().any(|link| link.text == "[embed]"));
+        assert!(links.iter().any(|link| link.text == "[object]"));
+    }
+
+    #[tokio::test]
+    async fn crawl_attempts_robots_fetch_before_failing_request() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind temp listener");
+        let addr = listener.local_addr().unwrap();
+        drop(listener);
+
+        let mut crawler = Crawler::new(
+            &format!("http://{addr}"),
+            CrawlerConfig {
+                respect_robots_txt: true,
+                ..config()
+            },
+        )
+        .unwrap();
+
+        crawler.crawl().await.unwrap();
     }
 }

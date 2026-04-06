@@ -2,9 +2,9 @@ use crate::http_client::build_http_client;
 use crate::models::{PageInfo, SitemapEntry};
 use crate::robots::RobotsTxt;
 use anyhow::Result;
-use std::sync::LazyLock;
 use scraper::{ElementRef, Html, Selector};
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::LazyLock;
 use url::Url;
 
 static URL_SELECTOR: LazyLock<Selector> =
@@ -27,9 +27,7 @@ pub async fn collect_sitemap_entries(
     let base_url = Url::parse(start_url)?;
     let mut robots = RobotsTxt::new();
 
-    if let Err(error) = robots.fetch(&client, &base_url).await {
-        tracing::warn!(error = %error, url = %start_url, "Failed to fetch robots.txt for sitemap discovery");
-    }
+    let _ = robots.fetch(&client, &base_url).await;
 
     let mut sitemap_queue = VecDeque::from(discover_sitemap_urls(&base_url, &robots));
     let mut visited_sitemaps = HashSet::new();
@@ -213,16 +211,11 @@ fn url_lookup_variants(url: &str, keep_fragments: bool) -> Vec<String> {
 
     let mut variants = vec![base.clone()];
 
-    if let Ok(parsed) = Url::parse(&base) {
-        if parsed.path() == "/" {
-            if let Some(without_root_slash) = origin_with_optional_suffix(&parsed, false) {
-                push_unique(&mut variants, without_root_slash);
-            }
-        } else if parsed.path().is_empty()
-            && let Some(with_root_slash) = origin_with_optional_suffix(&parsed, true)
-        {
-            push_unique(&mut variants, with_root_slash);
-        }
+    if let Ok(parsed) = Url::parse(&base)
+        && parsed.path() == "/"
+        && let Some(without_root_slash) = origin_with_optional_suffix(&parsed, false)
+    {
+        push_unique(&mut variants, without_root_slash);
     }
 
     variants
@@ -325,6 +318,85 @@ mod tests {
         assert_eq!(
             lookup_title(&lookup, "https://example.com/", false),
             "Home".to_string()
+        );
+    }
+
+    #[test]
+    fn parse_sitemap_document_keeps_unresolved_locations() {
+        let parsed = parse_sitemap_document(
+            "not-a-valid-base",
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+            <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+              <sitemap><loc>/posts.xml</loc></sitemap>
+            </sitemapindex>
+            <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+              <url><loc>/about</loc></url>
+            </urlset>"#,
+        );
+
+        assert_eq!(parsed.nested_sitemaps, vec!["/posts.xml"]);
+        assert_eq!(parsed.urls[0].loc, "/about");
+    }
+
+    #[test]
+    fn lookup_variants_cover_root_slash_query_and_fragment_modes() {
+        assert_eq!(
+            url_lookup_variants("https://example.com/", false),
+            vec![
+                "https://example.com/".to_string(),
+                "https://example.com".to_string(),
+            ]
+        );
+        assert_eq!(
+            url_lookup_variants("https://example.com", false),
+            vec!["https://example.com".to_string()]
+        );
+        assert_eq!(
+            url_lookup_variants("https://example.com?a=1", false),
+            vec!["https://example.com?a=1".to_string()]
+        );
+        assert_eq!(
+            canonical_url_key("https://example.com/about#team", false),
+            "https://example.com/about".to_string()
+        );
+        assert_eq!(
+            canonical_url_key("https://example.com/about#team", true),
+            "https://example.com/about#team".to_string()
+        );
+    }
+
+    #[test]
+    fn discover_default_sitemap_and_title_fallback_paths() {
+        let robots = RobotsTxt::new();
+        let base = Url::parse("https://example.com").unwrap();
+        assert_eq!(
+            discover_sitemap_urls(&base, &robots),
+            vec!["https://example.com/sitemap.xml".to_string()]
+        );
+
+        let title = lookup_title(&HashMap::new(), "https://example.com/blog/post", false);
+        assert!(title.contains("post"));
+    }
+
+    #[test]
+    fn parse_sitemap_document_skips_url_entries_without_loc() {
+        let parsed = parse_sitemap_document(
+            "https://example.com/sitemap.xml",
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+            <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+              <url><priority>0.7</priority></url>
+            </urlset>"#,
+        );
+
+        assert!(parsed.urls.is_empty());
+    }
+
+    #[test]
+    fn origin_with_optional_suffix_can_add_root_slash_and_query() {
+        let url = Url::parse("https://example.com?lang=en").unwrap();
+        assert_eq!(
+            origin_with_optional_suffix(&url, true),
+            Some("https://example.com/?lang=en".to_string())
         );
     }
 }

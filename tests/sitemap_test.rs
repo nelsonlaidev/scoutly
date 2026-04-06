@@ -158,6 +158,80 @@ async fn start_sitemap_test_server(
     base_url
 }
 
+async fn start_duplicate_sitemap_test_server() -> String {
+    let listener = std::net::TcpListener::bind(("127.0.0.1", 0))
+        .expect("Failed to bind duplicate sitemap server");
+    let base_url = format!(
+        "http://{}",
+        listener
+            .local_addr()
+            .expect("Duplicate sitemap server should have an address")
+    );
+
+    let server = HttpServer::new({
+        let base_url = base_url.clone();
+        move || {
+            let base_url = base_url.clone();
+            App::new()
+                .app_data(web::Data::new(base_url))
+                .route(
+                    "/robots.txt",
+                    web::get().to(|base_url: web::Data<String>| async move {
+                        HttpResponse::Ok().content_type("text/plain").body(format!(
+                            "User-agent: *\nSitemap: {}/index.xml\n",
+                            base_url.get_ref()
+                        ))
+                    }),
+                )
+                .route(
+                    "/index.xml",
+                    web::get().to(|base_url: web::Data<String>| async move {
+                        HttpResponse::Ok()
+                            .content_type("application/xml")
+                            .body(format!(
+                                r#"<?xml version="1.0" encoding="UTF-8"?>
+                            <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+                              <sitemap><loc>{}/nested.xml</loc></sitemap>
+                              <sitemap><loc>{}/nested.xml</loc></sitemap>
+                            </sitemapindex>"#,
+                                base_url.get_ref(),
+                                base_url.get_ref()
+                            ))
+                    }),
+                )
+                .route(
+                    "/nested.xml",
+                    web::get().to(|base_url: web::Data<String>| async move {
+                        HttpResponse::Ok()
+                            .content_type("application/xml")
+                            .body(format!(
+                                r#"<?xml version="1.0" encoding="UTF-8"?>
+                            <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+                              <url><loc>{}/about</loc></url>
+                              <url><loc>{}/about</loc></url>
+                            </urlset>"#,
+                                base_url.get_ref(),
+                                base_url.get_ref()
+                            ))
+                    }),
+                )
+        }
+    })
+    .workers(1)
+    .listen(listener)
+    .expect("Failed to start duplicate sitemap server")
+    .run();
+
+    tokio::spawn(async move {
+        if let Err(error) = server.await {
+            eprintln!("Duplicate sitemap server error: {error}");
+        }
+    });
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    base_url
+}
+
 #[tokio::test]
 #[serial_test::serial]
 async fn collect_sitemap_entries_uses_robots_sitemap_and_joins_titles() {
@@ -221,4 +295,37 @@ async fn collect_sitemap_entries_falls_back_to_default_sitemap_url() {
             .iter()
             .any(|entry| entry.url == format!("{}/about", base_url))
     );
+}
+
+#[tokio::test]
+#[serial_test::serial]
+async fn collect_sitemap_entries_tolerates_robots_fetch_failures() {
+    let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("bind temp listener");
+    let addr = listener.local_addr().unwrap();
+    drop(listener);
+
+    let base_url = format!("http://{addr}");
+    let entries = collect_sitemap_entries(&base_url, &HashMap::new(), false)
+        .await
+        .expect("robots fetch failures should not abort sitemap discovery");
+
+    assert!(entries.is_empty());
+}
+
+#[tokio::test]
+#[serial_test::serial]
+async fn collect_sitemap_entries_skips_duplicate_sitemaps_and_urls() {
+    let base_url = start_duplicate_sitemap_test_server().await;
+    let pages = HashMap::from([(
+        format!("{}/about", base_url),
+        page(&format!("{}/about", base_url), Some("About")),
+    )]);
+
+    let entries = collect_sitemap_entries(&base_url, &pages, false)
+        .await
+        .expect("duplicate sitemap entries should be deduplicated");
+
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].url, format!("{}/about", base_url));
+    assert_eq!(entries[0].title, "About");
 }
