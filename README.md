@@ -36,6 +36,34 @@ A fast, lightweight CLI website crawler and SEO analyzer built with Rust. Scoutl
 
 ## Installation
 
+### Prebuilt Binaries
+
+Download the latest release from [GitHub Releases](https://github.com/nelsonlaidev/scoutly/releases/latest) or use one of the following install methods:
+
+**macOS / Linux (Shell Script)**
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/nelsonlaidev/scoutly/releases/latest/download/scoutly-installer.sh | sh
+```
+
+**Windows (PowerShell)**
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/nelsonlaidev/scoutly/releases/latest/download/scoutly-installer.ps1 | iex"
+```
+
+**Homebrew (macOS / Linux)**
+
+```bash
+brew install nelsonlaidev/tap/scoutly
+```
+
+**npm**
+
+```bash
+npm install @nelsonlaidev/scoutly
+```
+
 ### From Source
 
 ```bash
@@ -48,10 +76,6 @@ cargo build --release
 
 # The binary will be at target/release/scoutly
 ```
-
-### Release Process
-
-Release and packaging instructions live in [`RELEASE.md`](RELEASE.md).
 
 ## Usage
 
