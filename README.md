@@ -12,6 +12,8 @@ A fast, lightweight CLI website crawler and SEO analyzer built with Rust. Scoutl
   - Detect missing or multiple H1 tags
   - Find images without alt text
   - Identify thin content
+  - Check for missing Open Graph tags (`og:title`, `og:description`, `og:image`, `og:url`, `og:type`)
+- **Update Checker**: Automatically notifies you when a newer Scoutly release is available
 - **Configuration Files**: Support for JSON, TOML, and YAML configuration files with automatic detection
 - **Default TUI + CLI**: Launch an interactive terminal UI by default, or force the text/JSON CLI when needed
 - **Fast & Concurrent**: Built with Tokio for async I/O and parallel link checking
@@ -240,22 +242,36 @@ Arguments:
   [URL]  The URL to start crawling from (optional in TUI mode)
 
 Options:
-  -d, --depth <DEPTH>              Maximum crawl depth (default: 5)
-  -m, --max-pages <MAX_PAGES>      Maximum number of pages to crawl (default: 200)
-  -o, --output <OUTPUT>            CLI output format: text or json
-      --cli                        Force CLI mode instead of launching the TUI
-      --tui                        Force the interactive TUI
-  -s, --save <SAVE>                Save report to file
-  -e, --external                   Follow external links
-  -v, --verbose                    Verbose output
-      --ignore-redirects           Ignore redirect issues in the report
-      --keep-fragments             Treat URLs with fragment identifiers (#) as unique links
-  -r, --rate-limit <RATE_LIMIT>    Rate limit for requests per second
-  -c, --concurrency <CONCURRENCY>  Number of concurrent requests (default: 5)
+  -d, --depth <DEPTH>
+          Maximum crawl depth (default: 5)
+  -m, --max-pages <MAX_PAGES>
+          Maximum number of pages to crawl (default: 200)
+  -o, --output <OUTPUT>
+          CLI output format: text or json [possible values: text, json]
+      --cli
+          Force CLI mode instead of launching the TUI
+      --tui
+          Force the interactive TUI (errors if no interactive terminal is available)
+  -s, --save <SAVE>
+          Save report to file
+  -e, --external
+          Follow external links
+  -v, --verbose
+          Verbose output
+      --ignore-redirects
+          Ignore redirect issues in the report
+      --keep-fragments
+          Treat URLs with fragment identifiers (#) as unique links
+  -r, --rate-limit <RATE_LIMIT>
+          Rate limit for requests per second (optional, e.g., 1.0 for 1 req/s)
+  -c, --concurrency <CONCURRENCY>
+          Number of concurrent requests (default: 5)
       --respect-robots-txt <RESPECT_ROBOTS_TXT>
-                                   Respect robots.txt rules (default: true)
-      --config <CONFIG>            Path to configuration file (JSON, TOML, or YAML)
-  -h, --help                       Print help
+          Respect robots.txt rules (default: true) [possible values: true, false]
+      --config <CONFIG>
+          Path to configuration file (JSON, TOML, or YAML)
+  -h, --help
+          Print help
 ```
 
 ## Example Output
@@ -373,6 +389,13 @@ Scoutly extracts links from multiple HTML elements:
   - Broken links (4xx and 5xx status codes)
   - Redirect detection (3xx status codes)
 
+- **Open Graph**
+  - Missing `og:title` tag
+  - Missing `og:description` tag
+  - Missing `og:image` tag
+  - Missing `og:url` tag
+  - Missing `og:type` tag
+
 ## Performance
 
 - Asynchronous I/O for fast crawling
@@ -385,7 +408,7 @@ Scoutly extracts links from multiple HTML elements:
 - No JavaScript rendering (only parses initial HTML)
 - Basic content analysis (no detailed text analysis)
 - No authentication support
-- No sitemap export/generation yet
+- No sitemap XML export (sitemap is displayed in the TUI but not exported)
 
 ## Future Enhancements
 
