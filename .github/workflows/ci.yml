@@ -145,6 +145,7 @@ jobs:
       - name: Run govulncheck
         uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
         with:
+          go-version-input: ""
           go-version-file: go.mod
           go-package: ./...
 
@@ -155,6 +156,9 @@ jobs:
     steps:
       - name: Checkout branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check npm license copy
+        run: cmp LICENSE npm/LICENSE
 
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0

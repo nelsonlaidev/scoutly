@@ -119,7 +119,7 @@ func validateJSONDocument(data []byte) error {
 	for decoder.More() {
 		token, err := decoder.Token()
 		if err != nil {
-			return err
+			return normalizeJSONStructureError(err)
 		}
 		key, ok := token.(string)
 		if !ok {
@@ -135,7 +135,7 @@ func validateJSONDocument(data []byte) error {
 
 		var value json.RawMessage
 		if err := decoder.Decode(&value); err != nil {
-			return err
+			return normalizeJSONStructureError(err)
 		}
 		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
 			return fmt.Errorf("field %q cannot be null", key)
@@ -143,7 +143,7 @@ func validateJSONDocument(data []byte) error {
 	}
 
 	if _, err := decoder.Token(); err != nil {
-		return err
+		return normalizeJSONStructureError(err)
 	}
 
 	var extra any
@@ -156,6 +156,13 @@ func validateJSONDocument(data []byte) error {
 	}
 
 	return nil
+}
+
+func normalizeJSONStructureError(err error) error {
+	if errors.Is(err, io.EOF) {
+		return io.ErrUnexpectedEOF
+	}
+	return err
 }
 
 func validateYAMLDocument(document *yaml.Node) error {

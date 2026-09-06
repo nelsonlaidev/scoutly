@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -156,6 +157,10 @@ func TestOptionsRunReportsResolveErrors(t *testing.T) {
 }
 
 func TestOptionsRunMapsInterruptToExitCodeError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.Process.Signal(os.Interrupt) is not supported on Windows")
+	}
+
 	started := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		close(started)

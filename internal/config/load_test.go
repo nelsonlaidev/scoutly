@@ -116,7 +116,7 @@ func TestLoadExplicitPathSkipsDiscovery(t *testing.T) {
 
 func TestLoadExpandsHomeInExplicitPath(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setTestHome(t, home)
 	path := filepath.Join(home, "custom.toml")
 	writeConfig(t, path, 4)
 
@@ -135,7 +135,7 @@ func TestLoadExpandsHomeInExplicitPath(t *testing.T) {
 
 func TestLoadExpandsHomeDirectoryPath(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setTestHome(t, home)
 
 	if _, err := Load(LoadOptions{Directory: t.TempDir(), ConfigPath: "~"}); err == nil || !strings.Contains(err.Error(), "not a regular file") {
 		t.Fatalf("Load() error = %v, want non-regular home path", err)
@@ -151,7 +151,7 @@ func TestLoadReportsWorkingAndHomeDirectoryErrors(t *testing.T) {
 	})
 
 	t.Run("home directory", func(t *testing.T) {
-		t.Setenv("HOME", "")
+		setTestHome(t, "")
 		if _, err := Load(LoadOptions{Directory: t.TempDir(), ConfigPath: "~"}); err == nil || !strings.Contains(err.Error(), "resolve home directory") {
 			t.Fatalf("Load() error = %v, want home-directory context", err)
 		}
@@ -426,6 +426,13 @@ func writeConfig(t *testing.T, path string, maxDepth int) {
 	}
 
 	writeFile(t, path, content)
+}
+
+func setTestHome(t *testing.T, home string) {
+	t.Helper()
+
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 }
 
 func writeFile(t *testing.T, path, content string) {
