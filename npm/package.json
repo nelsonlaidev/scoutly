@@ -1,0 +1,45 @@
+{
+  "name": "@nelsonlaidev/scoutly",
+  "version": "0.0.0",
+  "description": "Fast website auditing CLI",
+  "license": "MIT",
+  "author": "Nelson Lai <me@nelsonlai.dev>",
+  "homepage": "https://github.com/nelsonlaidev/scoutly",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nelsonlaidev/scoutly.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nelsonlaidev/scoutly/issues"
+  },
+  "keywords": [
+    "cli",
+    "crawler",
+    "seo",
+    "website-audit",
+    "golang"
+  ],
+  "bin": {
+    "scoutly": "run-scoutly.js"
+  },
+  "files": [
+    "install.js",
+    "run-scoutly.js"
+  ],
+  "scripts": {
+    "postinstall": "node ./install.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "preferUnplugged": true,
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "adm-zip": "^0.6.0",
+    "tar": "^7.5.22",
+    "undici": "^8.10.2"
+  }
+}

@@ -24,6 +24,13 @@ Install Scoutly on macOS or Linux with Homebrew:
 brew install --cask nelsonlaidev/tap/scoutly
 ```
 
+Or install Scoutly on macOS, Linux, or Windows with npm and Node.js 22.14 or
+newer:
+
+```sh
+npm install --global @nelsonlaidev/scoutly
+```
+
 Prebuilt archives for Linux, macOS, and Windows are available from the
 [latest GitHub release](https://github.com/nelsonlaidev/scoutly/releases/latest).
 
@@ -32,6 +39,25 @@ If Go is already installed, you can instead build and install the CLI directly:
 ```sh
 go install github.com/nelsonlaidev/scoutly/cmd/scoutly@latest
 ```
+
+### Prerelease builds
+
+Prereleases use Semantic Versioning tags such as `v0.5.0-beta.1` and
+`v0.5.0-rc.1`. Install the latest prerelease through the opt-in beta channels:
+
+```sh
+brew install --cask nelsonlaidev/tap/scoutly@beta
+npm install --global @nelsonlaidev/scoutly@beta
+```
+
+GitHub publishes prerelease archives under the exact version tag. Go users can
+also install a specific prerelease directly:
+
+```sh
+go install github.com/nelsonlaidev/scoutly/cmd/scoutly@v0.5.0-rc.1
+```
+
+Stable installations are never advanced to a prerelease automatically.
 
 ## CLI
 
@@ -236,4 +262,14 @@ just tidy
 `just test` enables the race detector and disables cached test results. Tests
 use local HTTP servers and do not depend on public websites. CI additionally
 checks module tidiness, builds and tests on Linux, macOS, and Windows, runs
-`govulncheck`, and uploads coverage from the Linux race-enabled test run.
+`govulncheck`, validates the npm package, and uploads coverage from the Linux
+race-enabled test run.
+
+When changing the npm installer, install its dependencies without running the
+download hook, then test and inspect the package contents:
+
+```sh
+npm --prefix npm ci --ignore-scripts
+npm --prefix npm test
+npm pack ./npm --dry-run
+```

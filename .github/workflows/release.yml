@@ -31,3 +31,46 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+  publish-npm:
+    name: Publish npm package
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Set npm package version and dist-tag
+        shell: bash
+        working-directory: npm
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          npm version "${version}" --no-git-tag-version --allow-same-version
+
+          if [[ "${version}" == *-* ]]; then
+            echo "NPM_DIST_TAG=beta" >> "${GITHUB_ENV}"
+          else
+            echo "NPM_DIST_TAG=latest" >> "${GITHUB_ENV}"
+          fi
+
+      - name: Install npm package dependencies
+        working-directory: npm
+        run: npm ci --ignore-scripts
+
+      - name: Test npm package
+        working-directory: npm
+        run: npm test
+
+      - name: Publish npm package
+        working-directory: npm
+        run: npm publish --access public --tag "${NPM_DIST_TAG}"

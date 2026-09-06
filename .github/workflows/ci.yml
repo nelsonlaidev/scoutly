@@ -147,3 +147,30 @@ jobs:
         with:
           go-version-file: go.mod
           go-package: ./...
+
+  npm-package:
+    name: npm Package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: npm/package-lock.json
+
+      - name: Install npm package dependencies
+        working-directory: npm
+        run: npm ci --ignore-scripts
+
+      - name: Test npm package
+        working-directory: npm
+        run: npm test
+
+      - name: Check npm package contents
+        working-directory: npm
+        run: npm pack --dry-run

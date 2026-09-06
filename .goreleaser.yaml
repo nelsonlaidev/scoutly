@@ -31,8 +31,12 @@ archives:
       - goos: windows
         formats: [zip]
 
+release:
+  prerelease: auto
+  make_latest: '{{ if .Prerelease }}false{{ else }}true{{ end }}'
+
 homebrew_casks:
-  - name: scoutly
+  - name: '{{ if .Prerelease }}scoutly@beta{{ else }}scoutly{{ end }}'
     ids:
       - default
     binaries:
@@ -46,7 +50,7 @@ homebrew_casks:
     homepage: 'https://github.com/nelsonlaidev/scoutly'
     description: 'Fast website auditing tool'
     commit_msg_template: 'chore: update scoutly to {{ .Tag }}'
-    skip_upload: auto
+    skip_upload: false
     hooks:
       post:
         install: |

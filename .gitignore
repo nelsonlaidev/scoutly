@@ -3,6 +3,8 @@ dist/
 
 # Binaries
 /scoutly
+/npm/bin/
+/npm/node_modules/
 
 # Coverage
 coverage.out
