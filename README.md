@@ -244,7 +244,7 @@ sitemap documents to 50 MiB and 50,000 entries.
 
 ## Development
 
-Development requires Go 1.26.5 or newer, [just](https://github.com/casey/just),
+Development requires Go 1.26.6 or newer, [just](https://github.com/casey/just),
 and golangci-lint v2. Clone the repository and run the project checks with:
 
 ```sh
