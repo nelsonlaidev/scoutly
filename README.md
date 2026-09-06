@@ -18,9 +18,16 @@ and an importable Go library.
 
 ## Installation
 
-Download a prebuilt archive for Linux, macOS, or Windows from the
-[latest GitHub release](https://github.com/nelsonlaidev/scoutly/releases/latest),
-or, if Go is already installed, install the CLI directly:
+Install Scoutly on macOS or Linux with Homebrew:
+
+```sh
+brew install --cask nelsonlaidev/tap/scoutly
+```
+
+Prebuilt archives for Linux, macOS, and Windows are available from the
+[latest GitHub release](https://github.com/nelsonlaidev/scoutly/releases/latest).
+
+If Go is already installed, you can instead build and install the CLI directly:
 
 ```sh
 go install github.com/nelsonlaidev/scoutly/cmd/scoutly@latest

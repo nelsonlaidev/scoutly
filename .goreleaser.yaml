@@ -31,6 +31,30 @@ archives:
       - goos: windows
         formats: [zip]
 
+homebrew_casks:
+  - name: scoutly
+    ids:
+      - default
+    binaries:
+      - scoutly
+    repository:
+      owner: nelsonlaidev
+      name: homebrew-tap
+      branch: main
+      token: '{{ .Env.HOMEBREW_TAP_TOKEN }}'
+    directory: Casks
+    homepage: 'https://github.com/nelsonlaidev/scoutly'
+    description: 'Fast website auditing tool'
+    commit_msg_template: 'chore: update scoutly to {{ .Tag }}'
+    skip_upload: auto
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr",
+                           args: ["-dr", "com.apple.quarantine", "#{staged_path}/scoutly"]
+          end
+
 changelog:
   sort: asc
   filters:
