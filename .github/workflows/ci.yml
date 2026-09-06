@@ -2,8 +2,8 @@ name: Continuous Integration
 
 on:
   push:
-    branches: ['**']
-    tags-ignore: ['v*']
+    branches: ["**"]
+    tags-ignore: ["v*"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CARGO_TERM_COLOR: always
+  GOTOOLCHAIN: local
 
 permissions:
   contents: read
@@ -22,44 +22,37 @@ jobs:
   ci:
     name: Build and Test (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    needs: [clippy, format, audit]
+    needs: [lint, format, audit]
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
             name: Linux
           - os: macos-latest
-            target: x86_64-apple-darwin
             name: macOS
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            name: macOS ARM
           - os: windows-latest
-            target: x86_64-pc-windows-msvc
             name: Windows
 
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          targets: ${{ matrix.target }}
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
-      - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.target }}
+      - name: Download modules
+        run: go mod download
 
       - name: Build
-        run: cargo build --locked --verbose --target ${{ matrix.target }}
+        run: go build ./cmd/scoutly
 
       - name: Run tests
-        run: cargo test --locked --verbose --target ${{ matrix.target }}
+        run: go test -count=1 ./...
 
   coverage:
     name: Code Coverage
@@ -69,51 +62,54 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Cache cargo-tarpaulin
-        uses: actions/cache@v4
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          path: ~/.cargo/bin/cargo-tarpaulin
-          key: ${{ runner.os }}-cargo-tarpaulin-${{ hashFiles('**/Cargo.lock') }}
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
-      - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin --locked --force
-        continue-on-error: false
-
-      - name: Run tarpaulin
-        run: cargo tarpaulin --out Xml --ignore-tests --timeout 300
+      - name: Run tests with coverage
+        run: go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
 
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.out
+          disable_search: true
           fail_ci_if_error: false
 
-  clippy:
-    name: Clippy
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          components: clippy
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
-      - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
+      - name: Check module files
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
 
-      - name: Run Clippy
-        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      - name: Verify downloaded modules
+        run: go mod verify
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.13
 
   format:
     name: Check formatting
@@ -121,35 +117,33 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          components: rustfmt
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
-      - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.13
+          install-only: true
 
       - name: Check formatting
-        run: cargo fmt --all -- --check
+        run: |
+          gofmt -l -w .
+          golangci-lint fmt
+          git diff --exit-code
 
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Checkout branch
-        uses: actions/checkout@v4
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked --force
-
-      - name: Run security audit
-        run: cargo audit
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
+        with:
+          go-version-file: go.mod
+          go-package: ./...

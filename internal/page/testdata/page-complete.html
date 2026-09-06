@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Example Page</title>
+    <meta name="description" content="An example page used to test HTML extraction." />
+    <meta property="og:title" content="Example Open Graph Title" />
+    <meta property="og:description" content="Example Open Graph description." />
+    <meta property="og:image" content="/images/social.png" />
+    <meta property="og:image" content="/images/social-wide.png" />
+    <meta property="og:url" content="https://example.com/articles/page.html" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Example Site" />
+    <meta property="og:locale" content="en_US" />
+  </head>
+  <body>
+    <h1>Main <span>heading</span></h1>
+    <h1>Secondary heading</h1>
+
+    <a href="../about?source=page#team"> About <span>us</span> </a>
+    <a href="https://example.com:8443/status">Different port</a>
+    <a href="https://other.example/contact">External contact</a>
+    <a href="#details">Details</a>
+    <a href="mailto:hello@example.com">Email us</a>
+    <a href="http://[invalid">Invalid URL</a>
+
+    <iframe src="/frame.html" title="Example frame"></iframe>
+    <video src="/media/intro.mp4"></video>
+    <source src="/media/intro.webm" type="video/webm" />
+    <source src="/media/intro.ogv" />
+    <audio src="/media/intro.mp3"></audio>
+    <embed src="/media/document.pdf" />
+    <object data="/media/chart.svg"></object>
+
+    <picture>
+      <source srcset="/images/hero-small.webp 480w, /images/hero-large.webp 960w" />
+      <img
+        src="/images/hero.jpg"
+        srcset="/images/hero@2x.jpg 2x, https://cdn.example.com/hero@3x.jpg 3x"
+        alt="Example hero"
+      />
+    </picture>
+    <img src="https://cdn.example.com/logo.svg" />
+    <img src="https://[invalid" alt="Invalid image URL" />
+  </body>
+</html>

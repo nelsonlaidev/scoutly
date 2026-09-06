@@ -2,33 +2,37 @@
 
 ## Project Structure & Module Organization
 
-- `src/` contains the Rust crate: `main.rs` is the CLI entry point, `lib.rs` orchestrates runs, and focused modules handle crawling, link checking, SEO analysis, reporting, config loading, robots rules, and HTTP behavior.
-- `tests/` holds integration-style coverage. Use `tests/*_test.rs` for behavior suites, `tests/server/` for local Actix-based test servers, and `tests/static/` for HTML fixtures.
-- `target/` is generated build output. CI and release automation live in `.github/workflows/`.
+- `cmd/scoutly/` contains the executable entry point, CLI flags, signal handling, and CLI/TUI mode selection.
+- `audit/` is the public library package. It owns audit orchestration, options, progress events, report models, and report construction.
+- `internal/` contains implementation packages for crawling, fetching, resource checking, page parsing, configuration, robots.txt, sitemaps, CLI output, and the TUI. Keep implementation-only packages internal unless callers need a stable public API.
+- Tests live beside the code as `*_test.go`. Package fixtures belong in a nearby `testdata/` directory, and shared test-only helpers belong in `internal/testutil/`.
+- `go.mod` and `go.sum` define the module and toolchain requirements. Development recipes live in `justfile`, lint configuration in `.golangci.yml`, and CI/release automation in `.github/workflows/`.
 
 ## Build, Test, and Development Commands
 
-- `cargo build` compiles the debug binary.
-- `cargo build --release` builds the distributable CLI at `target/release/scoutly`.
-- `cargo run -- https://example.com --verbose` runs the crawler locally.
-- `cargo test` runs the full test suite.
-- `cargo fmt --all` formats Rust code.
-- `cargo clippy --all-targets --all-features -- -D warnings` enforces lint-clean code.
-- `cargo tarpaulin --out Xml --ignore-tests` generates the coverage report used in CI.
-- Optional: `lefthook install` enables the pre-commit `fmt` and `clippy` hooks.
+- `just build` compiles the CLI to `./scoutly` using `go build ./cmd/scoutly`.
+- `just run https://example.com --progress never` runs the crawler locally.
+- `just test` runs `go test -race -count=1 ./...` across every package.
+- `just test-cover` writes an atomic coverage profile to `coverage.out` and prints the function summary.
+- `just fmt` applies `gofmt` and the formatters configured in `.golangci.yml`.
+- `just lint` runs `go vet ./...` and golangci-lint.
+- `just tidy` updates `go.mod` and `go.sum`; review both files after running it.
+- The equivalent raw Go commands are acceptable when `just` is unavailable.
 
 ## Coding Style & Naming Conventions
 
-- Follow `rustfmt` defaults: 4-space indentation and standard Rust formatting.
-- Use `snake_case` for files, modules, functions, and tests; use `CamelCase` for types and enums.
-- Keep CLI/output concerns in `cli`, `lib`, and `reporter`; keep crawl and network behavior in their dedicated modules.
-- Prefer small, focused functions and return `anyhow::Result` for fallible top-level flows.
+- Let `gofmt` and the configured goimports formatter determine source and import formatting.
+- Use short lowercase package names, `snake_case.go` file names where multiple words are needed, `PascalCase` for exported identifiers, and `camelCase` for unexported identifiers. Preserve conventional initialisms such as `URL`, `HTTP`, and `CLI`.
+- Put stable caller-facing types and behavior in `audit`; keep executable, output, TUI, and implementation concerns in `cmd/scoutly` or the relevant `internal` package.
+- Pass `context.Context` as the first parameter for cancellable work, propagate cancellation, wrap errors with operation context using `%w`, and avoid logging from library packages.
+- Prefer small, focused functions and the standard library. Add dependencies only when their production value justifies the maintenance cost.
 
 ## Testing Guidelines
 
-- Add or update tests in the closest matching `tests/<area>_test.rs` file.
-- Prefer deterministic fixture-based coverage using `tests/static/` or the helpers in `tests/server/mod.rs`.
-- CI enforces formatting, clippy, cross-platform tests, and Codecov thresholds of 95% project coverage (excluding `src/main.rs`).
+- Add or update tests in the closest matching `*_test.go` file. Use external test packages only when the public API boundary is what the test needs to exercise.
+- Prefer deterministic table-driven tests, `httptest` servers, package-local `testdata/` fixtures, and the helpers in `internal/testutil/`. Do not depend on public websites.
+- Call `t.Parallel()` only when the test does not mutate process-wide state, environment, working directories, or shared fixtures.
+- CI enforces module tidiness, formatting, `go vet`, golangci-lint, `govulncheck`, cross-platform build/test coverage, and a Linux race-enabled coverage run uploaded to Codecov.
 
 ## Commit & Pull Request Guidelines
 
@@ -38,5 +42,6 @@
 
 ## Configuration & Security Tips
 
-- Validate config handling with `scoutly.{json,toml,yaml}` or `~/.config/scoutly/config.*`.
-- Do not commit secrets or real crawl credentials; use local fixtures for repeatable regression tests.
+- Validate config discovery with `scoutly.config.*`, `scoutly.*`, and `.scoutly.*` JSON, YAML, or TOML fixtures in an isolated temporary directory.
+- Keep HTTP behavior deterministic and bounded: preserve request cancellation, response-size limits, redirect limits, robots.txt handling, and configured concurrency/rate limits.
+- Do not commit secrets or real crawl credentials; use local fixtures and `httptest` servers for repeatable regression tests.

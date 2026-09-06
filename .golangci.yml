@@ -1,0 +1,46 @@
+version: '2'
+
+linters:
+  default: none
+
+  enable:
+    # Core correctness
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    # Error handling
+    - errorlint
+    - nilerr
+
+    # Web and security
+    - bodyclose
+    - gosec
+
+    # Maintenance
+    - misspell
+    - nolintlint
+    - unconvert
+
+    # Modernization
+    - modernize
+
+  settings:
+    misspell:
+      locale: US
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/nelsonlaidev/scoutly
+
+run:
+  timeout: 3m
+  relative-path-mode: gomod

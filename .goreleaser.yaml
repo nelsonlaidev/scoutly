@@ -1,0 +1,51 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - binary: scoutly
+    main: ./cmd/scoutly/
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - arm64
+      - amd64
+      - '386'
+
+archives:
+  - formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+  groups:
+    - title: 'New Features'
+      regexp: '^.*?feat(\(.+\))?!?: .+$'
+      order: 0
+    - title: 'Bug Fixes'
+      regexp: '^.*?fix(\(.+\))?!?: .+$'
+      order: 1
+    - title: 'Performance'
+      regexp: '^.*?perf(\(.+\))?!?: .+$'
+      order: 2
+    - title: 'Others'
+      order: 999

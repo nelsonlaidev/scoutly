@@ -1,444 +1,232 @@
 # Scoutly
 
-A fast, lightweight CLI website crawler and SEO analyzer built with Rust. Scoutly is inspired by Scrutiny and helps you analyze websites for broken links, SEO issues, and overall site health.
+Scoutly audits a website by crawling its HTML pages, analyzing common SEO
+problems, and checking discovered links and images.
 
-## Features
+Scoutly provides a script-friendly CLI, a keyboard-driven terminal interface,
+and an importable Go library.
 
-- **Website Crawling**: Recursively crawl websites with configurable depth limits
-- **Link Checking**: Validate all internal and external links, detect broken links (404s, 500s), and record transport failures explicitly
-- **SEO Analysis**:
-  - Check for missing or poorly optimized title tags
-  - Validate meta descriptions
-  - Detect missing or multiple H1 tags
-  - Find images without alt text
-  - Identify thin content
-  - Check for missing Open Graph tags (`og:title`, `og:description`, `og:image`, `og:url`, `og:type`)
-- **Update Checker**: Automatically notifies you when a newer Scoutly release is available
-- **Configuration Files**: Support for JSON, TOML, and YAML configuration files with automatic detection
-- **Default TUI + CLI**: Launch an interactive terminal UI by default, or force the text/JSON CLI when needed
-- **Fast & Concurrent**: Built with Tokio for async I/O and parallel link checking
-- **robots.txt Support**: Respects robots.txt rules by default
+## Highlights
 
-## Prerequisites
-
-- **Rust** (1.91 or later) - [Install Rust](https://www.rust-lang.org/tools/install)
-- **Cargo** (comes with Rust)
-
-### Optional Development Tools
-
-- **Lefthook** - Git hooks manager for running linters and formatters automatically
-
-  ```bash
-  # macOS
-  brew install lefthook
-
-  # After installation, initialize hooks
-  lefthook install
-  ```
+- Crawl same-origin HTML pages with configurable depth, page, concurrency, and
+  request-rate limits.
+- Find broken or redirected links and validate discovered images.
+- Flag common SEO problems involving titles, meta descriptions, H1 headings,
+  image alt text, thin content, and Open Graph metadata.
+- Respect robots.txt rules and discover pages from XML and gzip sitemaps.
+- Explore results interactively or emit text and machine-readable JSON reports.
 
 ## Installation
 
-### Prebuilt Binaries
+Download a prebuilt archive for Linux, macOS, or Windows from the
+[latest GitHub release](https://github.com/nelsonlaidev/scoutly/releases/latest),
+or, if Go is already installed, install the CLI directly:
 
-Download the latest release from [GitHub Releases](https://github.com/nelsonlaidev/scoutly/releases/latest) or use one of the following install methods:
-
-**macOS / Linux (Shell Script)**
-
-```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/nelsonlaidev/scoutly/releases/latest/download/scoutly-installer.sh | sh
+```sh
+go install github.com/nelsonlaidev/scoutly/cmd/scoutly@latest
 ```
 
-**Windows (PowerShell)**
+## CLI
 
-```powershell
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/nelsonlaidev/scoutly/releases/latest/download/scoutly-installer.ps1 | iex"
-```
+Audit a website by passing its URL:
 
-**Homebrew (macOS / Linux)**
-
-```bash
-brew install nelsonlaidev/tap/scoutly
-```
-
-**npm**
-
-```bash
-npm install @nelsonlaidev/scoutly
-```
-
-### From Source
-
-```bash
-# Clone the repository
-git clone https://github.com/nelsonlaidev/scoutly.git
-cd scoutly
-
-# Build the project
-cargo build --release
-
-# The binary will be at target/release/scoutly
-```
-
-## Usage
-
-### Default TUI
-
-```bash
-# Launch the interactive TUI (default in an interactive terminal)
-scoutly
-
-# Launch the TUI with a pre-filled URL and start immediately
+```sh
 scoutly https://example.com
-
-# Specify custom depth and page limits
-scoutly https://example.com --depth 3 --max-pages 100
-
-# Force the TUI explicitly
-scoutly https://example.com --tui
 ```
 
-### CLI and JSON Modes
+Run Scoutly without a URL in an interactive terminal to open the full-screen
+TUI:
 
-```bash
-# Force the text report instead of the TUI
-scoutly https://example.com --cli
-
-# Output machine-readable JSON instead of launching the TUI
-scoutly https://example.com --output json
-
-# Save the final report to a file
-scoutly https://example.com --cli --save report.json
+```sh
+scoutly
 ```
 
-### More Options
+CLI flags and the discovered config file initialize the TUI fields:
 
-```bash
-# Follow external links (by default, only internal links are followed)
-scoutly https://example.com --external
-
-# Ignore redirect issues in the report
-scoutly https://example.com --ignore-redirects
-
-# Treat URLs with fragment identifiers (#) as unique links
-scoutly https://example.com --keep-fragments
-
-# Combine options
-scoutly https://example.com --cli --depth 4 --max-pages 200 --verbose --ignore-redirects --save report.json
+```sh
+scoutly --max-depth 2 --max-pages 100 --concurrency 10
 ```
 
-### TUI Key Bindings
+When a URL is supplied, the final report is written to standard output, while
+errors and optional progress remain on standard error.
 
-The default TUI is keyboard-first and intentionally close to tools like `llmfit`. If you launch `scoutly` without a URL, the TUI opens a URL input first:
+```sh
+scoutly https://example.com --max-depth 2 --max-pages 100
+scoutly https://example.com --format json
+scoutly https://example.com --progress never
+```
 
-| Key                        | Action                                                                                |
-| -------------------------- | ------------------------------------------------------------------------------------- |
-| `j` / `k` or `Up` / `Down` | Move within active section                                                            |
-| `Tab` / `Shift-Tab`        | Switch result section (`By Page`, `By Link URL`, `By Status`, `Sitemap`, `All Links`) |
-| `/`                        | Enter search mode                                                                     |
-| `f`                        | Cycle severity filter (`By Page`)                                                     |
-| `s`                        | Cycle sort mode (`By Page`)                                                           |
-| `Enter`                    | Toggle the detail pane                                                                |
-| `q` / `Esc`                | Quit                                                                                  |
+Pressing `Ctrl+C` cancels every outstanding request, produces no partial
+report, and exits with status 130. Inside the TUI, `Ctrl+C` cancels a running
+audit without closing the interface; on other screens it exits normally.
 
-When Scoutly is not attached to an interactive terminal, it automatically falls back to the CLI unless you explicitly pass `--tui`.
+Running without a URL when standard input or standard output is not attached
+to a terminal fails instead of waiting for interactive input.
 
-### Configuration Files
+### TUI
 
-Scoutly supports configuration files in JSON, TOML, or YAML format. Configuration files allow you to set default values for options without having to specify them on the command line every time.
+The setup screen contains the target URL and every audit option in one
+scrollable form. Use `Tab` or `Enter` to move forward, `Shift+Tab` to move back,
+and `Space` to toggle settings. You can also click a field to focus it or click
+a confirmation choice directly. Submit or click the final `Run audit` button
+to start.
 
-#### Default Configuration Paths
+While an audit is running, Scoutly displays the active phase, elapsed time,
+page and resource counters, the current URL, and the 200 most recent activity
+entries. Scroll the recent activity pane with the mouse wheel; scrolling up
+pauses automatic following until you return to the bottom. Cancelling or
+failing an audit keeps the configured fields available for editing and
+retrying.
 
-Scoutly automatically looks for configuration files in the following locations (in order of priority):
+Completed reports include five views:
 
-1. **Current directory:**
-   - `scoutly.json`
-   - `scoutly.toml`
-   - `scoutly.yaml`
-   - `scoutly.yml`
+- `1`–`5`: Overview, Issues, Pages, Links, and Images
+- `/`: search the current result list
+- `f`: cycle the current tab's filters
+- `Tab`: switch between list and detail panes
+- Arrow keys and Page Up/Down: navigate tabs, results, and details
+- `Enter`: open or close full-page details at widths below 100 columns
+- `n`: configure another audit while preserving the previous fields
+- `q`: leave the TUI
 
-2. **User config directory:**
-   - Linux/macOS: `~/.config/scoutly/config.{json,toml,yaml,yml}`
-   - Windows: `%APPDATA%\scoutly\config.{json,toml,yaml,yml}`
+You can also click a result tab or overview summary card, focus the search
+field, cycle the current filter, select a result row, or focus a result pane.
+The mouse wheel scrolls the result list or the overview and detail pane under
+the pointer. At widths below 100 columns, clicking a row opens its details;
+press `Esc` to return to the list.
 
-#### Example Configuration Files
+At widths of 100 columns or more, result lists and details appear side by side.
+Widths from 70 to 99 columns use one pane at a time. Smaller terminals show a
+resize prompt without discarding the current state. Reports remain in the
+alternate-screen TUI and are not written to standard output when the TUI exits.
 
-All configuration fields are optional. You can provide only the fields you want to customize.
+### Configuration
 
-**JSON** (`scoutly.json`):
+Scoutly automatically discovers one of the following files in the current
+directory:
 
-```json
-{
-  "depth": 10,
-  "max_pages": 500,
-  "cli": true,
-  "output": "json",
-  "external": true,
-  "verbose": true,
-  "ignore_redirects": false,
-  "keep_fragments": false,
-  "rate_limit": 2.0,
-  "concurrency": 10,
-  "respect_robots_txt": true
+- `scoutly.config.{json,yaml,yml,toml}`
+- `scoutly.{json,yaml,yml,toml}`
+- `.scoutly.{json,yaml,yml,toml}`
+
+Configuration keys use snake case. CLI flags override file values, and file
+values override defaults.
+
+```toml
+max_depth = 2
+max_pages = 100
+keep_fragments = false
+ignore_redirects = false
+rate_limit = 5
+respect_robots = true
+sitemaps = true
+images = true
+max_sitemap_documents = 1000
+timeout = 30000
+max_redirects = 10
+user_agent = "scoutly/custom"
+concurrency = 20
+format = "text"
+progress = "auto"
+```
+
+`timeout` is expressed in milliseconds. `rate_limit = 0` disables global
+request rate limiting. Supported progress modes are `auto`, `always`, and
+`never`.
+
+Use an explicit file or disable discovery:
+
+```sh
+scoutly https://example.com --config ./audit.toml
+scoutly https://example.com --no-config
+```
+
+Discovery fails when more than one conventional config file exists. JSON,
+YAML, and TOML parsing is strict: unknown fields, duplicate fields, null
+values, and multiple documents are rejected.
+
+## Go library
+
+Start with `DefaultOptions`, change the desired values, and pass a context to
+`Audit`:
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	"github.com/nelsonlaidev/scoutly/audit"
+)
+
+func main() {
+	options := audit.DefaultOptions()
+	options.MaxDepth = 2
+	options.MaxPages = 100
+
+	report, err := audit.Audit(
+		context.Background(),
+		"https://example.com",
+		options,
+		func(progress audit.Progress) error {
+			fmt.Printf("%s: %s\n", progress.Phase, progress.CurrentURL)
+			return nil
+		},
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("%d issues\n", report.Summary.Issues.Total)
 }
 ```
 
-**TOML** (`scoutly.toml`):
+`Audit` returns a nil report on cancellation, invalid input, or progress
+callback failure.
 
-```toml
-depth = 10
-max_pages = 500
-cli = true
-output = "json"
-external = true
-verbose = true
-ignore_redirects = false
-keep_fragments = false
-rate_limit = 2.0
-concurrency = 10
-respect_robots_txt = true
+The JSON representation of `Report` uses stable snake_case field names.
+
+## Audit behavior
+
+- Crawling follows same-origin HTTP(S) links from `<a>` and `<iframe>` elements
+  in deterministic breadth-first order. An initial redirect establishes the
+  effective crawl origin, whose robots.txt policy and sitemaps are then used.
+- External links are checked but never crawled.
+- robots.txt is respected by default. A missing 4xx robots file allows
+  crawling; failures that prevent determining the policy stop the audit with
+  an error rather than producing an empty report.
+- XML sitemap indexes, URL sets, namespaces, and gzip documents are supported.
+  Sitemap-only pages are recorded at depth `-1`.
+- Link and image requests are deduplicated by fragment-free URL, including
+  resources that appear as both a link and an image.
+- Image discovery covers `img src`, `img srcset`, `picture source srcset`, and
+  `og:image`.
+- Image checks inspect HTTP status and `Content-Type`; they do not decode image
+  contents or inspect dimensions.
+
+HTML responses are limited to 10 MiB, robots.txt to 512 KiB, and decompressed
+sitemap documents to 50 MiB and 50,000 entries.
+
+## Development
+
+Development requires Go 1.26.5 or newer, [just](https://github.com/casey/just),
+and golangci-lint v2. Clone the repository and run the project checks with:
+
+```sh
+git clone https://github.com/nelsonlaidev/scoutly.git
+cd scoutly
+go mod download
+just build
+just fmt
+just lint
+just test
+just test-cover
+just tidy
 ```
 
-**YAML** (`scoutly.yaml`):
-
-```yaml
-depth: 10
-max_pages: 500
-cli: true
-output: json
-external: true
-verbose: true
-ignore_redirects: false
-keep_fragments: false
-rate_limit: 2.0
-concurrency: 10
-respect_robots_txt: true
-```
-
-#### Using a Custom Config File
-
-You can specify a custom configuration file path using the `--config` option:
-
-```bash
-scoutly https://example.com --config ./my-config.json
-```
-
-#### Configuration Priority
-
-Command-line arguments always take precedence over configuration file values. For example:
-
-```bash
-# If scoutly.json sets depth to 10, this command will use depth 15
-scoutly https://example.com --depth 15
-```
-
-This allows you to set sensible defaults in your config file while still being able to override them when needed.
-
-### Command Line Options
-
-```
-Usage: scoutly [OPTIONS] [URL]
-
-Arguments:
-  [URL]  The URL to start crawling from (optional in TUI mode)
-
-Options:
-  -d, --depth <DEPTH>
-          Maximum crawl depth (default: 5)
-  -m, --max-pages <MAX_PAGES>
-          Maximum number of pages to crawl (default: 200)
-  -o, --output <OUTPUT>
-          CLI output format: text or json [possible values: text, json]
-      --cli
-          Force CLI mode instead of launching the TUI
-      --tui
-          Force the interactive TUI (errors if no interactive terminal is available)
-  -s, --save <SAVE>
-          Save report to file
-  -e, --external
-          Follow external links
-  -v, --verbose
-          Verbose output
-      --ignore-redirects
-          Ignore redirect issues in the report
-      --keep-fragments
-          Treat URLs with fragment identifiers (#) as unique links
-  -r, --rate-limit <RATE_LIMIT>
-          Rate limit for requests per second (optional, e.g., 1.0 for 1 req/s)
-  -c, --concurrency <CONCURRENCY>
-          Number of concurrent requests (default: 5)
-      --respect-robots-txt <RESPECT_ROBOTS_TXT>
-          Respect robots.txt rules (default: true) [possible values: true, false]
-      --config <CONFIG>
-          Path to configuration file (JSON, TOML, or YAML)
-  -h, --help
-          Print help
-```
-
-## Example Output
-
-### Default TUI
-
-Running `scoutly https://example.com` in an interactive terminal opens the Ratatui dashboard with:
-
-- a live status/header bar
-- pages / links / error / warning counters
-- five result sections: By Page, By Link URL, By Status, Sitemap, and All Links
-- searchable browsing across the active section, including sitemap URL/title/priority/frequency rows
-- page-only severity/sort controls in the By Page section
-- a detail pane for the selected page, link URL group, status bucket, sitemap row, or individual link
-- a footer showing the active mode and available keys
-
-### Text Report
-
-```
-================================================================================
-Scoutly - Crawl Report
-================================================================================
-
-Start URL: https://example.com
-Timestamp: 2025-11-03T16:05:29.911833+00:00
-
-Summary
-  Total Pages Crawled: 15
-  Total Links Found:   127
-  Broken Links:        2
-  Errors:              3
-  Warnings:            8
-  Info:                5
-
-Pages with Issues
-
-  URL: https://example.com/about
-    Status: 200
-    Depth:  1
-    Title:  About Us
-    Issues:
-      [WARN ] Page is missing a meta description
-      [WARN ] 3 image(s) missing alt text
-
-  URL: https://example.com/contact
-    Status: 200
-    Depth:  1
-    Title:  Contact
-    Issues:
-      [ERROR] Broken link: https://example.com/old-page (HTTP 404)
-```
-
-### JSON Report
-
-Use `--output json` to get machine-readable output suitable for integration with other tools or CI/CD pipelines. In JSON mode, Scoutly writes the report JSON to stdout and keeps human-oriented progress/status messages off stdout so the output stays parseable. Link objects also include an optional `check_error` field when a link fails due to a transport-level error instead of an HTTP response.
-
-## How It Works
-
-```mermaid
-graph TD
-    A([Start URL]) --> B[Crawler]
-    B -->|Fetch HTML| C{Parse Page}
-    C -->|Extract Links| D[Link Queue]
-    C -->|Extract Metadata| E[Page Data]
-    D -->|Under Depth Limit?| B
-    D --> F[Link Checker]
-    F -->|Concurrent Requests| G[Link Status]
-    E --> H[SEO Analyzer]
-    H -->|Check Rules| I[SEO Issues]
-    G --> J[Report Generator]
-    I --> J
-    J --> K([TUI / CLI / JSON Output])
-```
-
-1. **Crawling**: Starting from the provided URL, Scoutly fetches each page and extracts all links from various HTML elements (anchor tags, iframes, media elements, embeds, etc.)
-2. **Link Discovery**: Internal links (same domain) are queued for crawling based on depth limits
-3. **Link Validation**: All discovered links are checked asynchronously for HTTP status codes
-4. **SEO Analysis**: Each page is analyzed for common SEO issues
-5. **Report Generation**: Results are compiled into a comprehensive report
-
-### Link Extraction
-
-Scoutly extracts links from multiple HTML elements:
-
-- `<a href>` - Standard hyperlinks
-- `<iframe src>` - Embedded content
-- `<video src>` and `<source src>` - Video content
-- `<audio src>` - Audio content
-- `<embed src>` - Embedded plugins
-- `<object data>` - Embedded objects
-
-## SEO Checks Performed
-
-- **Title Tag**
-  - Missing title
-  - Title too short (< 50 characters, recommended: 50-60)
-  - Title too long (> 60 characters, recommended: 50-60)
-
-- **Meta Description**
-  - Missing meta description
-  - Description too short (< 150 characters, recommended: 150-160)
-  - Description too long (> 160 characters, recommended: 150-160)
-
-- **Headings**
-  - Missing H1 tag
-  - Multiple H1 tags
-
-- **Images**
-  - Missing alt attributes
-
-- **Content**
-  - Thin content detection (checks if page has fewer than 5 content indicators)
-
-- **Links**
-  - Broken links (4xx and 5xx status codes)
-  - Redirect detection (3xx status codes)
-
-- **Open Graph**
-  - Missing `og:title` tag
-  - Missing `og:description` tag
-  - Missing `og:image` tag
-  - Missing `og:url` tag
-  - Missing `og:type` tag
-
-## Performance
-
-- Asynchronous I/O for fast crawling
-- Concurrent link checking
-- Configurable limits to prevent excessive resource usage
-- Typical crawl speed: 10-20 pages per second (depending on target site and network)
-
-## Limitations (Basic Version)
-
-- No JavaScript rendering (only parses initial HTML)
-- Basic content analysis (no detailed text analysis)
-- No authentication support
-- No sitemap XML export (sitemap is displayed in the TUI but not exported)
-
-## Future Enhancements
-
-- JavaScript rendering with headless browser support
-- Sitemap export/generation (XML)
-- Authentication support
-- More advanced SEO checks (keyword density, structured data)
-- Additional TUI views and filters
-- HTML validation
-- Accessibility checks (WCAG compliance)
-- PDF and document crawling
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Author
-
-- [@nelsonlaidev](https://github.com/nelsonlaidev)
-
-## Donation
-
-If you find this project helpful, consider supporting me by [sponsoring the project](https://github.com/sponsors/nelsonlaidev).
-
-## License
-
-This project is open source and available under the [MIT License](LICENSE).
-
----
-
-<p align="center">
-Made with ❤️ in Hong Kong
-</p>
+`just test` enables the race detector and disables cached test results. Tests
+use local HTTP servers and do not depend on public websites. CI additionally
+checks module tidiness, builds and tests on Linux, macOS, and Windows, runs
+`govulncheck`, and uploads coverage from the Linux race-enabled test run.
