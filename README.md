@@ -21,7 +21,7 @@ and an importable Go library.
 Install Scoutly on macOS or Linux with Homebrew:
 
 ```sh
-brew install --cask nelsonlaidev/tap/scoutly
+brew install nelsonlaidev/tap/scoutly
 ```
 
 Or install Scoutly on macOS, Linux, or Windows with npm and Node.js 22.14 or
