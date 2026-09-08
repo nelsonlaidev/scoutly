@@ -44,10 +44,16 @@
 - Keep commits scoped and imperative, e.g. `fix: preserve machine-readable JSON output`.
 - PRs should summarize user-visible changes, link related issues, list verification commands, and include sample CLI output when flags or reports change.
 
+## Releases
+
+- Scoutly is tag-driven: pushing a new `v*` tag triggers the Release workflow (GoReleaser creates the GitHub Release and Homebrew cask, then the npm job publishes). Only release when the user explicitly asks.
+- Before tagging, confirm all of: (1) `main` is current — `git switch main && git pull --ff-only origin main`; (2) the CI run for `HEAD` passed — `gh run list --workflow "Continuous Integration" --commit "$(git rev-parse HEAD)" --limit 1 --json status,conclusion` shows success; (3) the tree is clean — `git status --porcelain` is empty.
+- Create a new SemVer tag (`vX.Y.Z` or `vX.Y.Z-beta.N`) that does not exist on the remote, then push only that tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
 ## Configuration & Security Tips
 
 - Validate config discovery with `scoutly.config.*`, `scoutly.*`, and `.scoutly.*` JSON, YAML, or TOML fixtures in an isolated temporary directory.
 - Keep HTTP behavior deterministic and bounded: preserve request cancellation, response-size limits, redirect limits, robots.txt handling, and configured concurrency/rate limits.
 - Do not commit secrets or real crawl credentials; use local fixtures and `httptest` servers for repeatable regression tests.
 - Keep npm publishing on GitHub Actions trusted publishing. Do not add a long-lived npm token when OIDC is available, and do not bypass release checksum verification in the npm installer.
-- Use Semantic Versioning release tags: `vX.Y.Z` for stable releases and `vX.Y.Z-alpha.N`, `vX.Y.Z-beta.N`, or `vX.Y.Z-rc.N` for prereleases. Prereleases publish to the npm `beta` dist-tag and the Homebrew `scoutly@beta` Cask without replacing stable channels.
+- Use Semantic Versioning release tags: `vX.Y.Z` for stable releases and `vX.Y.Z-beta.N` for prereleases. Prereleases publish to the npm `beta` dist-tag and the Homebrew `scoutly@beta` Cask without replacing stable channels.

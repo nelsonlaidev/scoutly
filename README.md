@@ -42,8 +42,8 @@ go install github.com/nelsonlaidev/scoutly/cmd/scoutly@latest
 
 ### Prerelease builds
 
-Prereleases use Semantic Versioning tags such as `v0.5.0-beta.1` and
-`v0.5.0-rc.1`. Install the latest prerelease through the opt-in beta channels:
+Prereleases use Semantic Versioning tags such as `v0.5.0-beta.1`. Install the
+latest prerelease through the opt-in beta channels:
 
 ```sh
 brew install --cask nelsonlaidev/tap/scoutly@beta
@@ -54,7 +54,7 @@ GitHub publishes prerelease archives under the exact version tag. Go users can
 also install a specific prerelease directly:
 
 ```sh
-go install github.com/nelsonlaidev/scoutly/cmd/scoutly@v0.5.0-rc.1
+go install github.com/nelsonlaidev/scoutly/cmd/scoutly@v0.5.0-beta.1
 ```
 
 Stable installations are never advanced to a prerelease automatically.
