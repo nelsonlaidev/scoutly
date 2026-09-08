@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"testing"
 
-	"charm.land/huh/v2"
 	"charm.land/lipgloss/v2"
 )
 
@@ -65,7 +64,6 @@ func TestPaletteUsesMonochromeVercelColors(t *testing.T) {
 func TestHuhThemeUsesApplicationPalette(t *testing.T) {
 	for _, dark := range []bool{false, true} {
 		styles := newHuhTheme(dark)
-		baseStyles := huh.ThemeBase(dark)
 		colors := newPalette(dark)
 
 		if got := styles.Focused.Title.GetForeground(); !reflect.DeepEqual(got, colors.accent) {
@@ -83,17 +81,38 @@ func TestHuhThemeUsesApplicationPalette(t *testing.T) {
 		if got := styles.Focused.ErrorMessage.GetForeground(); !reflect.DeepEqual(got, colors.error) {
 			t.Errorf("dark=%t error color = %v, want %v", dark, got, colors.error)
 		}
-		if got := styles.Focused.FocusedButton; !reflect.DeepEqual(got, baseStyles.Focused.FocusedButton) {
-			t.Errorf("dark=%t focused confirm style differs from Huh ThemeBase", dark)
-		}
-		if got := styles.Focused.BlurredButton; !reflect.DeepEqual(got, baseStyles.Focused.BlurredButton) {
-			t.Errorf("dark=%t blurred confirm style differs from Huh ThemeBase", dark)
-		}
-		if got := styles.Blurred.FocusedButton; !reflect.DeepEqual(got, baseStyles.Blurred.FocusedButton) {
-			t.Errorf("dark=%t unfocused field's selected confirm style differs from Huh ThemeBase", dark)
-		}
-		if got := styles.Blurred.BlurredButton; !reflect.DeepEqual(got, baseStyles.Blurred.BlurredButton) {
-			t.Errorf("dark=%t unfocused field's unselected confirm style differs from Huh ThemeBase", dark)
+		for name, comparison := range map[string]struct {
+			got            lipgloss.Style
+			wantForeground any
+			wantBackground any
+		}{
+			"focused selected confirm": {
+				got:            styles.Focused.FocusedButton,
+				wantForeground: colors.selectedForeground,
+				wantBackground: colors.selectedBackground,
+			},
+			"focused unselected confirm": {
+				got:            styles.Focused.BlurredButton,
+				wantForeground: colors.selectedBackground,
+				wantBackground: colors.selectedForeground,
+			},
+			"blurred selected confirm": {
+				got:            styles.Blurred.FocusedButton,
+				wantForeground: colors.selectedForeground,
+				wantBackground: colors.selectedBackground,
+			},
+			"blurred unselected confirm": {
+				got:            styles.Blurred.BlurredButton,
+				wantForeground: colors.selectedBackground,
+				wantBackground: colors.selectedForeground,
+			},
+		} {
+			if got := comparison.got.GetForeground(); !reflect.DeepEqual(got, comparison.wantForeground) {
+				t.Errorf("dark=%t %s foreground = %v, want %v", dark, name, got, comparison.wantForeground)
+			}
+			if got := comparison.got.GetBackground(); !reflect.DeepEqual(got, comparison.wantBackground) {
+				t.Errorf("dark=%t %s background = %v, want %v", dark, name, got, comparison.wantBackground)
+			}
 		}
 		if got := styles.Focused.TextInput.Prompt.GetForeground(); !reflect.DeepEqual(got, colors.accent) {
 			t.Errorf("dark=%t input prompt color = %v, want %v", dark, got, colors.accent)

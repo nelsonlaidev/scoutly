@@ -54,6 +54,12 @@ func newHuhTheme(dark bool) *huh.Styles {
 	styles.Focused.TextInput.Cursor = styles.Focused.TextInput.Cursor.Foreground(colors.accent)
 	styles.Focused.TextInput.Placeholder = styles.Focused.TextInput.Placeholder.Foreground(colors.muted)
 	styles.Focused.TextInput.Prompt = styles.Focused.TextInput.Prompt.Foreground(colors.accent)
+	styles.Focused.FocusedButton = styles.Focused.FocusedButton.
+		Foreground(colors.selectedForeground).
+		Background(colors.selectedBackground)
+	styles.Focused.BlurredButton = styles.Focused.BlurredButton.
+		Foreground(colors.selectedBackground).
+		Background(colors.selectedForeground)
 
 	styles.Blurred = styles.Focused
 	styles.Blurred.Base = styles.Focused.Base.BorderStyle(lipgloss.HiddenBorder())
