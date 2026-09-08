@@ -13,6 +13,8 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 	"go.yaml.in/yaml/v3"
+
+	"github.com/nelsonlaidev/scoutly/audit"
 )
 
 func decodeFile(path string) (Overrides, error) {
@@ -50,7 +52,7 @@ func decodeJSON(reader io.Reader) (Overrides, error) {
 	if err != nil {
 		return Overrides{}, err
 	}
-	if err := validateJSONDocument(data); err != nil {
+	if err := validateJSONDocument(data, configSchema(reflect.TypeFor[Overrides]())); err != nil {
 		return Overrides{}, err
 	}
 
@@ -103,7 +105,7 @@ func decodeTOML(reader io.Reader) (Overrides, error) {
 	return overrides, nil
 }
 
-func validateJSONDocument(data []byte) error {
+func validateJSONDocument(data []byte, schema map[string]reflect.Kind) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	token, err := decoder.Token()
 	if err != nil {
@@ -114,7 +116,6 @@ func validateJSONDocument(data []byte) error {
 		return errors.New("configuration must be an object")
 	}
 
-	schema := overrideSchema()
 	seen := make(map[string]struct{}, len(schema))
 	for decoder.More() {
 		token, err := decoder.Token()
@@ -140,9 +141,30 @@ func validateJSONDocument(data []byte) error {
 		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
 			return fmt.Errorf("field %q cannot be null", key)
 		}
-		if key == "rules" {
+		if key == "rules" && schema[key] == reflect.Map {
 			if err := validateJSONRules(value); err != nil {
 				return err
+			}
+		}
+		if schema[key] == reflect.Slice {
+			var items []json.RawMessage
+			if err := json.Unmarshal(value, &items); err != nil {
+				return fmt.Errorf("field %q must be an array: %w", key, err)
+			}
+			for index, item := range items {
+				if key == "ignore_rules" {
+					if err := validateJSONDocument(item, configSchema(reflect.TypeFor[audit.RuleIgnore]())); err != nil {
+						return fmt.Errorf("ignore_rules[%d]: %w", index, err)
+					}
+				} else {
+					var text string
+					if bytes.Equal(bytes.TrimSpace(item), []byte("null")) {
+						return fmt.Errorf("%s[%d] cannot be null", key, index)
+					}
+					if err := json.Unmarshal(item, &text); err != nil {
+						return fmt.Errorf("%s[%d] must be a string: %w", key, index, err)
+					}
+				}
 			}
 		}
 	}
@@ -220,12 +242,14 @@ func validateYAMLDocument(document *yaml.Node) error {
 		return errors.New("configuration must be a mapping")
 	}
 
-	mapping := document.Content[0]
+	return validateYAMLMapping(document.Content[0], configSchema(reflect.TypeFor[Overrides]()))
+}
+
+func validateYAMLMapping(mapping *yaml.Node, schema map[string]reflect.Kind) error {
 	if mapping.Kind != yaml.MappingNode {
 		return errors.New("configuration must be a mapping")
 	}
 
-	schema := overrideSchema()
 	seen := make(map[string]struct{}, len(schema))
 	for index := 0; index < len(mapping.Content); index += 2 {
 		keyNode := mapping.Content[index]
@@ -250,9 +274,20 @@ func validateYAMLDocument(document *yaml.Node) error {
 		if !matchesYAMLKind(valueNode, kind) {
 			return fmt.Errorf("field %q has invalid type %s", key, valueNode.Tag)
 		}
-		if key == "rules" {
+		if key == "rules" && kind == reflect.Map {
 			if err := validateYAMLRules(valueNode); err != nil {
 				return err
+			}
+		}
+		if kind == reflect.Slice {
+			for index, item := range valueNode.Content {
+				if key == "ignore_rules" {
+					if err := validateYAMLMapping(item, configSchema(reflect.TypeFor[audit.RuleIgnore]())); err != nil {
+						return fmt.Errorf("ignore_rules[%d]: %w", index, err)
+					}
+				} else if item.Kind != yaml.ScalarNode || item.Tag != "!!str" {
+					return fmt.Errorf("%s[%d] must be a string", key, index)
+				}
 			}
 		}
 	}
@@ -284,11 +319,10 @@ func validateYAMLRules(mapping *yaml.Node) error {
 	return nil
 }
 
-func overrideSchema() map[string]reflect.Kind {
-	typeOfOverrides := reflect.TypeFor[Overrides]()
-	schema := make(map[string]reflect.Kind, typeOfOverrides.NumField())
+func configSchema(structType reflect.Type) map[string]reflect.Kind {
+	schema := make(map[string]reflect.Kind, structType.NumField())
 
-	for field := range typeOfOverrides.Fields() {
+	for field := range structType.Fields() {
 		key, _, _ := strings.Cut(field.Tag.Get("json"), ",")
 		fieldType := field.Type
 		if fieldType.Kind() == reflect.Pointer {
@@ -312,6 +346,8 @@ func matchesYAMLKind(node *yaml.Node, kind reflect.Kind) bool {
 		return node.Kind == yaml.ScalarNode && node.Tag == "!!str"
 	case reflect.Map:
 		return node.Kind == yaml.MappingNode
+	case reflect.Slice:
+		return node.Kind == yaml.SequenceNode
 	default:
 		return false
 	}

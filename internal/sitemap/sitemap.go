@@ -41,7 +41,9 @@ var (
 
 // Options controls sitemap discovery.
 type Options struct {
-	Allow             func(*url.URL) bool
+	Allow func(*url.URL) bool
+	// AllowPage filters page URLs before they consume MaxPageURLs, not documents.
+	AllowPage         func(*url.URL) bool
 	Scheme            string
 	Host              string
 	KeepFragments     bool
@@ -140,7 +142,8 @@ func Crawl(
 		}
 
 		for _, pageURL := range parsed.URLs {
-			if urlutil.Origin(pageURL) != urlutil.Origin(siteURL) || !allowed(pageURL) {
+			if urlutil.Origin(pageURL) != urlutil.Origin(siteURL) || !allowed(pageURL) ||
+				(options.AllowPage != nil && !options.AllowPage(pageURL)) {
 				continue
 			}
 

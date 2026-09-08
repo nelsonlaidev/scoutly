@@ -15,6 +15,106 @@ import (
 	"github.com/nelsonlaidev/scoutly/audit"
 )
 
+func TestDecodeScopeSettings(t *testing.T) {
+	for _, test := range []struct {
+		name, content string
+	}{
+		{"scope.json", `{"include_paths":["/docs"],"exclude_paths":["/docs/archive"],"ignore_rules":[{"url_prefix":"https://example.com/old","rules":["broken_link"]}]}`},
+		{"scope.yaml", "include_paths: [/docs]\nexclude_paths: [/docs/archive]\nignore_rules:\n  - url_prefix: https://example.com/old\n    rules: [broken_link]\n"},
+		{"scope.toml", "include_paths = [\"/docs\"]\nexclude_paths = [\"/docs/archive\"]\n[[ignore_rules]]\nurl_prefix = \"https://example.com/old\"\nrules = [\"broken_link\"]\n"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), test.name)
+			writeFile(t, path, test.content)
+			got, err := decodeFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := Overrides{IncludePaths: []string{"/docs"}, ExcludePaths: []string{"/docs/archive"}, IgnoreRules: []audit.RuleIgnore{{URLPrefix: "https://example.com/old", Rules: []string{"broken_link"}}}}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("decoded = %#v, want %#v", got, want)
+			}
+			if _, err := Resolve(defaults("dev"), got); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestDecodeRejectsMalformedScopeSettings(t *testing.T) {
+	for index, content := range []string{
+		`{"include_paths":null}`, `{"include_paths":[null]}`, `{"include_paths":[1]}`,
+		`{"include_paths":"/docs"}`, `{"exclude_paths":[{}]}`,
+		`{"ignore_rules":null}`, `{"ignore_rules":{}}`, `{"ignore_rules":[null]}`,
+		`{"ignore_rules":[{"url_prefix":"https://example.com","rules":[null]}]}`,
+		`{"ignore_rules":[{"url_prefix":"https://example.com","rules":[false]}]}`,
+		`{"ignore_rules":[{"url_prefix":"https://example.com","rules":"broken_link"}]}`,
+		`{"ignore_rules":[{"url_prefix":null,"rules":[]}]}`,
+		`{"ignore_rules":[{"URL_prefix":"https://example.com","rules":[]}]}`,
+		`{"ignore_rules":[{"url_prefix":"https://example.com","url_prefix":"https://other.example","rules":[]}]}`,
+		`{"ignore_rules":[{"url_prefix":"https://example.com","rules":[],"rules":[]}]}`,
+		`{"ignore_rules":[{"url_prefix":"https://example.com","rules":[],"extra":true}]}`,
+	} {
+		if _, err := decodeJSON(strings.NewReader(content)); err == nil {
+			t.Errorf("JSON case %d accepted: %s", index, content)
+		}
+	}
+	for index, content := range []string{
+		"include_paths: null", "include_paths: [null]", "include_paths: [1]", "include_paths: /docs",
+		"exclude_paths: [{}]", "ignore_rules: null", "ignore_rules: {}", "ignore_rules: [null]",
+		"ignore_rules: [{url_prefix: 'https://example.com', rules: [null]}]",
+		"ignore_rules: [{url_prefix: 'https://example.com', rules: [true]}]",
+		"ignore_rules: [{url_prefix: 'https://example.com', rules: broken_link}]",
+		"ignore_rules: [{url_prefix: null, rules: []}]",
+		"ignore_rules: [{URL_prefix: 'https://example.com', rules: []}]",
+		"ignore_rules: [{url_prefix: 'https://example.com', url_prefix: 'https://other.example', rules: []}]",
+		"ignore_rules: [{url_prefix: 'https://example.com', rules: [], rules: []}]",
+		"ignore_rules: [{url_prefix: 'https://example.com', rules: [], extra: true}]",
+	} {
+		if _, err := decodeYAML(strings.NewReader(content)); err == nil {
+			t.Errorf("YAML case %d accepted: %s", index, content)
+		}
+	}
+	for index, content := range []string{
+		"include_paths = [1]", "include_paths = \"/docs\"",
+		"ignore_rules = [{url_prefix = 1, rules = []}]",
+		"ignore_rules = [{url_prefix = \"https://example.com\", rules = [1]}]",
+		"ignore_rules = [{url_prefix = \"https://example.com\", rules = [], extra = true}]",
+		"ignore_rules = [{url_prefix = \"https://example.com\", rules = [], rules = []}]",
+	} {
+		if _, err := decodeTOML(strings.NewReader(content)); err == nil {
+			t.Errorf("TOML case %d accepted: %s", index, content)
+		}
+	}
+}
+
+func TestDecodeEmptyScopeListsClearConfiguration(t *testing.T) {
+	for _, test := range []struct {
+		name, content string
+	}{
+		{"empty.json", `{"include_paths":[],"exclude_paths":[],"ignore_rules":[]}`},
+		{"empty.yaml", "include_paths: []\nexclude_paths: []\nignore_rules: []\n"},
+		{"empty.toml", "include_paths = []\nexclude_paths = []\nignore_rules = []\n"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), test.name)
+			writeFile(t, path, test.content)
+			overrides, err := decodeFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			base := defaults("dev")
+			base.IncludePaths = []string{"/docs"}
+			base.ExcludePaths = []string{"/docs/archive"}
+			base.IgnoreRules = []audit.RuleIgnore{{URLPrefix: "https://example.com", Rules: []string{"broken_link"}}}
+			got, err := Resolve(base, overrides)
+			if err != nil || len(got.IncludePaths)+len(got.ExcludePaths)+len(got.IgnoreRules) != 0 {
+				t.Fatalf("cleared config=%#v error=%v", got, err)
+			}
+		})
+	}
+}
+
 func TestDecodeFileSelectsDecoderByExtension(t *testing.T) {
 	tests := []struct {
 		name    string

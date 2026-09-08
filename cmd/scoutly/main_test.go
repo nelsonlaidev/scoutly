@@ -25,8 +25,42 @@ func TestParseOptionsPreservesUnsetFields(t *testing.T) {
 		t.Fatalf("parseOptions() error = %v", err)
 	}
 
-	if options.KeepFragments != nil || options.RespectRobots != nil || options.Format != nil {
+	if options.KeepFragments != nil || options.RespectRobots != nil || options.Format != nil || options.IncludePaths != nil || options.ExcludePaths != nil {
 		t.Fatalf("parseOptions() populated unset fields: %#v", options)
+	}
+}
+
+func TestScopeFlagsReplaceFileLists(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "scoutly.toml")
+	if err := os.WriteFile(path, []byte("include_paths = [\"/old\"]\nexclude_paths = [\"/private\"]\n[[ignore_rules]]\nurl_prefix = \"https://example.com\"\nrules = [\"broken_link\"]\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	options, _, err := parseOptions([]string{"example.com/docs", "--include-path", "/docs", "--include-path", "/news,updates"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, cfg, err := options.resolve(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(cfg.IncludePaths, []string{"/docs", "/news,updates"}) || !reflect.DeepEqual(cfg.ExcludePaths, []string{"/private"}) || len(cfg.IgnoreRules) != 1 {
+		t.Fatalf("resolved config = %#v", cfg)
+	}
+	options, _, err = parseOptions([]string{"--exclude-path", "/one", "--exclude-path", "/two"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, cfg, err = options.resolve(directory)
+	if err != nil || !reflect.DeepEqual(cfg.ExcludePaths, []string{"/one", "/two"}) || !reflect.DeepEqual(cfg.IncludePaths, []string{"/old"}) {
+		t.Fatalf("TUI config = %#v error=%v", cfg, err)
+	}
+	options, _, err = parseOptions([]string{"--include-path="})
+	if err == nil {
+		_, _, err = options.resolve(directory)
+	}
+	if err == nil {
+		t.Fatal("empty CLI path accepted")
 	}
 }
 

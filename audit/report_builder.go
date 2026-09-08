@@ -24,6 +24,7 @@ func buildReport(
 	imagesChecked bool,
 	rules Rules,
 	ignoreRedirects bool,
+	ignores []RuleIgnore,
 	auditedAt time.Time,
 ) (*Report, error) {
 	if err := ctx.Err(); err != nil {
@@ -84,7 +85,7 @@ func buildReport(
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		if page.IsHTMLContentType(crawled.Page.ContentType) {
+		if !crawled.OutsideScope && page.IsHTMLContentType(crawled.Page.ContentType) {
 			public, err := publicPage(ctx, crawled)
 			if err != nil {
 				return nil, err
@@ -107,7 +108,7 @@ func buildReport(
 				Message:  fmt.Sprintf("Page returned HTTP %d", *crawled.StatusCode),
 				Target:   IssueTarget{Type: TargetPage, URL: crawled.URL.String()},
 			})
-		case page.IsHTMLContentType(crawled.Page.ContentType):
+		case !crawled.OutsideScope && page.IsHTMLContentType(crawled.Page.ContentType):
 			report.Issues = append(report.Issues, analyzePage(
 				crawled.Page,
 				IssueTarget{Type: TargetPage, URL: crawled.URL.String()},
@@ -129,7 +130,7 @@ func buildReport(
 			report.Issues = append(report.Issues, analyzeImage(image)...)
 		}
 	}
-	report.Issues, err = applyRulePolicy(ctx, report.Issues, rules, ignoreRedirects)
+	report.Issues, err = applyRulePolicy(ctx, report.Issues, rules, ignoreRedirects, ignores)
 	if err != nil {
 		return nil, err
 	}

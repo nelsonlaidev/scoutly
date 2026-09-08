@@ -38,6 +38,8 @@ type Options struct {
 	MaxRedirects        *int     `name:"max-redirects" help:"Maximum number of redirects per request."`
 	UserAgent           *string  `name:"user-agent" help:"User-Agent header sent with requests."`
 	Concurrency         *int     `name:"concurrency" help:"Maximum number of concurrent page crawls, link checks, and image checks."`
+	IncludePaths        []string `name:"include-path" sep:"none" help:"Crawl only this path prefix (repeatable); referenced resources are still checked."`
+	ExcludePaths        []string `name:"exclude-path" sep:"none" help:"Do not crawl this path prefix (repeatable); referenced resources are still checked."`
 
 	Format   *string `name:"format" enum:"text,json" help:"Output format."`
 	Progress *string `name:"progress" enum:"auto,always,never" help:"Progress display mode."`
@@ -94,6 +96,8 @@ func (options Options) resolve(workingDirectory string) (string, config.Config, 
 	}
 
 	cfg, err := config.Resolve(loaded.Base, config.Overrides{
+		IncludePaths:        options.IncludePaths,
+		ExcludePaths:        options.ExcludePaths,
 		MaxDepth:            options.MaxDepth,
 		MaxPages:            options.MaxPages,
 		KeepFragments:       options.KeepFragments,

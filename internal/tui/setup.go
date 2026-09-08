@@ -2,6 +2,7 @@ package tui
 
 import (
 	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -52,7 +53,16 @@ type setupState struct {
 
 func newSetupState(options audit.Options) setupState {
 	rules := maps.Clone(options.Rules)
+	includes := slices.Clone(options.IncludePaths)
+	excludes := slices.Clone(options.ExcludePaths)
+	ignores := slices.Clone(options.IgnoreRules)
+	for index := range ignores {
+		ignores[index] = ignores[index].Clone()
+	}
 	values := &setupValues{
+		includePaths:        &includes,
+		excludePaths:        &excludes,
+		ignoreRules:         &ignores,
 		maxDepth:            strconv.Itoa(options.MaxDepth),
 		maxPages:            strconv.Itoa(options.MaxPages),
 		maxSitemapDocuments: strconv.Itoa(options.MaxSitemapDocuments),

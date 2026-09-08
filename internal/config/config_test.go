@@ -9,6 +9,39 @@ import (
 	"github.com/nelsonlaidev/scoutly/audit"
 )
 
+func TestScopeOverridesReplaceListsAndCloneSettings(t *testing.T) {
+	base := defaults("dev")
+	base.IncludePaths = []string{"/old"}
+	base.ExcludePaths = []string{"/private"}
+	base.IgnoreRules = []audit.RuleIgnore{{URLPrefix: "https://example.com", Rules: []string{"broken_link"}}}
+	overrides := Overrides{IncludePaths: []string{"/docs", "/about"}}
+	resolved, err := Resolve(base, overrides)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(resolved.IncludePaths, overrides.IncludePaths) || !reflect.DeepEqual(resolved.ExcludePaths, base.ExcludePaths) || !reflect.DeepEqual(resolved.IgnoreRules, base.IgnoreRules) {
+		t.Fatalf("unexpected overrides: %#v", resolved)
+	}
+	options := resolved.AuditOptions()
+	options.IncludePaths[0] = "/mutated"
+	options.ExcludePaths[0] = "/mutated"
+	options.IgnoreRules[0].Rules[0] = "missing_title"
+	options.IgnoreRules[0].URLPrefix = "https://other.example"
+	if resolved.IncludePaths[0] != "/docs" || resolved.ExcludePaths[0] != "/private" || resolved.IgnoreRules[0].Rules[0] != "broken_link" || resolved.IgnoreRules[0].URLPrefix != "https://example.com" {
+		t.Fatal("AuditOptions shares scope settings")
+	}
+	resolved.IncludePaths[0] = "/mutated"
+	resolved.ExcludePaths[0] = "/mutated"
+	resolved.IgnoreRules[0].Rules[0] = "missing_title"
+	if overrides.IncludePaths[0] != "/docs" || base.ExcludePaths[0] != "/private" || base.IgnoreRules[0].Rules[0] != "broken_link" {
+		t.Fatal("Resolve shares scope settings")
+	}
+	_, err = Resolve(base, Overrides{IgnoreRules: []audit.RuleIgnore{{URLPrefix: "https://example.com", Rules: []string{"unknown_rule"}}}})
+	if err == nil {
+		t.Fatal("unknown ignore rule accepted")
+	}
+}
+
 func TestDefaults(t *testing.T) {
 	want := Config{
 		MaxDepth:            10,

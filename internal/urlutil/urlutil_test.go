@@ -5,6 +5,30 @@ import (
 	"testing"
 )
 
+func TestMatchesPathPrefix(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		path, prefix string
+		want         bool
+	}{
+		{"/docs", "/docs", true},
+		{"/docs", "/docs/", true},
+		{"/docs/start", "/docs", true},
+		{"/docs-old", "/docs", false},
+		{"/Docs", "/docs", false},
+		{"/", "/", true},
+		{"/anything", "/", true},
+		{"/docs//start", "/docs", true},
+		{"/docs/../other", "/docs", true},
+	} {
+		t.Run(test.path+"_"+test.prefix, func(t *testing.T) {
+			if got := MatchesPathPrefix(test.path, test.prefix); got != test.want {
+				t.Fatalf("MatchesPathPrefix(%q, %q) = %t", test.path, test.prefix, got)
+			}
+		})
+	}
+}
+
 func TestNormalizeHTTPURL(t *testing.T) {
 	input := mustParse(t, "HTTPS://EXAMPLE.COM:443#section")
 	got := Normalize(input, false)

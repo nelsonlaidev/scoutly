@@ -5,6 +5,7 @@ package crawler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"strings"
@@ -29,7 +30,9 @@ var (
 )
 
 type Options struct {
-	Allowed               func(*url.URL) bool
+	Allowed func(*url.URL) bool
+	// PageAllowed limits pages only, leaving robots and sitemap document access unchanged.
+	PageAllowed           func(*url.URL) bool
 	SitemapURLs           []*url.URL
 	SitemapURLsFor        func(*url.URL) []*url.URL
 	ScanSitemaps          bool
@@ -46,12 +49,14 @@ type Options struct {
 }
 
 type CrawledPage struct {
-	Page        page.Page
-	URL         *url.URL
-	FinalURL    *url.URL
-	Depth       int
-	StatusCode  *int
-	ContentType *string
+	// OutsideScope marks a final redirect destination whose HTML was not analyzed.
+	OutsideScope bool
+	Page         page.Page
+	URL          *url.URL
+	FinalURL     *url.URL
+	Depth        int
+	StatusCode   *int
+	ContentType  *string
 }
 
 type queuedPage struct {
@@ -96,7 +101,7 @@ func Crawl(
 
 	initial := createQueuedPage(startURL, 0, options.KeepFragments)
 	pages := make([]CrawledPage, 0, min(options.MaxPages, 128))
-	if !allowed(initial.URL) {
+	if !allowed(initial.URL) || (options.PageAllowed != nil && !options.PageAllowed(initial.URL)) {
 		if options.OnSitemapPhaseStarted != nil {
 			if err := options.OnSitemapPhaseStarted(); err != nil {
 				return nil, err
@@ -127,6 +132,10 @@ func Crawl(
 			return nil, err
 		}
 		for _, result := range crawled {
+			if result.Queued.Key == initial.Key && options.PageAllowed != nil &&
+				!options.PageAllowed(result.Page.FinalURL) {
+				return nil, fmt.Errorf("start URL %s redirects outside page scope to %s; choose a start URL within scope", startURL, result.Page.FinalURL)
+			}
 			pages = append(pages, result.Page)
 			if result.Queued.Key == initial.Key && result.Page.FinalURL != nil {
 				crawlScopeURL = ptrutil.Clone(result.Page.FinalURL)
@@ -145,7 +154,8 @@ func Crawl(
 					continue
 				}
 				next := createQueuedPage(link.URL, result.Queued.Depth+1, options.KeepFragments)
-				if _, exists := enqueued[next.Key]; exists || !allowed(next.URL) {
+				if _, exists := enqueued[next.Key]; exists || !allowed(next.URL) ||
+					(options.PageAllowed != nil && !options.PageAllowed(next.URL)) {
 					continue
 				}
 
@@ -188,6 +198,7 @@ func Crawl(
 	var callbackErr error
 	sitemapURLs, err := sitemap.Crawl(discoveryContext, initialSitemaps, httpFetcher, sitemap.Options{
 		Allow:            allowed,
+		AllowPage:        options.PageAllowed,
 		Scheme:           crawlScopeURL.Scheme,
 		Host:             crawlScopeURL.Host,
 		KeepFragments:    options.KeepFragments,
@@ -330,6 +341,10 @@ func crawlPage(
 	contentType := strings.Join(contentTypeValue, ", ")
 	if hasContentType {
 		result.ContentType = &contentType
+	}
+	if options.PageAllowed != nil && !options.PageAllowed(baseURL) {
+		result.OutsideScope = true
+		return result, nil
 	}
 
 	if !page.IsHTMLContentType(contentType) {

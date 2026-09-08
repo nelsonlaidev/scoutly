@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"net/url"
+	"slices"
 	"time"
 
 	"github.com/nelsonlaidev/scoutly/internal/checker"
@@ -33,6 +34,12 @@ func Audit(
 		return nil, err
 	}
 	options.Rules = maps.Clone(options.Rules)
+	options.IncludePaths = slices.Clone(options.IncludePaths)
+	options.ExcludePaths = slices.Clone(options.ExcludePaths)
+	options.IgnoreRules = slices.Clone(options.IgnoreRules)
+	for index := range options.IgnoreRules {
+		options.IgnoreRules[index] = options.IgnoreRules[index].Clone()
+	}
 	if err := options.Validate(); err != nil {
 		return nil, err
 	}
@@ -40,6 +47,9 @@ func Audit(
 	startURL, err := urlutil.ParseTarget(target)
 	if err != nil {
 		return nil, err
+	}
+	if !options.AllowsPage(startURL) {
+		return nil, fmt.Errorf("start URL %s is outside page scope (include_paths=%q, exclude_paths=%q); choose a start URL within scope", startURL, options.IncludePaths, options.ExcludePaths)
 	}
 
 	httpFetcher, err := fetcher.New(fetcher.Options{
@@ -74,6 +84,7 @@ func Audit(
 		return nil, err
 	}
 	crawledPages, err := crawler.Crawl(ctx, startURL, httpFetcher, crawler.Options{
+		PageAllowed: options.AllowsPage,
 		Allowed: func(candidate *url.URL) bool {
 			policy, ok := robotsCache.Lookup(candidate)
 			if !ok {
@@ -194,6 +205,7 @@ func Audit(
 		options.Images,
 		options.Rules,
 		options.IgnoreRedirects,
+		options.IgnoreRules,
 		time.Now(),
 	)
 	if err != nil {

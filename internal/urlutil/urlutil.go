@@ -106,6 +106,13 @@ func Origin(u *url.URL) string {
 	return scheme + "://" + CanonicalHost(scheme, u.Host)
 }
 
+// MatchesPathPrefix compares decoded URL paths on segment boundaries. A trailing
+// slash in prefix is optional; the root prefix matches every absolute path.
+func MatchesPathPrefix(path, prefix string) bool {
+	prefix = strings.TrimSuffix(prefix, "/")
+	return path == prefix || strings.HasPrefix(path, prefix+"/")
+}
+
 func isHTTP(scheme string) bool {
 	return scheme == "http" || scheme == "https"
 }

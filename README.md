@@ -216,6 +216,72 @@ Discovery fails when more than one conventional config file exists. JSON,
 YAML, and TOML parsing is strict: unknown fields, duplicate fields, null
 values, and multiple documents are rejected.
 
+### Page scope and local rule ignores
+
+Limit page crawling to selected path prefixes:
+
+```sh
+scoutly https://example.com/docs --include-path /docs --exclude-path /docs/archive
+scoutly https://example.com/docs --include-path /docs --include-path /about
+```
+
+Each flag accepts one path and can be repeated. CLI values replace the entire
+corresponding config list; omitted flags preserve file settings. Empty config
+arrays clear lists. An empty inclusion list allows all paths, and exclusions
+always win. The starting URL must be in scope; an out-of-scope start fails before
+any network requests. Choose a starting page within the included paths.
+
+Prefixes match path segments: `/docs` and `/docs/` match `/docs` and its children,
+but not `/docs-old`. `/` matches every path. Matching is case-sensitive, uses
+percent-decoded URL paths, and ignores query strings and fragments. Scoutly does
+not additionally collapse dot segments or repeated slashes. Prefixes must be
+rooted URL paths without queries, fragments, or wildcards; glob and regular
+expression matching are not supported.
+
+Scope controls page crawling and SEO analysis, not all HTTP requests. Links and
+images referenced by in-scope pages are still checked, even outside the page
+scope. Out-of-scope pages are not explored and do not consume discovery slots.
+Robots and sitemap documents remain accessible under existing crawl policies;
+page URLs inside sitemaps are filtered before counting toward the page limit.
+Redirects retain existing HTTP and robots policies: an out-of-scope destination
+may be requested, but its HTML is not analyzed or explored. Actual HTTP errors
+are still reported. An initial page redirecting out of scope fails the audit.
+
+Suppress particular findings for an issue target's URL prefix using a config file:
+
+```toml
+include_paths = ["/docs"]
+exclude_paths = ["/docs/archive"]
+
+[[ignore_rules]]
+url_prefix = "https://example.com/docs/legacy"
+rules = ["missing_meta_description"]
+
+[[ignore_rules]]
+url_prefix = "https://external.example/old"
+rules = ["broken_link"]
+```
+
+Each ignore requires an absolute HTTP(S) URL without credentials, query strings,
+fragments, or wildcards, and at least one known snake_case rule name. Origins
+must match after normalizing host names and default ports; paths use the same
+prefix rules as page scope. Queries and fragments in issue targets are ignored.
+Ignores match the reported target URL, not a redirect destination or the page
+referencing a link or image. Multiple entries combine, and cannot re-enable
+globally disabled rules or override `ignore_redirects`.
+
+Ignored findings are removed from the issue list and issue counts. Raw pages,
+link/image results, occurrences, and resource statistics remain intact: a broken
+link can still appear in the Links view and broken-link total even when its
+`broken_link` finding is suppressed.
+
+JSON and YAML support the same `include_paths`, `exclude_paths`, and
+`ignore_rules` lists. Go callers can set `Options.IncludePaths`,
+`Options.ExcludePaths`, and `Options.IgnoreRules` (`[]audit.RuleIgnore`). The TUI
+shows loaded settings above the Run audit button and preserves them across
+cancellation, retries, and new audits. Edit these settings in CLI arguments or
+the config file; the TUI does not provide a scope or ignore editor.
+
 ## Go library
 
 Start with `DefaultOptions`, change the desired values, and pass a context to

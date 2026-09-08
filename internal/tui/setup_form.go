@@ -4,6 +4,7 @@ import (
 	"errors"
 	"maps"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -58,6 +59,9 @@ type setupValues struct {
 	sitemaps            bool
 	images              bool
 	rules               *audit.Rules
+	includePaths        *[]string
+	excludePaths        *[]string
+	ignoreRules         *[]audit.RuleIgnore
 }
 
 type setupLayout struct {
@@ -117,6 +121,21 @@ func newSetupForm(values *setupValues, formTheme *setupTheme) (*huh.Form, []fiel
 		Key(string(fieldRun)).
 		Affirmative(runButtonLabel).
 		Negative("")
+	var scopeDetails []string
+	if values.includePaths != nil && len(*values.includePaths) > 0 {
+		scopeDetails = append(scopeDetails, "Include paths: "+strings.Join(*values.includePaths, ", "))
+	}
+	if values.excludePaths != nil && len(*values.excludePaths) > 0 {
+		scopeDetails = append(scopeDetails, "Exclude paths: "+strings.Join(*values.excludePaths, ", "))
+	}
+	if values.ignoreRules != nil {
+		for _, ignore := range *values.ignoreRules {
+			scopeDetails = append(scopeDetails, "Ignore "+strings.Join(ignore.Rules, ", ")+": "+ignore.URLPrefix)
+		}
+	}
+	if len(scopeDetails) > 0 {
+		runField.Inline(true).Description("Loaded settings (read-only)\n" + strings.Join(scopeDetails, "\n") + "\n")
+	}
 	runField.WithTheme(runTheme)
 
 	fields := []huh.Field{
@@ -236,6 +255,18 @@ func parseSetupValues(values setupValues) (string, audit.Options, map[fieldID]st
 	if values.rules != nil {
 		options.Rules = maps.Clone(*values.rules)
 	}
+	if values.includePaths != nil {
+		options.IncludePaths = slices.Clone(*values.includePaths)
+	}
+	if values.excludePaths != nil {
+		options.ExcludePaths = slices.Clone(*values.excludePaths)
+	}
+	if values.ignoreRules != nil {
+		options.IgnoreRules = slices.Clone(*values.ignoreRules)
+		for index := range options.IgnoreRules {
+			options.IgnoreRules[index] = options.IgnoreRules[index].Clone()
+		}
+	}
 
 	target := strings.TrimSpace(values.url)
 	if _, err := urlutil.ParseTarget(target); err != nil {
@@ -289,6 +320,8 @@ func parseSetupValues(values setupValues) (string, audit.Options, map[fieldID]st
 				}
 			}
 		}
+	} else if parsed, err := urlutil.ParseTarget(target); err == nil && !options.AllowsPage(parsed) {
+		errorsByField[fieldURL] = "Choose a start URL within the loaded include/exclude paths"
 	}
 
 	return target, options, errorsByField

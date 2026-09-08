@@ -2,7 +2,11 @@ package audit
 
 import (
 	"context"
+	"net/url"
+	"slices"
 	"strings"
+
+	"github.com/nelsonlaidev/scoutly/internal/urlutil"
 )
 
 // RuleLevel controls whether an issue is reported and which severity it uses.
@@ -52,6 +56,7 @@ func applyRulePolicy(
 	issues []Issue,
 	overrides Rules,
 	ignoreRedirects bool,
+	ignores []RuleIgnore,
 ) ([]Issue, error) {
 	result := make([]Issue, 0, len(issues))
 	for _, issue := range issues {
@@ -73,6 +78,29 @@ func applyRulePolicy(
 			level = RuleLevelOff
 		}
 		if level == RuleLevelOff {
+			continue
+		}
+		ignored := false
+		for _, ignore := range ignores {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			if !slices.Contains(ignore.Rules, name) {
+				continue
+			}
+			prefix, prefixErr := url.Parse(ignore.URLPrefix)
+			target, targetErr := url.Parse(issue.Target.URL)
+			if prefixErr != nil || targetErr != nil || !urlutil.IsHTTPWithHost(target) {
+				continue
+			}
+			prefix = urlutil.Normalize(prefix, false)
+			target = urlutil.Normalize(target, false)
+			if urlutil.Origin(prefix) == urlutil.Origin(target) && urlutil.MatchesPathPrefix(target.Path, prefix.Path) {
+				ignored = true
+				break
+			}
+		}
+		if ignored {
 			continue
 		}
 

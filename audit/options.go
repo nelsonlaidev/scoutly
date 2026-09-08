@@ -3,9 +3,12 @@ package audit
 import (
 	"fmt"
 	"math"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/nelsonlaidev/scoutly/internal/urlutil"
 )
 
 // Options controls an audit. Start with DefaultOptions and override the fields
@@ -25,6 +28,53 @@ type Options struct {
 	UserAgent           string
 	Concurrency         int
 	Rules               Rules
+	// IncludePaths and ExcludePaths restrict page crawling by path prefix.
+	// Referenced links and images are still checked, including outside this scope.
+	IncludePaths []string
+	ExcludePaths []string
+	// IgnoreRules suppresses findings for matching target URLs, not source pages.
+	IgnoreRules []RuleIgnore
+}
+
+// RuleIgnore suppresses the named rules for a URL origin and path prefix.
+// URLPrefix must be an absolute HTTP(S) URL without credentials, query or fragment.
+type RuleIgnore struct {
+	URLPrefix string   `json:"url_prefix" yaml:"url_prefix" toml:"url_prefix"`
+	Rules     []string `json:"rules" yaml:"rules" toml:"rules"`
+}
+
+// Clone copies the rule names so callers can safely retain independent settings.
+func (ignore RuleIgnore) Clone() RuleIgnore {
+	ignore.Rules = slices.Clone(ignore.Rules)
+	return ignore
+}
+
+// AllowsPage reports whether a parsed URL is within the configured path scope.
+// Options must pass Validate before use. Origin restrictions are handled by the crawler.
+func (options Options) AllowsPage(candidate *url.URL) bool {
+	if candidate == nil {
+		return false
+	}
+	path := candidate.Path
+	if path == "" {
+		path = "/"
+	}
+	for _, prefix := range options.ExcludePaths {
+		parsed, _ := url.Parse(prefix)
+		if urlutil.MatchesPathPrefix(path, parsed.Path) {
+			return false
+		}
+	}
+	if len(options.IncludePaths) == 0 {
+		return true
+	}
+	for _, prefix := range options.IncludePaths {
+		parsed, _ := url.Parse(prefix)
+		if urlutil.MatchesPathPrefix(path, parsed.Path) {
+			return true
+		}
+	}
+	return false
 }
 
 // DefaultOptions returns the default audit settings.
@@ -115,6 +165,36 @@ func (options Options) Validate() error {
 		}
 		if !isValidRuleLevel(level) {
 			add("rules."+name, "must be one of: off, info, warning, error")
+		}
+	}
+	for _, list := range []struct {
+		name  string
+		paths []string
+	}{{"include_paths", options.IncludePaths}, {"exclude_paths", options.ExcludePaths}} {
+		for index, path := range list.paths {
+			parsed, err := url.Parse(path)
+			if err != nil || !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") || parsed.Host != "" ||
+				strings.ContainsAny(path, "?#*[]") {
+				add(fmt.Sprintf("%s[%d]", list.name, index), "must be an absolute URL path without query, fragment or wildcards")
+			}
+		}
+	}
+	for index, ignore := range options.IgnoreRules {
+		field := fmt.Sprintf("ignore_rules[%d]", index)
+		parsed, err := url.Parse(ignore.URLPrefix)
+		if err != nil || !urlutil.IsHTTPWithHost(parsed) || parsed.Hostname() == "" ||
+			parsed.User != nil || strings.ContainsAny(ignore.URLPrefix, "?#*") || strings.ContainsAny(parsed.Path, "[]") {
+			add(field+".url_prefix", "must be an HTTP(S) URL without credentials, query, fragment or wildcards")
+		} else if _, err := urlutil.ParseTarget(ignore.URLPrefix); err != nil {
+			add(field+".url_prefix", "must be a valid HTTP(S) URL")
+		}
+		if len(ignore.Rules) == 0 {
+			add(field+".rules", "must contain at least one rule")
+		}
+		for ruleIndex, name := range ignore.Rules {
+			if _, exists := defaultRuleLevels[name]; !exists {
+				add(fmt.Sprintf("%s.rules[%d]", field, ruleIndex), "must be a known snake_case rule name")
+			}
 		}
 	}
 

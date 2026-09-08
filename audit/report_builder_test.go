@@ -71,6 +71,7 @@ func TestBuildReportAggregatesPagesResourcesAndIssues(t *testing.T) {
 		true,
 		nil,
 		false,
+		nil,
 		time.Date(2026, 7, 31, 12, 0, 0, 0, time.UTC),
 	)
 	if err != nil {
@@ -133,6 +134,7 @@ func TestBuildReportRulesDoNotChangeResourceStatus(t *testing.T) {
 			"invalid_image_url": RuleLevelOff,
 		},
 		false,
+		nil,
 		time.Now(),
 	)
 	if err != nil {
@@ -192,6 +194,7 @@ func TestBuildReportClassifiesPageFailuresAndNonHTML(t *testing.T) {
 		false,
 		nil,
 		false,
+		nil,
 		time.Now(),
 	)
 	if err != nil {
@@ -251,6 +254,7 @@ func TestBuildReportClassifiesBlockedResources(t *testing.T) {
 		true,
 		nil,
 		false,
+		nil,
 		time.Now(),
 	)
 	if err != nil {
@@ -346,6 +350,7 @@ func TestPublicReportCollectionsMarshalAsArrays(t *testing.T) {
 		false,
 		nil,
 		false,
+		nil,
 		time.Now(),
 	)
 	if err != nil {
@@ -448,13 +453,13 @@ func TestBuildReportRejectsMissingResourceResults(t *testing.T) {
 		URL: start, StatusCode: &status, ContentType: &contentType,
 		Page: page.Page{ContentType: contentType, Links: []page.Link{{Element: page.LinkElementAnchor, URL: linkURL}}},
 	}}
-	if _, err := buildReport(context.Background(), start, crawled, nil, nil, false, nil, false, time.Now()); err == nil || !strings.Contains(err.Error(), "missing check result for link") {
+	if _, err := buildReport(context.Background(), start, crawled, nil, nil, false, nil, false, nil, time.Now()); err == nil || !strings.Contains(err.Error(), "missing check result for link") {
 		t.Fatalf("missing link error = %v", err)
 	}
 
 	crawled[0].Page.Links = nil
 	crawled[0].Page.ImageReferences = []page.ImageReference{{OriginalURL: "%"}}
-	if _, err := buildReport(context.Background(), start, crawled, nil, nil, true, nil, false, time.Now()); err == nil || !strings.Contains(err.Error(), "missing check result for image") {
+	if _, err := buildReport(context.Background(), start, crawled, nil, nil, true, nil, false, nil, time.Now()); err == nil || !strings.Contains(err.Error(), "missing check result for image") {
 		t.Fatalf("missing image error = %v", err)
 	}
 }
@@ -494,7 +499,7 @@ func TestReportBuildingHonorsCancellationAtEveryStage(t *testing.T) {
 
 	for cancelAt := 1; cancelAt <= 20; cancelAt++ {
 		ctx := &cancelAfterChecksContext{cancelAt: cancelAt}
-		_, err := buildReport(ctx, start, crawled, links, images, true, nil, false, time.Now())
+		_, err := buildReport(ctx, start, crawled, links, images, true, nil, false, nil, time.Now())
 		if ctx.checks >= cancelAt && !errors.Is(err, context.Canceled) {
 			t.Fatalf("cancelAt=%d checks=%d error=%v", cancelAt, ctx.checks, err)
 		}

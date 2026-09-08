@@ -2,6 +2,7 @@ package config
 
 import (
 	"maps"
+	"slices"
 	"time"
 
 	"github.com/nelsonlaidev/scoutly/audit"
@@ -26,25 +27,31 @@ type Config struct {
 	Format              string
 	Progress            string
 	Rules               audit.Rules
+	IncludePaths        []string
+	ExcludePaths        []string
+	IgnoreRules         []audit.RuleIgnore
 }
 
 type Overrides struct {
-	MaxDepth            *int        `json:"max_depth" yaml:"max_depth" toml:"max_depth"`
-	MaxPages            *int        `json:"max_pages" yaml:"max_pages" toml:"max_pages"`
-	KeepFragments       *bool       `json:"keep_fragments" yaml:"keep_fragments" toml:"keep_fragments"`
-	IgnoreRedirects     *bool       `json:"ignore_redirects" yaml:"ignore_redirects" toml:"ignore_redirects"`
-	RateLimit           *float64    `json:"rate_limit" yaml:"rate_limit" toml:"rate_limit"`
-	RespectRobots       *bool       `json:"respect_robots" yaml:"respect_robots" toml:"respect_robots"`
-	Sitemaps            *bool       `json:"sitemaps" yaml:"sitemaps" toml:"sitemaps"`
-	Images              *bool       `json:"images" yaml:"images" toml:"images"`
-	MaxSitemapDocuments *int        `json:"max_sitemap_documents" yaml:"max_sitemap_documents" toml:"max_sitemap_documents"`
-	Timeout             *int        `json:"timeout" yaml:"timeout" toml:"timeout"`
-	MaxRedirects        *int        `json:"max_redirects" yaml:"max_redirects" toml:"max_redirects"`
-	UserAgent           *string     `json:"user_agent" yaml:"user_agent" toml:"user_agent"`
-	Concurrency         *int        `json:"concurrency" yaml:"concurrency" toml:"concurrency"`
-	Format              *string     `json:"format" yaml:"format" toml:"format"`
-	Progress            *string     `json:"progress" yaml:"progress" toml:"progress"`
-	Rules               audit.Rules `json:"rules" yaml:"rules" toml:"rules"`
+	MaxDepth            *int               `json:"max_depth" yaml:"max_depth" toml:"max_depth"`
+	MaxPages            *int               `json:"max_pages" yaml:"max_pages" toml:"max_pages"`
+	KeepFragments       *bool              `json:"keep_fragments" yaml:"keep_fragments" toml:"keep_fragments"`
+	IgnoreRedirects     *bool              `json:"ignore_redirects" yaml:"ignore_redirects" toml:"ignore_redirects"`
+	RateLimit           *float64           `json:"rate_limit" yaml:"rate_limit" toml:"rate_limit"`
+	RespectRobots       *bool              `json:"respect_robots" yaml:"respect_robots" toml:"respect_robots"`
+	Sitemaps            *bool              `json:"sitemaps" yaml:"sitemaps" toml:"sitemaps"`
+	Images              *bool              `json:"images" yaml:"images" toml:"images"`
+	MaxSitemapDocuments *int               `json:"max_sitemap_documents" yaml:"max_sitemap_documents" toml:"max_sitemap_documents"`
+	Timeout             *int               `json:"timeout" yaml:"timeout" toml:"timeout"`
+	MaxRedirects        *int               `json:"max_redirects" yaml:"max_redirects" toml:"max_redirects"`
+	UserAgent           *string            `json:"user_agent" yaml:"user_agent" toml:"user_agent"`
+	Concurrency         *int               `json:"concurrency" yaml:"concurrency" toml:"concurrency"`
+	Format              *string            `json:"format" yaml:"format" toml:"format"`
+	Progress            *string            `json:"progress" yaml:"progress" toml:"progress"`
+	Rules               audit.Rules        `json:"rules" yaml:"rules" toml:"rules"`
+	IncludePaths        []string           `json:"include_paths" yaml:"include_paths" toml:"include_paths"`
+	ExcludePaths        []string           `json:"exclude_paths" yaml:"exclude_paths" toml:"exclude_paths"`
+	IgnoreRules         []audit.RuleIgnore `json:"ignore_rules" yaml:"ignore_rules" toml:"ignore_rules"`
 }
 
 func defaults(version string) Config {
@@ -76,7 +83,14 @@ func defaults(version string) Config {
 }
 
 func (cfg Config) AuditOptions() audit.Options {
+	ignores := slices.Clone(cfg.IgnoreRules)
+	for index := range ignores {
+		ignores[index] = ignores[index].Clone()
+	}
 	return audit.Options{
+		IncludePaths:        slices.Clone(cfg.IncludePaths),
+		ExcludePaths:        slices.Clone(cfg.ExcludePaths),
+		IgnoreRules:         ignores,
 		MaxDepth:            cfg.MaxDepth,
 		MaxPages:            cfg.MaxPages,
 		KeepFragments:       cfg.KeepFragments,
@@ -103,6 +117,21 @@ func timeoutDuration(milliseconds int) time.Duration {
 
 func apply(base Config, overrides Overrides) Config {
 	base.Rules = maps.Clone(base.Rules)
+	if overrides.IncludePaths != nil {
+		base.IncludePaths = overrides.IncludePaths
+	}
+	if overrides.ExcludePaths != nil {
+		base.ExcludePaths = overrides.ExcludePaths
+	}
+	if overrides.IgnoreRules != nil {
+		base.IgnoreRules = overrides.IgnoreRules
+	}
+	base.IncludePaths = slices.Clone(base.IncludePaths)
+	base.ExcludePaths = slices.Clone(base.ExcludePaths)
+	base.IgnoreRules = slices.Clone(base.IgnoreRules)
+	for index := range base.IgnoreRules {
+		base.IgnoreRules[index] = base.IgnoreRules[index].Clone()
+	}
 	if overrides.MaxDepth != nil {
 		base.MaxDepth = *overrides.MaxDepth
 	}

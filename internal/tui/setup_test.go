@@ -3,6 +3,7 @@ package tui
 import (
 	"image/color"
 	"math"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,58 @@ import (
 
 	"github.com/nelsonlaidev/scoutly/audit"
 )
+
+func TestSetupRetainsAndDisplaysScopeSettings(t *testing.T) {
+	initial := audit.DefaultOptions()
+	initial.IncludePaths = []string{"/docs"}
+	initial.ExcludePaths = []string{"/docs/archive"}
+	initial.IgnoreRules = []audit.RuleIgnore{{URLPrefix: "https://example.com/old", Rules: []string{"broken_link"}}}
+	state := newSetupState(initial)
+	state.values.url = "https://example.com/docs"
+	state.resize(100, 80)
+	_ = state.form.Init()
+	content := ansi.Strip(state.form.View())
+	for y, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, runButtonLabel) {
+			click, ok := state.fieldClickAt(99, y)
+			if !ok || !click.submit {
+				t.Fatalf("configured Run audit button is not clickable: %#v, %t", click, ok)
+			}
+		}
+	}
+	for _, want := range []string{"Loaded settings (read-only)", "Include paths: /docs", "Exclude paths: /docs/archive", "broken_link", "https://example.com/old"} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("setup missing %q:\n%s", want, content)
+		}
+	}
+	_, parsed, errorsByField := parseSetupValues(*state.values)
+	if len(errorsByField) != 0 || !reflect.DeepEqual(parsed, initial) {
+		t.Fatalf("parsed=%#v errors=%v", parsed, errorsByField)
+	}
+	initial.IncludePaths[0] = "/mutated"
+	initial.ExcludePaths[0] = "/mutated"
+	initial.IgnoreRules[0].Rules[0] = "missing_title"
+	parsed.IncludePaths[0] = "/mutated"
+	parsed.ExcludePaths[0] = "/mutated"
+	parsed.IgnoreRules[0].URLPrefix = "https://other.example"
+	parsed.IgnoreRules[0].Rules[0] = "missing_title"
+	_ = state.reset(80, 24)
+	_, retained, errorsByField := parseSetupValues(*state.values)
+	if len(errorsByField) != 0 || retained.IncludePaths[0] != "/docs" || retained.ExcludePaths[0] != "/docs/archive" || retained.IgnoreRules[0].URLPrefix != "https://example.com/old" || retained.IgnoreRules[0].Rules[0] != "broken_link" {
+		t.Fatalf("settings were not retained: %#v, %v", retained, errorsByField)
+	}
+	state.values.url = "https://example.com/"
+	_, _, errorsByField = parseSetupValues(*state.values)
+	if !strings.Contains(errorsByField[fieldURL], "within") {
+		t.Fatalf("out-of-scope URL not rejected: %v", errorsByField)
+	}
+	for _, width := range []int{70, 80, 100} {
+		state.resize(width, 12)
+		if !state.overflow || lipgloss.Width(state.view(newTheme(true))) > width {
+			t.Fatalf("scope settings overflow incorrectly at width %d", width)
+		}
+	}
+}
 
 func TestSetupParsesFieldsIntoAuditOptions(t *testing.T) {
 	initial := audit.DefaultOptions()

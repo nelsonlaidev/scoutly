@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -16,6 +17,142 @@ import (
 	"github.com/nelsonlaidev/scoutly/internal/page"
 	"github.com/nelsonlaidev/scoutly/internal/testutil"
 )
+
+func TestAuditPageScopePreservesResourceChecksAndSitemapBudget(t *testing.T) {
+	var mutex sync.Mutex
+	counts := make(map[string]int)
+	server := httptest.NewUnstartedServer(nil)
+	server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mutex.Lock()
+		counts[r.URL.Path]++
+		mutex.Unlock()
+		switch r.URL.Path {
+		case "/robots.txt":
+			_, _ = io.WriteString(w, "User-agent: *\nAllow: /\n")
+		case "/sitemap.xml":
+			w.Header().Set("Content-Type", "application/xml")
+			_, _ = io.WriteString(w, testutil.SitemapIndex(server.URL+"/maps/pages.xml"))
+		case "/maps/pages.xml":
+			w.Header().Set("Content-Type", "application/xml")
+			_, _ = io.WriteString(w, testutil.URLSet(server.URL+"/excluded-sitemap", server.URL+"/docs/archive/sitemap", server.URL+"/docs/sitemap"))
+		case "/docs":
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = io.WriteString(w, `<title>Docs</title><meta name="description" content="Docs"><h1>Docs</h1><a href="/docs/archive">Archive</a><a href="/other?version=1#part">Other</a><a href="/docs-old">Old</a><a href="/docs/child">Child</a><img src="/docs/archive/image.png" alt="Example">`)
+		case "/docs/child", "/docs/sitemap":
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = io.WriteString(w, `<title>Page</title><meta name="description" content="Page"><h1>Page</h1>`)
+		case "/docs/archive", "/docs-old":
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = io.WriteString(w, `<a href="/docs/leaked">Must not discover</a>`)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	server.Start()
+	defer server.Close()
+	options := DefaultOptions()
+	options.MaxPages = 3
+	options.IncludePaths = []string{"/docs"}
+	options.ExcludePaths = []string{"/docs/archive"}
+	baseline, err := Audit(context.Background(), server.URL+"/docs", options, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var urls []string
+	for _, page := range baseline.Pages {
+		urls = append(urls, page.URL)
+	}
+	wantURLs := []string{server.URL + "/docs", server.URL + "/docs/child", server.URL + "/docs/sitemap"}
+	if !reflect.DeepEqual(urls, wantURLs) {
+		t.Fatalf("pages = %v, want %v", urls, wantURLs)
+	}
+	mutex.Lock()
+	for _, path := range []string{"/robots.txt", "/sitemap.xml", "/maps/pages.xml", "/other", "/docs/archive/image.png", "/docs/archive", "/docs-old"} {
+		if counts[path] == 0 {
+			t.Errorf("expected request for %s", path)
+		}
+	}
+	for _, path := range []string{"/docs/leaked", "/excluded-sitemap", "/docs/archive/sitemap"} {
+		if counts[path] != 0 {
+			t.Errorf("unexpected request for %s", path)
+		}
+	}
+	mutex.Unlock()
+	options.IgnoreRules = []RuleIgnore{
+		{URLPrefix: server.URL + "/other", Rules: []string{"broken_link"}},
+		{URLPrefix: server.URL + "/docs/archive/image.png", Rules: []string{"broken_image"}},
+	}
+	mutated := false
+	filtered, err := Audit(context.Background(), server.URL+"/docs", options, func(Progress) error {
+		if !mutated {
+			mutated = true
+			options.IncludePaths[0] = "/changed"
+			options.ExcludePaths[0] = "/changed"
+			options.IgnoreRules[0].URLPrefix = server.URL + "/changed"
+			options.IgnoreRules[1].Rules[0] = "missing_title"
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(baseline.Pages, filtered.Pages) || !reflect.DeepEqual(baseline.Links, filtered.Links) || !reflect.DeepEqual(baseline.Images, filtered.Images) {
+		t.Fatal("ignores changed raw resources or occurrences")
+	}
+	if baseline.Summary.Issues.Total-filtered.Summary.Issues.Total != 2 || filtered.Summary.Links.Broken != 1 || filtered.Summary.Images.Broken != 1 {
+		t.Fatalf("unexpected summaries: baseline=%#v filtered=%#v", baseline.Summary, filtered.Summary)
+	}
+}
+
+func TestAuditRejectsOutOfScopeStartBeforeRequests(t *testing.T) {
+	var count atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count.Add(1)
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+	options := DefaultOptions()
+	options.IncludePaths = []string{"/docs"}
+	report, err := Audit(context.Background(), server.URL, options, nil)
+	if report != nil || err == nil || !strings.Contains(err.Error(), "include_paths") || count.Load() != 0 {
+		t.Fatalf("report=%v error=%v requests=%d", report, err, count.Load())
+	}
+}
+
+func TestAuditPageScopeRedirects(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/docs":
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = io.WriteString(w, `<title>Docs</title><meta name="description" content="Docs"><h1>Docs</h1><a href="/docs/redirect">Redirect</a><a href="/docs/error">Error</a>`)
+		case "/docs/redirect":
+			http.Redirect(w, r, "/outside", http.StatusFound)
+		case "/docs/error":
+			http.Redirect(w, r, "/outside-error", http.StatusFound)
+		case "/outside":
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = io.WriteString(w, `<a href="/docs/leaked">Hidden</a>`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	options := DefaultOptions()
+	options.IncludePaths = []string{"/docs"}
+	options.Sitemaps = false
+	options.RespectRobots = false
+	report, err := Audit(context.Background(), server.URL+"/docs", options, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Pages) != 1 || !hasIssue(report.Issues, IssuePageHTTPError) || hasIssue(report.Issues, IssueMissingTitle) || hasIssue(report.Issues, IssuePageCrawlFailed) {
+		t.Fatalf("unexpected report: %#v", report)
+	}
+	report, err = Audit(context.Background(), server.URL+"/docs/redirect", options, nil)
+	if report != nil || err == nil || !strings.Contains(err.Error(), "redirects outside page scope") {
+		t.Fatalf("report=%v error=%v", report, err)
+	}
+}
 
 func TestAuditRunsEveryPhaseAndReusesResourceChecks(t *testing.T) {
 	site := &countingAuditSite{requestCounts: make(map[string]int)}
