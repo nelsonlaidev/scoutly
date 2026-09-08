@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -56,7 +57,7 @@ func TestLoadUsesDefaultsWhenNoConfigExists(t *testing.T) {
 	if result.ConfigPath != "" {
 		t.Fatalf("ConfigPath = %q, want empty", result.ConfigPath)
 	}
-	if result.Base != defaults("test") {
+	if !reflect.DeepEqual(result.Base, defaults("test")) {
 		t.Fatalf("Base = %#v, want defaults", result.Base)
 	}
 }
@@ -88,7 +89,7 @@ func TestLoadDisableDiscoverySkipsFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if result.Base != defaults("test") || result.ConfigPath != "" {
+	if !reflect.DeepEqual(result.Base, defaults("test")) || result.ConfigPath != "" {
 		t.Fatalf("Load() result = %#v, want defaults without config path", result)
 	}
 }

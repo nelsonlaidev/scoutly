@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"maps"
 	"math"
 	"strconv"
 	"strings"
@@ -56,6 +57,7 @@ type setupValues struct {
 	respectRobots       bool
 	sitemaps            bool
 	images              bool
+	rules               *audit.Rules
 }
 
 type setupLayout struct {
@@ -230,6 +232,9 @@ func parseSetupValues(values setupValues) (string, audit.Options, map[fieldID]st
 		Sitemaps:        values.sitemaps,
 		Images:          values.images,
 		UserAgent:       values.userAgent,
+	}
+	if values.rules != nil {
+		options.Rules = maps.Clone(*values.rules)
 	}
 
 	target := strings.TrimSpace(values.url)

@@ -57,17 +57,19 @@ func TestResultSelectorsApplyQueriesAndFilters(t *testing.T) {
 	}
 }
 
-func TestFragmentDoesNotCountAsLinkRedirect(t *testing.T) {
-	finalURL := "https://example.com/page"
-	link := audit.Link{
-		URL: "https://example.com/page#section",
-		Result: audit.LinkResult{
-			Kind:     audit.ResultResponse,
-			FinalURL: &finalURL,
-		},
+func TestResultSelectorsUseResourceStatusWhenIssuesAreDisabled(t *testing.T) {
+	t.Parallel()
+
+	report := resultTestReport()
+	report.Issues = nil
+
+	links := selectResultItems(report, tabLinks, "", "broken")
+	if len(links) != 1 || links[0].link.URL != "https://example.com/broken" {
+		t.Fatalf("broken links = %#v", links)
 	}
-	if linkRedirected(link) {
-		t.Fatal("linkRedirected() = true for fragment-only difference")
+	images := selectResultItems(report, tabImages, "", "invalid")
+	if len(images) != 1 || images[0].image.URL != "https://example.com/not-image" {
+		t.Fatalf("invalid images = %#v", images)
 	}
 }
 

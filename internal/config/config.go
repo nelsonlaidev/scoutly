@@ -1,6 +1,7 @@
 package config
 
 import (
+	"maps"
 	"time"
 
 	"github.com/nelsonlaidev/scoutly/audit"
@@ -24,24 +25,26 @@ type Config struct {
 	Concurrency         int
 	Format              string
 	Progress            string
+	Rules               audit.Rules
 }
 
 type Overrides struct {
-	MaxDepth            *int     `json:"max_depth" yaml:"max_depth" toml:"max_depth"`
-	MaxPages            *int     `json:"max_pages" yaml:"max_pages" toml:"max_pages"`
-	KeepFragments       *bool    `json:"keep_fragments" yaml:"keep_fragments" toml:"keep_fragments"`
-	IgnoreRedirects     *bool    `json:"ignore_redirects" yaml:"ignore_redirects" toml:"ignore_redirects"`
-	RateLimit           *float64 `json:"rate_limit" yaml:"rate_limit" toml:"rate_limit"`
-	RespectRobots       *bool    `json:"respect_robots" yaml:"respect_robots" toml:"respect_robots"`
-	Sitemaps            *bool    `json:"sitemaps" yaml:"sitemaps" toml:"sitemaps"`
-	Images              *bool    `json:"images" yaml:"images" toml:"images"`
-	MaxSitemapDocuments *int     `json:"max_sitemap_documents" yaml:"max_sitemap_documents" toml:"max_sitemap_documents"`
-	Timeout             *int     `json:"timeout" yaml:"timeout" toml:"timeout"`
-	MaxRedirects        *int     `json:"max_redirects" yaml:"max_redirects" toml:"max_redirects"`
-	UserAgent           *string  `json:"user_agent" yaml:"user_agent" toml:"user_agent"`
-	Concurrency         *int     `json:"concurrency" yaml:"concurrency" toml:"concurrency"`
-	Format              *string  `json:"format" yaml:"format" toml:"format"`
-	Progress            *string  `json:"progress" yaml:"progress" toml:"progress"`
+	MaxDepth            *int        `json:"max_depth" yaml:"max_depth" toml:"max_depth"`
+	MaxPages            *int        `json:"max_pages" yaml:"max_pages" toml:"max_pages"`
+	KeepFragments       *bool       `json:"keep_fragments" yaml:"keep_fragments" toml:"keep_fragments"`
+	IgnoreRedirects     *bool       `json:"ignore_redirects" yaml:"ignore_redirects" toml:"ignore_redirects"`
+	RateLimit           *float64    `json:"rate_limit" yaml:"rate_limit" toml:"rate_limit"`
+	RespectRobots       *bool       `json:"respect_robots" yaml:"respect_robots" toml:"respect_robots"`
+	Sitemaps            *bool       `json:"sitemaps" yaml:"sitemaps" toml:"sitemaps"`
+	Images              *bool       `json:"images" yaml:"images" toml:"images"`
+	MaxSitemapDocuments *int        `json:"max_sitemap_documents" yaml:"max_sitemap_documents" toml:"max_sitemap_documents"`
+	Timeout             *int        `json:"timeout" yaml:"timeout" toml:"timeout"`
+	MaxRedirects        *int        `json:"max_redirects" yaml:"max_redirects" toml:"max_redirects"`
+	UserAgent           *string     `json:"user_agent" yaml:"user_agent" toml:"user_agent"`
+	Concurrency         *int        `json:"concurrency" yaml:"concurrency" toml:"concurrency"`
+	Format              *string     `json:"format" yaml:"format" toml:"format"`
+	Progress            *string     `json:"progress" yaml:"progress" toml:"progress"`
+	Rules               audit.Rules `json:"rules" yaml:"rules" toml:"rules"`
 }
 
 func defaults(version string) Config {
@@ -68,6 +71,7 @@ func defaults(version string) Config {
 		Concurrency:         auditOptions.Concurrency,
 		Format:              "text",
 		Progress:            "auto",
+		Rules:               maps.Clone(auditOptions.Rules),
 	}
 }
 
@@ -86,6 +90,7 @@ func (cfg Config) AuditOptions() audit.Options {
 		MaxRedirects:        cfg.MaxRedirects,
 		UserAgent:           cfg.UserAgent,
 		Concurrency:         cfg.Concurrency,
+		Rules:               maps.Clone(cfg.Rules),
 	}
 }
 
@@ -97,6 +102,7 @@ func timeoutDuration(milliseconds int) time.Duration {
 }
 
 func apply(base Config, overrides Overrides) Config {
+	base.Rules = maps.Clone(base.Rules)
 	if overrides.MaxDepth != nil {
 		base.MaxDepth = *overrides.MaxDepth
 	}
@@ -141,6 +147,12 @@ func apply(base Config, overrides Overrides) Config {
 	}
 	if overrides.Progress != nil {
 		base.Progress = *overrides.Progress
+	}
+	if overrides.Rules != nil {
+		if base.Rules == nil {
+			base.Rules = make(audit.Rules, len(overrides.Rules))
+		}
+		maps.Copy(base.Rules, overrides.Rules)
 	}
 
 	return base

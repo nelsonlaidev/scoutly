@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"maps"
 	"strconv"
 	"strings"
 
@@ -50,6 +51,7 @@ type setupState struct {
 }
 
 func newSetupState(options audit.Options) setupState {
+	rules := maps.Clone(options.Rules)
 	values := &setupValues{
 		maxDepth:            strconv.Itoa(options.MaxDepth),
 		maxPages:            strconv.Itoa(options.MaxPages),
@@ -63,6 +65,7 @@ func newSetupState(options audit.Options) setupState {
 		respectRobots:       options.RespectRobots,
 		sitemaps:            options.Sitemaps,
 		images:              options.Images,
+		rules:               &rules,
 	}
 	if options.RateLimit != 0 {
 		values.rateLimit = strconv.FormatFloat(options.RateLimit, 'g', -1, 64)

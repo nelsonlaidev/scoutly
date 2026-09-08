@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"net/url"
 	"strings"
 
 	"github.com/nelsonlaidev/scoutly/audit"
@@ -59,9 +58,8 @@ func selectResultItems(report *audit.Report, tab resultTab, query, filter string
 		}
 
 	case tabLinks:
-		broken := issueURLs(report, audit.IssueBrokenLink)
 		for _, link := range report.Links {
-			if !matchesLinkFilter(link, filter, broken) {
+			if !matchesLinkFilter(link, filter) {
 				continue
 			}
 			description := describeLink(link)
@@ -77,10 +75,8 @@ func selectResultItems(report *audit.Report, tab resultTab, query, filter string
 		}
 
 	case tabImages:
-		broken := issueURLs(report, audit.IssueBrokenImage)
-		invalid := issueURLs(report, audit.IssueInvalidImageURL, audit.IssueInvalidImageContentType)
 		for _, image := range report.Images {
-			if !matchesImageFilter(image, filter, broken, invalid) {
+			if !matchesImageFilter(image, filter) {
 				continue
 			}
 			description := describeImage(image)
@@ -111,10 +107,10 @@ func matchesPageFilter(page audit.Page, filter string) bool {
 	}
 }
 
-func matchesLinkFilter(link audit.Link, filter string, broken map[string]struct{}) bool {
-	_, isBroken := broken[link.URL]
+func matchesLinkFilter(link audit.Link, filter string) bool {
+	isBroken := link.IsBroken()
 	blocked := link.Result.Kind == audit.ResultBlocked
-	redirected := linkRedirected(link)
+	redirected := link.IsRedirected()
 	skipped := link.Result.Kind == audit.ResultSkipped
 	switch filter {
 	case "healthy":
@@ -135,13 +131,11 @@ func matchesLinkFilter(link audit.Link, filter string, broken map[string]struct{
 func matchesImageFilter(
 	image audit.Image,
 	filter string,
-	broken map[string]struct{},
-	invalid map[string]struct{},
 ) bool {
-	_, isBroken := broken[image.URL]
-	_, isInvalid := invalid[image.URL]
+	isBroken := image.IsBroken()
+	isInvalid := image.IsInvalid()
 	blocked := image.Result.Kind == audit.ResultBlocked
-	redirected := imageRedirected(image)
+	redirected := image.IsRedirected()
 	skipped := image.Result.Kind == audit.ResultSkipped
 	switch filter {
 	case "healthy":
@@ -159,37 +153,4 @@ func matchesImageFilter(
 	default:
 		return true
 	}
-}
-
-func issueURLs(report *audit.Report, codes ...audit.IssueCode) map[string]struct{} {
-	wanted := make(map[audit.IssueCode]struct{}, len(codes))
-	for _, code := range codes {
-		wanted[code] = struct{}{}
-	}
-	result := make(map[string]struct{})
-	for _, issue := range report.Issues {
-		if _, exists := wanted[issue.Code]; exists {
-			result[issue.Target.URL] = struct{}{}
-		}
-	}
-	return result
-}
-
-func linkRedirected(link audit.Link) bool {
-	if (link.Result.Kind != audit.ResultResponse && link.Result.Kind != audit.ResultBlocked) ||
-		link.Result.FinalURL == nil {
-		return false
-	}
-	requestURL := link.URL
-	if parsed, err := url.Parse(link.URL); err == nil {
-		parsed.Fragment = ""
-		requestURL = parsed.String()
-	}
-	return *link.Result.FinalURL != requestURL
-}
-
-func imageRedirected(image audit.Image) bool {
-	return (image.Result.Kind == audit.ResultResponse || image.Result.Kind == audit.ResultBlocked) &&
-		image.Result.FinalURL != nil &&
-		*image.Result.FinalURL != image.URL
 }

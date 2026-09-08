@@ -142,8 +142,8 @@ directory:
 - `scoutly.{json,yaml,yml,toml}`
 - `.scoutly.{json,yaml,yml,toml}`
 
-Configuration keys use snake case. CLI flags override file values, and file
-values override defaults.
+Configuration keys and rule names use snake case. CLI flags override file
+values, and file values override defaults.
 
 ```toml
 max_depth = 2
@@ -161,11 +161,46 @@ user_agent = "scoutly/custom"
 concurrency = 20
 format = "text"
 progress = "auto"
+
+[rules]
+title_too_short = "warning"
+meta_description_too_short = "warning"
+broken_link = "error"
 ```
 
 `timeout` is expressed in milliseconds. `rate_limit = 0` disables global
 request rate limiting. Supported progress modes are `auto`, `always`, and
-`never`.
+`never`. Rule levels are `off`, `info`, `warning`, and `error`; omitted rules
+keep their built-in level. Unknown rule names and invalid levels are rejected.
+
+The following advisory rules are disabled by default to keep initial scans
+focused on high-confidence findings:
+
+- `title_too_short`
+- `title_too_long`
+- `meta_description_too_short`
+- `meta_description_too_long`
+- `thin_content`
+- `missing_og_title`
+- `missing_og_description`
+- `missing_og_image`
+- `missing_og_url`
+- `missing_og_type`
+
+The enabled defaults are:
+
+- Error: `missing_title`, `missing_meta_description`, `page_crawl_failed`,
+  `page_http_error`, `broken_link`, `invalid_image_url`, `broken_image`, and
+  `invalid_image_content_type`
+- Warning: `missing_image_alt`, `missing_h1`, `multiple_h1`,
+  `link_check_blocked`, and `image_check_blocked`
+- Info: `redirect` and `image_redirect`
+
+Every name above can be used as a rule key. Reported issue codes remain
+kebab-case for compatibility. Changing a rule only controls
+issue reporting and severity; it does not skip crawling or resource checks.
+`ignore_redirects` continues to suppress both `redirect` and `image_redirect`,
+even when those rules are explicitly enabled.
 
 Use an explicit file or disable discovery:
 
@@ -198,6 +233,7 @@ func main() {
 	options := audit.DefaultOptions()
 	options.MaxDepth = 2
 	options.MaxPages = 100
+	options.Rules["title_too_short"] = audit.RuleLevelWarning
 
 	report, err := audit.Audit(
 		context.Background(),

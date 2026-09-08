@@ -12,7 +12,7 @@ func describeLink(link audit.Link) string {
 	switch link.Result.Kind {
 	case audit.ResultResponse:
 		description := fmt.Sprintf("HTTP %s", intValue(link.Result.StatusCode, "unknown"))
-		if linkRedirected(link) {
+		if link.IsRedirected() {
 			description += " -> " + stringValue(link.Result.FinalURL, "")
 		}
 		return description
@@ -22,7 +22,7 @@ func describeLink(link audit.Link) string {
 			link.Result.Reason,
 			intValue(link.Result.StatusCode, "unknown"),
 		)
-		if linkRedirected(link) {
+		if link.IsRedirected() {
 			description += " -> " + stringValue(link.Result.FinalURL, "")
 		}
 		return description
@@ -39,7 +39,7 @@ func describeImage(image audit.Image) string {
 			intValue(image.Result.StatusCode, "unknown"),
 			stringValue(image.Result.ContentType, "(missing Content-Type)"),
 		)
-		if imageRedirected(image) {
+		if image.IsRedirected() {
 			description += " -> " + stringValue(image.Result.FinalURL, "")
 		}
 		return description
@@ -49,7 +49,7 @@ func describeImage(image audit.Image) string {
 			image.Result.Reason,
 			intValue(image.Result.StatusCode, "unknown"),
 		)
-		if imageRedirected(image) {
+		if image.IsRedirected() {
 			description += " -> " + stringValue(image.Result.FinalURL, "")
 		}
 		return description

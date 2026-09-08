@@ -300,12 +300,6 @@ func TestResultFiltersAndDescriptionsCoverEveryKind(t *testing.T) {
 	for _, image := range report.Images {
 		_ = describeImage(image)
 	}
-	if !linkRedirected(audit.Link{URL: ":", Result: audit.LinkResult{Kind: audit.ResultResponse, FinalURL: &redirect}}) {
-		t.Fatal("malformed request URL did not compare against final URL")
-	}
-	if imageRedirected(audit.Image{Result: audit.ImageResult{Kind: audit.ResultFailed, FinalURL: &redirect}}) {
-		t.Fatal("failed image was classified as redirected")
-	}
 }
 
 func TestDetailLinesCoverEveryResourceShape(t *testing.T) {

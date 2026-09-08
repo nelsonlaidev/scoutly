@@ -11,6 +11,8 @@ import (
 	"testing/iotest"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/nelsonlaidev/scoutly/audit"
 )
 
 func TestDecodeFileSelectsDecoderByExtension(t *testing.T) {
@@ -97,6 +99,37 @@ func TestDecodersPreserveExplicitZeroPresence(t *testing.T) {
 	}
 }
 
+func TestDecodersDecodeRules(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		content string
+		decode  func(io.Reader) (Overrides, error)
+	}{
+		{name: "JSON", content: `{"rules":{"title_too_short":"warning","broken_link":"off"}}`, decode: decodeJSON},
+		{name: "YAML", content: "rules:\n  title_too_short: warning\n  broken_link: off\n", decode: decodeYAML},
+		{name: "TOML", content: "[rules]\ntitle_too_short = \"warning\"\nbroken_link = \"off\"\n", decode: decodeTOML},
+	}
+	want := audit.Rules{
+		"title_too_short": audit.RuleLevelWarning,
+		"broken_link":     audit.RuleLevelOff,
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			overrides, err := test.decode(strings.NewReader(test.content))
+			if err != nil {
+				t.Fatalf("decode error = %v", err)
+			}
+			if !reflect.DeepEqual(overrides.Rules, want) {
+				t.Fatalf("Rules = %#v, want %#v", overrides.Rules, want)
+			}
+		})
+	}
+}
+
 func TestDecodersDecodeSupportedScalarTypes(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -155,6 +188,10 @@ func TestDecodeJSONRejectsInvalidDocuments(t *testing.T) {
 		{name: "non-canonical field", content: `{"Max_Depth": 3}`, want: `unknown field "Max_Depth"`},
 		{name: "duplicate field", content: `{"max_depth": 1, "max_depth": 2}`, want: `duplicate field "max_depth"`},
 		{name: "null field", content: `{"max_depth": null}`, want: `field "max_depth" cannot be null`},
+		{name: "rules non-object", content: `{"rules": []}`, want: `field "rules" must be an object`},
+		{name: "duplicate rule", content: `{"rules":{"broken_link":"off","broken_link":"error"}}`, want: `duplicate rule "broken_link"`},
+		{name: "null rule", content: `{"rules":{"broken_link":null}}`, want: `rule "broken_link" cannot be null`},
+		{name: "non-string rule level", content: `{"rules":{"broken_link":false}}`, want: `rule "broken_link" must be a string`},
 		{name: "invalid field type", content: `{"max_depth": "three"}`, want: "cannot unmarshal"},
 		{name: "multiple documents", content: `{"max_depth": 1} {"max_depth": 2}`, want: "multiple JSON documents"},
 		{name: "malformed document", content: `{"max_depth":`, wantTruncated: true},
@@ -196,6 +233,10 @@ func TestDecodeYAMLRejectsInvalidDocuments(t *testing.T) {
 		{name: "unknown field", content: "max_dept: 3\n", want: `unknown field "max_dept"`},
 		{name: "duplicate field", content: "max_depth: 1\nmax_depth: 2\n", want: `duplicate field "max_depth"`},
 		{name: "null field", content: "max_depth: null\n", want: `field "max_depth" cannot be null`},
+		{name: "rules non-mapping", content: "rules: []\n", want: `field "rules" has invalid type !!seq`},
+		{name: "duplicate rule", content: "rules:\n  broken_link: off\n  broken_link: error\n", want: `duplicate rule "broken_link"`},
+		{name: "null rule", content: "rules:\n  broken_link: null\n", want: `rule "broken_link" cannot be null`},
+		{name: "non-string rule level", content: "rules:\n  broken_link: false\n", want: `rule "broken_link" has invalid type !!bool`},
 		{name: "fractional integer", content: "max_depth: 1.5\n", want: `field "max_depth" has invalid type !!float`},
 		{name: "legacy boolean", content: "respect_robots: yes\n", want: `field "respect_robots" has invalid type !!str`},
 		{name: "boolean float", content: "rate_limit: true\n", want: `field "rate_limit" has invalid type !!bool`},

@@ -140,6 +140,11 @@ func validateJSONDocument(data []byte) error {
 		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
 			return fmt.Errorf("field %q cannot be null", key)
 		}
+		if key == "rules" {
+			if err := validateJSONRules(value); err != nil {
+				return err
+			}
+		}
 	}
 
 	if _, err := decoder.Token(); err != nil {
@@ -155,6 +160,51 @@ func validateJSONDocument(data []byte) error {
 		return err
 	}
 
+	return nil
+}
+
+func validateJSONRules(data []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	token, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	delimiter, ok := token.(json.Delim)
+	if !ok || delimiter != '{' {
+		return errors.New("field \"rules\" must be an object")
+	}
+
+	seen := make(map[string]struct{})
+	for decoder.More() {
+		token, err := decoder.Token()
+		if err != nil {
+			return normalizeJSONStructureError(err)
+		}
+		key, ok := token.(string)
+		if !ok {
+			return errors.New("rule keys must be strings")
+		}
+		if _, exists := seen[key]; exists {
+			return fmt.Errorf("duplicate rule %q", key)
+		}
+		seen[key] = struct{}{}
+
+		var level json.RawMessage
+		if err := decoder.Decode(&level); err != nil {
+			return normalizeJSONStructureError(err)
+		}
+		if bytes.Equal(bytes.TrimSpace(level), []byte("null")) {
+			return fmt.Errorf("rule %q cannot be null", key)
+		}
+		var value string
+		if err := json.Unmarshal(level, &value); err != nil {
+			return fmt.Errorf("rule %q must be a string: %w", key, err)
+		}
+	}
+
+	if _, err := decoder.Token(); err != nil {
+		return normalizeJSONStructureError(err)
+	}
 	return nil
 }
 
@@ -200,8 +250,37 @@ func validateYAMLDocument(document *yaml.Node) error {
 		if !matchesYAMLKind(valueNode, kind) {
 			return fmt.Errorf("field %q has invalid type %s", key, valueNode.Tag)
 		}
+		if key == "rules" {
+			if err := validateYAMLRules(valueNode); err != nil {
+				return err
+			}
+		}
 	}
 
+	return nil
+}
+
+func validateYAMLRules(mapping *yaml.Node) error {
+	seen := make(map[string]struct{}, len(mapping.Content)/2)
+	for index := 0; index < len(mapping.Content); index += 2 {
+		keyNode := mapping.Content[index]
+		valueNode := mapping.Content[index+1]
+		if keyNode.Kind != yaml.ScalarNode || keyNode.Tag != "!!str" {
+			return errors.New("rule keys must be strings")
+		}
+
+		key := keyNode.Value
+		if _, exists := seen[key]; exists {
+			return fmt.Errorf("duplicate rule %q", key)
+		}
+		seen[key] = struct{}{}
+		if valueNode.Tag == "!!null" {
+			return fmt.Errorf("rule %q cannot be null", key)
+		}
+		if valueNode.Kind != yaml.ScalarNode || valueNode.Tag != "!!str" {
+			return fmt.Errorf("rule %q has invalid type %s", key, valueNode.Tag)
+		}
+	}
 	return nil
 }
 
@@ -211,7 +290,11 @@ func overrideSchema() map[string]reflect.Kind {
 
 	for field := range typeOfOverrides.Fields() {
 		key, _, _ := strings.Cut(field.Tag.Get("json"), ",")
-		schema[key] = field.Type.Elem().Kind()
+		fieldType := field.Type
+		if fieldType.Kind() == reflect.Pointer {
+			fieldType = fieldType.Elem()
+		}
+		schema[key] = fieldType.Kind()
 	}
 
 	return schema
@@ -227,6 +310,8 @@ func matchesYAMLKind(node *yaml.Node, kind reflect.Kind) bool {
 		return node.Kind == yaml.ScalarNode && node.Tag == "!!bool"
 	case reflect.String:
 		return node.Kind == yaml.ScalarNode && node.Tag == "!!str"
+	case reflect.Map:
+		return node.Kind == yaml.MappingNode
 	default:
 		return false
 	}

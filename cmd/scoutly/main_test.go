@@ -15,6 +15,7 @@ import (
 
 	"github.com/alecthomas/kong"
 
+	"github.com/nelsonlaidev/scoutly/audit"
 	"github.com/nelsonlaidev/scoutly/internal/config"
 )
 
@@ -121,6 +122,7 @@ func TestResolveMapsEveryOverride(t *testing.T) {
 		Concurrency:         7,
 		Format:              "json",
 		Progress:            "never",
+		Rules:               audit.Rules{},
 	}
 
 	_, got, err := options.resolve(t.TempDir())

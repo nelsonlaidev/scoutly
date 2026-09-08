@@ -3,6 +3,7 @@ package audit
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 	"time"
 )
@@ -23,6 +24,7 @@ type Options struct {
 	MaxRedirects        int
 	UserAgent           string
 	Concurrency         int
+	Rules               Rules
 }
 
 // DefaultOptions returns the default audit settings.
@@ -41,6 +43,7 @@ func DefaultOptions() Options {
 		MaxRedirects:        10,
 		UserAgent:           "scoutly/dev",
 		Concurrency:         20,
+		Rules:               make(Rules),
 	}
 }
 
@@ -97,6 +100,22 @@ func (options Options) Validate() error {
 	}
 	if options.Concurrency <= 0 {
 		add("concurrency", "must be greater than 0")
+	}
+
+	ruleCodes := make([]string, 0, len(options.Rules))
+	for name := range options.Rules {
+		ruleCodes = append(ruleCodes, name)
+	}
+	slices.Sort(ruleCodes)
+	for _, name := range ruleCodes {
+		level := options.Rules[name]
+		if _, exists := defaultRuleLevels[name]; !exists {
+			add("rules."+name, "is not a known rule")
+			continue
+		}
+		if !isValidRuleLevel(level) {
+			add("rules."+name, "must be one of: off, info, warning, error")
+		}
 	}
 
 	if len(fields) > 0 {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -36,10 +37,22 @@ func TestDefaultOptions(t *testing.T) {
 		MaxRedirects:        10,
 		UserAgent:           "scoutly/dev",
 		Concurrency:         20,
+		Rules:               Rules{},
 	}
 
 	if got := DefaultOptions(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("DefaultOptions() = %#v, want %#v", got, want)
+	}
+}
+
+func TestDefaultOptionsReturnsIndependentRules(t *testing.T) {
+	t.Parallel()
+
+	first := DefaultOptions()
+	first.Rules[ruleName(IssueTitleTooShort)] = RuleLevelWarning
+	second := DefaultOptions()
+	if _, exists := second.Rules[ruleName(IssueTitleTooShort)]; exists {
+		t.Fatalf("DefaultOptions() shared Rules map: %#v", second.Rules)
 	}
 }
 
@@ -88,5 +101,39 @@ func TestOptionsValidateRejectsUnsafeUserAgent(t *testing.T) {
 	if len(validationError.Fields) != 1 ||
 		validationError.Fields[0].Field != "user_agent" {
 		t.Fatalf("validation fields = %#v", validationError.Fields)
+	}
+}
+
+func TestOptionsValidateRules(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		rules Rules
+		field string
+	}{
+		{name: "valid", rules: Rules{"title_too_short": RuleLevelWarning}},
+		{name: "unknown rule", rules: Rules{"unknown_rule": RuleLevelOff}, field: "rules.unknown_rule"},
+		{name: "noncanonical rule", rules: Rules{"title-too-short": RuleLevelOff}, field: "rules.title-too-short"},
+		{name: "invalid level", rules: Rules{"title_too_short": RuleLevel("sometimes")}, field: "rules.title_too_short"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			options := DefaultOptions()
+			options.Rules = test.rules
+
+			err := options.Validate()
+			if test.field == "" {
+				if err != nil {
+					t.Fatalf("Validate() error = %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), test.field) {
+				t.Fatalf("Validate() error = %v, want field %q", err, test.field)
+			}
+		})
 	}
 }

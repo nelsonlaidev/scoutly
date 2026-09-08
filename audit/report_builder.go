@@ -22,6 +22,7 @@ func buildReport(
 	checkedLinks []checker.LinkResult,
 	checkedImages []checker.ImageResult,
 	imagesChecked bool,
+	rules Rules,
 	ignoreRedirects bool,
 	auditedAt time.Time,
 ) (*Report, error) {
@@ -114,19 +115,23 @@ func buildReport(
 		}
 	}
 
-	for _, result := range checkedLinks {
+	for _, link := range report.Links {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		report.Issues = append(report.Issues, analyzeLink(result, ignoreRedirects)...)
+		report.Issues = append(report.Issues, analyzeLink(link)...)
 	}
 	if imagesChecked {
-		for _, result := range checkedImages {
+		for _, image := range report.Images {
 			if err := ctx.Err(); err != nil {
 				return nil, err
 			}
-			report.Issues = append(report.Issues, analyzeImage(result, ignoreRedirects)...)
+			report.Issues = append(report.Issues, analyzeImage(image)...)
 		}
+	}
+	report.Issues, err = applyRulePolicy(ctx, report.Issues, rules, ignoreRedirects)
+	if err != nil {
+		return nil, err
 	}
 
 	summary, err := summarize(ctx, report)
@@ -281,101 +286,103 @@ func publicResultKind(kind checker.ResultKind) ResultKind {
 	return ResultKind(kind)
 }
 
-func analyzeLink(result checker.LinkResult, ignoreRedirects bool) []Issue {
-	target := IssueTarget{Type: TargetLink, URL: result.URL}
+func analyzeLink(link Link) []Issue {
+	result := link.Result
+	target := IssueTarget{Type: TargetLink, URL: link.URL}
 	switch result.Kind {
-	case checker.ResultFailed:
+	case ResultFailed:
 		return []Issue{{
 			Code:     IssueBrokenLink,
 			Severity: SeverityError,
 			Message: fmt.Sprintf(
 				"Link check failed: %s (%s)",
-				result.URL,
-				strings.ReplaceAll(string(result.Failure), "-", " "),
+				link.URL,
+				strings.ReplaceAll(string(result.Reason), "-", " "),
 			),
 			Target: target,
 		}}
-	case checker.ResultSkipped:
+	case ResultSkipped:
 		return []Issue{}
 	}
 
 	issues := make([]Issue, 0, 2)
-	if result.Kind == checker.ResultBlocked {
+	if result.Kind == ResultBlocked {
 		issues = append(issues, Issue{
 			Code:     IssueLinkCheckBlocked,
 			Severity: SeverityWarning,
 			Message: fmt.Sprintf(
 				"Link check blocked by anti-bot challenge: %s (HTTP %d)",
-				result.URL,
-				result.StatusCode,
+				link.URL,
+				*result.StatusCode,
 			),
 			Target: target,
 		})
 	}
-	if !ignoreRedirects && result.FinalURL != "" && result.FinalURL != result.RequestURL {
+	if link.IsRedirected() {
 		issues = append(issues, Issue{
 			Code:     IssueRedirect,
 			Severity: SeverityInfo,
-			Message:  fmt.Sprintf("Link redirected: %s -> %s", result.URL, result.FinalURL),
+			Message:  fmt.Sprintf("Link redirected: %s -> %s", link.URL, *result.FinalURL),
 			Target:   target,
 		})
 	}
-	if result.Kind != checker.ResultBlocked && result.StatusCode >= 400 {
+	if link.IsBroken() {
 		issues = append(issues, Issue{
 			Code:     IssueBrokenLink,
 			Severity: SeverityError,
-			Message:  fmt.Sprintf("Broken link: %s (HTTP %d)", result.URL, result.StatusCode),
+			Message:  fmt.Sprintf("Broken link: %s (HTTP %d)", link.URL, *result.StatusCode),
 			Target:   target,
 		})
 	}
 	return issues
 }
 
-func analyzeImage(result checker.ImageResult, ignoreRedirects bool) []Issue {
-	target := IssueTarget{Type: TargetImage, URL: result.URL}
+func analyzeImage(image Image) []Issue {
+	result := image.Result
+	target := IssueTarget{Type: TargetImage, URL: image.URL}
 	switch result.Kind {
-	case checker.ResultInvalid:
+	case ResultInvalid:
 		return []Issue{{
 			Code:     IssueInvalidImageURL,
 			Severity: SeverityError,
-			Message:  "Invalid image URL: " + result.URL,
+			Message:  "Invalid image URL: " + image.URL,
 			Target:   target,
 		}}
-	case checker.ResultFailed:
+	case ResultFailed:
 		return []Issue{{
 			Code:     IssueBrokenImage,
 			Severity: SeverityError,
 			Message: fmt.Sprintf(
 				"Image check failed: %s (%s)",
-				result.URL,
-				strings.ReplaceAll(string(result.Failure), "-", " "),
+				image.URL,
+				strings.ReplaceAll(string(result.Reason), "-", " "),
 			),
 			Target: target,
 		}}
-	case checker.ResultSkipped:
+	case ResultSkipped:
 		return []Issue{}
 	}
 
 	issues := make([]Issue, 0, 2)
-	if result.Kind == checker.ResultBlocked {
+	if result.Kind == ResultBlocked {
 		issues = append(issues, Issue{
 			Code:     IssueImageCheckBlocked,
 			Severity: SeverityWarning,
 			Message: fmt.Sprintf(
 				"Image check blocked by anti-bot challenge: %s (HTTP %d)",
-				result.URL,
-				result.StatusCode,
+				image.URL,
+				*result.StatusCode,
 			),
 			Target: target,
 		})
-	} else if result.StatusCode >= 400 {
+	} else if image.IsBroken() {
 		issues = append(issues, Issue{
 			Code:     IssueBrokenImage,
 			Severity: SeverityError,
-			Message:  fmt.Sprintf("Broken image: %s (HTTP %d)", result.URL, result.StatusCode),
+			Message:  fmt.Sprintf("Broken image: %s (HTTP %d)", image.URL, *result.StatusCode),
 			Target:   target,
 		})
-	} else if !isImageContentType(result.ContentType) {
+	} else if image.IsInvalid() {
 		contentType := "missing"
 		if result.ContentType != nil {
 			contentType = *result.ContentType
@@ -383,15 +390,15 @@ func analyzeImage(result checker.ImageResult, ignoreRedirects bool) []Issue {
 		issues = append(issues, Issue{
 			Code:     IssueInvalidImageContentType,
 			Severity: SeverityError,
-			Message:  fmt.Sprintf("Image has invalid Content-Type: %s (%s)", result.URL, contentType),
+			Message:  fmt.Sprintf("Image has invalid Content-Type: %s (%s)", image.URL, contentType),
 			Target:   target,
 		})
 	}
-	if !ignoreRedirects && result.FinalURL != "" && result.FinalURL != result.URL {
+	if image.IsRedirected() {
 		issues = append(issues, Issue{
 			Code:     IssueImageRedirect,
 			Severity: SeverityInfo,
-			Message:  fmt.Sprintf("Image redirected: %s -> %s", result.URL, result.FinalURL),
+			Message:  fmt.Sprintf("Image redirected: %s -> %s", image.URL, *result.FinalURL),
 			Target:   target,
 		})
 	}
@@ -416,9 +423,10 @@ func summarize(ctx context.Context, report *Report) (Summary, error) {
 		if link.Result.Kind == ResultBlocked {
 			summary.Links.Blocked++
 		}
-		if (link.Result.Kind == ResultResponse || link.Result.Kind == ResultBlocked) &&
-			link.Result.FinalURL != nil &&
-			*link.Result.FinalURL != link.URL {
+		if link.IsBroken() {
+			summary.Links.Broken++
+		}
+		if link.IsRedirected() {
 			summary.Links.Redirected++
 		}
 	}
@@ -434,16 +442,17 @@ func summarize(ctx context.Context, report *Report) (Summary, error) {
 		if image.Result.Kind == ResultBlocked {
 			summary.Images.Blocked++
 		}
-		if (image.Result.Kind == ResultResponse || image.Result.Kind == ResultBlocked) &&
-			image.Result.FinalURL != nil &&
-			*image.Result.FinalURL != image.URL {
+		if image.IsBroken() {
+			summary.Images.Broken++
+		}
+		if image.IsInvalid() {
+			summary.Images.Invalid++
+		}
+		if image.IsRedirected() {
 			summary.Images.Redirected++
 		}
 	}
 
-	brokenLinks := make(map[string]struct{})
-	brokenImages := make(map[string]struct{})
-	invalidImages := make(map[string]struct{})
 	for _, issue := range report.Issues {
 		if err := ctx.Err(); err != nil {
 			return Summary{}, err
@@ -456,19 +465,7 @@ func summarize(ctx context.Context, report *Report) (Summary, error) {
 		case SeverityInfo:
 			summary.Issues.Info++
 		}
-
-		switch issue.Code {
-		case IssueBrokenLink:
-			brokenLinks[issue.Target.URL] = struct{}{}
-		case IssueBrokenImage:
-			brokenImages[issue.Target.URL] = struct{}{}
-		case IssueInvalidImageURL, IssueInvalidImageContentType:
-			invalidImages[issue.Target.URL] = struct{}{}
-		}
 	}
-	summary.Links.Broken = len(brokenLinks)
-	summary.Images.Broken = len(brokenImages)
-	summary.Images.Invalid = len(invalidImages)
 	return summary, nil
 }
 

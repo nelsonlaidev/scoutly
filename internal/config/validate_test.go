@@ -5,6 +5,8 @@ import (
 	"math"
 	"strings"
 	"testing"
+
+	"github.com/nelsonlaidev/scoutly/audit"
 )
 
 func TestValidateAcceptsBoundaryValues(t *testing.T) {
@@ -34,6 +36,12 @@ func TestValidateRejectsInvalidValues(t *testing.T) {
 		{name: "concurrency", field: "concurrency", mutate: func(cfg *Config) { cfg.Concurrency = 0 }},
 		{name: "format", field: "format", mutate: func(cfg *Config) { cfg.Format = "xml" }},
 		{name: "progress", field: "progress", mutate: func(cfg *Config) { cfg.Progress = "sometimes" }},
+		{name: "unknown rule", field: "rules.unknown_rule", mutate: func(cfg *Config) {
+			cfg.Rules = audit.Rules{"unknown_rule": audit.RuleLevelOff}
+		}},
+		{name: "invalid rule level", field: "rules.title_too_short", mutate: func(cfg *Config) {
+			cfg.Rules = audit.Rules{"title_too_short": audit.RuleLevel("sometimes")}
+		}},
 	}
 
 	for _, test := range tests {

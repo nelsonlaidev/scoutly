@@ -16,7 +16,9 @@ import (
 )
 
 func TestSetupParsesFieldsIntoAuditOptions(t *testing.T) {
-	state := newSetupState(audit.DefaultOptions())
+	initial := audit.DefaultOptions()
+	initial.Rules = audit.Rules{"title_too_short": audit.RuleLevelWarning}
+	state := newSetupState(initial)
 	state.values.url = "https://example.com"
 	state.values.maxDepth = "2"
 	state.values.maxPages = "50"
@@ -35,7 +37,8 @@ func TestSetupParsesFieldsIntoAuditOptions(t *testing.T) {
 		options.MaxPages != 50 ||
 		options.Timeout != 1500*time.Millisecond ||
 		options.RateLimit != 2.5 ||
-		options.Images {
+		options.Images ||
+		options.Rules["title_too_short"] != audit.RuleLevelWarning {
 		t.Fatalf("options = %#v", options)
 	}
 }

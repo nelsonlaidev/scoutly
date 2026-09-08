@@ -69,6 +69,7 @@ func TestBuildReportAggregatesPagesResourcesAndIssues(t *testing.T) {
 		links,
 		images,
 		true,
+		nil,
 		false,
 		time.Date(2026, 7, 31, 12, 0, 0, 0, time.UTC),
 	)
@@ -91,6 +92,61 @@ func TestBuildReportAggregatesPagesResourcesAndIssues(t *testing.T) {
 	}
 	if !hasIssue(report.Issues, IssueBrokenLink) || !hasIssue(report.Issues, IssueInvalidImageURL) {
 		t.Fatalf("issues = %#v", report.Issues)
+	}
+	for _, code := range []IssueCode{
+		IssueTitleTooShort,
+		IssueMetaDescriptionTooShort,
+		IssueThinContent,
+		IssueMissingOGTitle,
+	} {
+		if hasIssue(report.Issues, code) {
+			t.Errorf("default report unexpectedly contains %q", code)
+		}
+	}
+}
+
+func TestBuildReportRulesDoNotChangeResourceStatus(t *testing.T) {
+	t.Parallel()
+
+	start := testutil.ParseURL(t, "https://example.com/")
+	linkURL := "https://example.com/missing"
+	imageURL := "%"
+	report, err := buildReport(
+		context.Background(),
+		start,
+		nil,
+		[]checker.LinkResult{{
+			URL:        linkURL,
+			RequestURL: linkURL,
+			Kind:       checker.ResultReachable,
+			StatusCode: 404,
+		}},
+		[]checker.ImageResult{{
+			Key:    "invalid:" + imageURL,
+			URL:    imageURL,
+			Kind:   checker.ResultInvalid,
+			Reason: checker.ReasonInvalidURL,
+		}},
+		true,
+		Rules{
+			"broken_link":       RuleLevelOff,
+			"invalid_image_url": RuleLevelOff,
+		},
+		false,
+		time.Now(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if hasIssue(report.Issues, IssueBrokenLink) || hasIssue(report.Issues, IssueInvalidImageURL) {
+		t.Fatalf("disabled issues = %#v", report.Issues)
+	}
+	if report.Summary.Links.Broken != 1 || report.Summary.Images.Invalid != 1 {
+		t.Fatalf("resource summary = %#v", report.Summary)
+	}
+	if !report.Links[0].IsBroken() || !report.Images[0].IsInvalid() {
+		t.Fatalf("resource status = %#v / %#v", report.Links[0], report.Images[0])
 	}
 }
 
@@ -134,6 +190,7 @@ func TestBuildReportClassifiesPageFailuresAndNonHTML(t *testing.T) {
 		nil,
 		nil,
 		false,
+		nil,
 		false,
 		time.Now(),
 	)
@@ -148,7 +205,7 @@ func TestBuildReportClassifiesPageFailuresAndNonHTML(t *testing.T) {
 	}
 }
 
-func TestAnalyzeRedirectsCanBeIgnored(t *testing.T) {
+func TestAnalyzeRedirects(t *testing.T) {
 	result := checker.LinkResult{
 		URL:        "https://example.com/a",
 		RequestURL: "https://example.com/a",
@@ -156,10 +213,7 @@ func TestAnalyzeRedirectsCanBeIgnored(t *testing.T) {
 		StatusCode: 200,
 		FinalURL:   "https://example.com/b",
 	}
-	if issues := analyzeLink(result, true); len(issues) != 0 {
-		t.Fatalf("issues = %#v", issues)
-	}
-	if issues := analyzeLink(result, false); len(issues) != 1 || issues[0].Code != IssueRedirect {
+	if issues := analyzeLink(publicLink(result, nil)); len(issues) != 1 || issues[0].Code != IssueRedirect {
 		t.Fatalf("issues = %#v", issues)
 	}
 }
@@ -195,6 +249,7 @@ func TestBuildReportClassifiesBlockedResources(t *testing.T) {
 		links,
 		images,
 		true,
+		nil,
 		false,
 		time.Now(),
 	)
@@ -227,9 +282,6 @@ func TestBuildReportClassifiesBlockedResources(t *testing.T) {
 		hasIssue(report.Issues, IssueBrokenImage) ||
 		hasIssue(report.Issues, IssueInvalidImageContentType) {
 		t.Fatalf("issues = %#v", report.Issues)
-	}
-	if got := analyzeLink(links[0], true); len(got) != 1 || got[0].Code != IssueLinkCheckBlocked {
-		t.Fatalf("issues with redirects ignored = %#v", got)
 	}
 }
 
@@ -292,6 +344,7 @@ func TestPublicReportCollectionsMarshalAsArrays(t *testing.T) {
 		links,
 		images,
 		false,
+		nil,
 		false,
 		time.Now(),
 	)
@@ -324,7 +377,7 @@ func TestReportBuilderResourceAndAnalyzerEdges(t *testing.T) {
 		{result: checker.LinkResult{URL: linkURL, RequestURL: linkURL, Kind: checker.ResultReachable, StatusCode: 404}, code: IssueBrokenLink, count: 1},
 	}
 	for _, test := range linkCases {
-		issues := analyzeLink(test.result, false)
+		issues := analyzeLink(publicLink(test.result, nil))
 		if len(issues) != test.count || test.count > 0 && issues[0].Code != test.code {
 			t.Errorf("analyzeLink(%q) = %#v", test.result.Kind, issues)
 		}
@@ -346,7 +399,7 @@ func TestReportBuilderResourceAndAnalyzerEdges(t *testing.T) {
 		{result: checker.ImageResult{URL: imageURL, Kind: checker.ResultReachable, StatusCode: 200, ContentType: new("image/png"), FinalURL: imageURL + "?v=2"}, code: IssueImageRedirect, count: 1},
 	}
 	for _, test := range imageCases {
-		issues := analyzeImage(test.result, false)
+		issues := analyzeImage(publicImage(test.result, nil))
 		if len(issues) != test.count || test.count > 0 && issues[0].Code != test.code {
 			t.Errorf("analyzeImage(%q, %v) = %#v", test.result.Kind, test.result.ContentType, issues)
 		}
@@ -395,13 +448,13 @@ func TestBuildReportRejectsMissingResourceResults(t *testing.T) {
 		URL: start, StatusCode: &status, ContentType: &contentType,
 		Page: page.Page{ContentType: contentType, Links: []page.Link{{Element: page.LinkElementAnchor, URL: linkURL}}},
 	}}
-	if _, err := buildReport(context.Background(), start, crawled, nil, nil, false, false, time.Now()); err == nil || !strings.Contains(err.Error(), "missing check result for link") {
+	if _, err := buildReport(context.Background(), start, crawled, nil, nil, false, nil, false, time.Now()); err == nil || !strings.Contains(err.Error(), "missing check result for link") {
 		t.Fatalf("missing link error = %v", err)
 	}
 
 	crawled[0].Page.Links = nil
 	crawled[0].Page.ImageReferences = []page.ImageReference{{OriginalURL: "%"}}
-	if _, err := buildReport(context.Background(), start, crawled, nil, nil, true, false, time.Now()); err == nil || !strings.Contains(err.Error(), "missing check result for image") {
+	if _, err := buildReport(context.Background(), start, crawled, nil, nil, true, nil, false, time.Now()); err == nil || !strings.Contains(err.Error(), "missing check result for image") {
 		t.Fatalf("missing image error = %v", err)
 	}
 }
@@ -441,7 +494,7 @@ func TestReportBuildingHonorsCancellationAtEveryStage(t *testing.T) {
 
 	for cancelAt := 1; cancelAt <= 20; cancelAt++ {
 		ctx := &cancelAfterChecksContext{cancelAt: cancelAt}
-		_, err := buildReport(ctx, start, crawled, links, images, true, false, time.Now())
+		_, err := buildReport(ctx, start, crawled, links, images, true, nil, false, time.Now())
 		if ctx.checks >= cancelAt && !errors.Is(err, context.Canceled) {
 			t.Fatalf("cancelAt=%d checks=%d error=%v", cancelAt, ctx.checks, err)
 		}
@@ -452,16 +505,22 @@ func TestSummarizeCountsEveryResultAndIssueKind(t *testing.T) {
 	t.Parallel()
 
 	redirected := "https://example.com/final"
+	serverError := 500
+	ok := 200
+	imageContentType := "image/png"
+	textContentType := "text/plain"
 	report := &Report{
 		Links: []Link{
-			{URL: "https://example.com/one", Result: LinkResult{Kind: ResultResponse, FinalURL: &redirected}},
+			{URL: "https://example.com/one", Result: LinkResult{Kind: ResultResponse, StatusCode: &serverError, FinalURL: &redirected}},
 			{URL: "https://example.com/two", Result: LinkResult{Kind: ResultBlocked, FinalURL: &redirected}},
 			{URL: "mailto:test@example.com", Result: LinkResult{Kind: ResultSkipped}},
 		},
 		Images: []Image{
-			{URL: "https://example.com/one.png", Result: ImageResult{Kind: ResultResponse, FinalURL: &redirected}},
+			{URL: "https://example.com/one.png", Result: ImageResult{Kind: ResultResponse, StatusCode: &serverError, FinalURL: &redirected, ContentType: &imageContentType}},
 			{URL: "https://example.com/two.png", Result: ImageResult{Kind: ResultBlocked, FinalURL: &redirected}},
 			{URL: "https://example.com/three.png", Result: ImageResult{Kind: ResultFailed}},
+			{URL: "%", Result: ImageResult{Kind: ResultInvalid}},
+			{URL: "https://example.com/four.png", Result: ImageResult{Kind: ResultResponse, StatusCode: &ok, ContentType: &textContentType}},
 		},
 		Issues: []Issue{
 			{Code: IssueBrokenLink, Severity: SeverityError, Target: IssueTarget{URL: "link"}},
@@ -475,7 +534,7 @@ func TestSummarizeCountsEveryResultAndIssueKind(t *testing.T) {
 		t.Fatal(err)
 	}
 	if summary.Links.Checked != 2 || summary.Links.Blocked != 1 || summary.Links.Redirected != 2 || summary.Links.Broken != 1 ||
-		summary.Images.Checked != 3 || summary.Images.Blocked != 1 || summary.Images.Redirected != 2 || summary.Images.Broken != 1 || summary.Images.Invalid != 2 ||
+		summary.Images.Checked != 4 || summary.Images.Blocked != 1 || summary.Images.Redirected != 2 || summary.Images.Broken != 2 || summary.Images.Invalid != 2 ||
 		summary.Issues.Error != 2 || summary.Issues.Warning != 1 || summary.Issues.Info != 1 {
 		t.Fatalf("summary = %#v", summary)
 	}

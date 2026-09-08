@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/nelsonlaidev/scoutly/audit"
 )
 
 func TestDefaults(t *testing.T) {
@@ -24,6 +26,7 @@ func TestDefaults(t *testing.T) {
 		Concurrency:         20,
 		Format:              "text",
 		Progress:            "auto",
+		Rules:               audit.Rules{},
 	}
 
 	if got := defaults("1.2.3"); !reflect.DeepEqual(got, want) {
@@ -54,6 +57,9 @@ func TestApplyOverridesEveryField(t *testing.T) {
 		Concurrency:         1,
 		Format:              "text",
 		Progress:            "auto",
+		Rules: audit.Rules{
+			"missing_title": audit.RuleLevelWarning,
+		},
 	}
 	want := Config{
 		MaxDepth:            0,
@@ -71,6 +77,10 @@ func TestApplyOverridesEveryField(t *testing.T) {
 		Concurrency:         2,
 		Format:              "json",
 		Progress:            "never",
+		Rules: audit.Rules{
+			"missing_title":   audit.RuleLevelWarning,
+			"title_too_short": audit.RuleLevelError,
+		},
 	}
 	overrides := Overrides{
 		MaxDepth:            new(0),
@@ -88,6 +98,9 @@ func TestApplyOverridesEveryField(t *testing.T) {
 		Concurrency:         new(2),
 		Format:              new("json"),
 		Progress:            new("never"),
+		Rules: audit.Rules{
+			"title_too_short": audit.RuleLevelError,
+		},
 	}
 
 	got := apply(base, overrides)
@@ -96,6 +109,9 @@ func TestApplyOverridesEveryField(t *testing.T) {
 	}
 	if base.MaxDepth != 1 || !base.RespectRobots {
 		t.Fatalf("apply() modified base: %#v", base)
+	}
+	if len(base.Rules) != 1 || base.Rules["missing_title"] != audit.RuleLevelWarning {
+		t.Fatalf("apply() modified base rules: %#v", base.Rules)
 	}
 }
 
@@ -140,5 +156,18 @@ func TestAuditOptionsRejectsTimeoutOverflow(t *testing.T) {
 	cfg.Timeout = int(maxTimeoutMilliseconds)
 	if got := cfg.AuditOptions().Timeout; got != time.Duration(cfg.Timeout)*time.Millisecond {
 		t.Fatalf("Timeout = %s", got)
+	}
+}
+
+func TestAuditOptionsCopiesRules(t *testing.T) {
+	t.Parallel()
+
+	cfg := defaults("test")
+	cfg.Rules["missing_title"] = audit.RuleLevelWarning
+	options := cfg.AuditOptions()
+	options.Rules["missing_title"] = audit.RuleLevelOff
+
+	if cfg.Rules["missing_title"] != audit.RuleLevelWarning {
+		t.Fatalf("AuditOptions() shared Rules map: %#v", cfg.Rules)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"time"
 
@@ -31,6 +32,7 @@ func Audit(
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	options.Rules = maps.Clone(options.Rules)
 	if err := options.Validate(); err != nil {
 		return nil, err
 	}
@@ -190,6 +192,7 @@ func Audit(
 		checkedLinks,
 		checkedImages,
 		options.Images,
+		options.Rules,
 		options.IgnoreRedirects,
 		time.Now(),
 	)
