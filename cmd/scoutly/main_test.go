@@ -282,7 +282,6 @@ func TestRunRejectsInvalidEffectiveConfig(t *testing.T) {
 
 func TestRunRejectsInvalidTarget(t *testing.T) {
 	targets := []string{
-		"example.com",
 		"http://:8080",
 		"http://user@:80",
 		"https://example.com:65536",

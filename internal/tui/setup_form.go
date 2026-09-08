@@ -120,7 +120,7 @@ func newSetupForm(values *setupValues, formTheme *setupTheme) (*huh.Form, []fiel
 	runField.WithTheme(runTheme)
 
 	fields := []huh.Field{
-		input(fieldURL, "Website URL", "https://example.com", &values.url),
+		input(fieldURL, "Website URL", "example.com", &values.url),
 		input(fieldMaxDepth, "Maximum depth", "", &values.maxDepth),
 		input(fieldMaxPages, "Maximum pages", "", &values.maxPages),
 		input(
@@ -239,7 +239,7 @@ func parseSetupValues(values setupValues) (string, audit.Options, map[fieldID]st
 
 	target := strings.TrimSpace(values.url)
 	if _, err := urlutil.ParseTarget(target); err != nil {
-		errorsByField[fieldURL] = "Enter a valid HTTP or HTTPS URL"
+		errorsByField[fieldURL] = "Enter a valid website URL"
 	}
 
 	parseInt := func(id fieldID, value string, destination *int) {

@@ -110,21 +110,36 @@ func isHTTP(scheme string) bool {
 	return scheme == "http" || scheme == "https"
 }
 
-// ParseTarget validates and normalizes a target URL. It returns the
-// parsed URL on success, or an error if the input is not a valid
-// HTTP(S) URL.
+// ParseTarget validates and normalizes a target URL. Targets without a scheme
+// default to HTTPS. It returns the parsed URL on success, or an error if the
+// input is not a valid HTTP(S) URL.
 func ParseTarget(value string) (*url.URL, error) {
+	original := value
+	value = strings.TrimSpace(value)
+	schemeSeparator := strings.Index(value, "://")
+	firstPathSeparator := strings.IndexAny(value, "/?#")
+	hasExplicitScheme := schemeSeparator >= 0 &&
+		(firstPathSeparator < 0 || schemeSeparator < firstPathSeparator)
+	if !hasExplicitScheme {
+		if strings.HasPrefix(value, "//") {
+			value = "https:" + value
+		} else {
+			value = "https://" + value
+		}
+	}
+
 	target, err := url.Parse(value)
 	if err != nil ||
 		target.Hostname() == "" ||
-		(!strings.EqualFold(target.Scheme, "http") && !strings.EqualFold(target.Scheme, "https")) {
-		return nil, fmt.Errorf("target %q must be an HTTP(S) URL", value)
+		(!strings.EqualFold(target.Scheme, "http") && !strings.EqualFold(target.Scheme, "https")) ||
+		(!hasExplicitScheme && (target.User != nil || strings.HasSuffix(target.Host, ":"))) {
+		return nil, fmt.Errorf("target %q must be an HTTP(S) URL", original)
 	}
 
 	if port := target.Port(); port != "" {
 		number, err := strconv.Atoi(port)
 		if err != nil || number < 1 || number > 65535 {
-			return nil, fmt.Errorf("target %q has an invalid port", value)
+			return nil, fmt.Errorf("target %q has an invalid port", original)
 		}
 	}
 

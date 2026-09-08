@@ -5,7 +5,7 @@ matching [GitHub release](https://github.com/nelsonlaidev/scoutly/releases).
 
 ```sh
 npm install --global @nelsonlaidev/scoutly
-scoutly https://example.com
+scoutly example.com
 ```
 
 Prereleases are published to the opt-in `beta` dist-tag:

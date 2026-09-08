@@ -64,8 +64,11 @@ Stable installations are never advanced to a prerelease automatically.
 Audit a website by passing its URL:
 
 ```sh
-scoutly https://example.com
+scoutly example.com
 ```
+
+Scoutly defaults targets without a protocol to HTTPS. Pass an explicit
+`http://` URL when auditing a site that does not support HTTPS.
 
 Run Scoutly without a URL in an interactive terminal to open the full-screen
 TUI:

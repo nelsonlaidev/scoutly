@@ -43,9 +43,22 @@ func TestSetupParsesFieldsIntoAuditOptions(t *testing.T) {
 	}
 }
 
+func TestSetupAcceptsURLWithoutScheme(t *testing.T) {
+	state := newSetupState(audit.DefaultOptions())
+	state.values.url = "example.com/path"
+
+	target, _, errorsByField := parseSetupValues(*state.values)
+	if len(errorsByField) != 0 {
+		t.Fatalf("parseSetupValues() errors = %#v", errorsByField)
+	}
+	if target != "example.com/path" {
+		t.Fatalf("target = %q", target)
+	}
+}
+
 func TestSetupReportsParsingAndValidationErrors(t *testing.T) {
 	state := newSetupState(audit.DefaultOptions())
-	state.values.url = "example.com"
+	state.values.url = "not a url"
 	state.values.maxDepth = "not-a-number"
 	state.values.maxPages = "0"
 	state.values.timeout = "9223372036855"
@@ -399,7 +412,7 @@ func TestSetupTabShowsValidationErrorWithoutLeavingInvalidField(t *testing.T) {
 	if key := state.form.GetFocusedField().GetKey(); key != string(fieldURL) {
 		t.Fatalf("focused field = %q, want %q", key, fieldURL)
 	}
-	if got, want := state.validationError, "Enter a valid HTTP or HTTPS URL"; got != want {
+	if got, want := state.validationError, "Enter a valid website URL"; got != want {
 		t.Fatalf("validation error = %q, want %q", got, want)
 	}
 	lines := strings.Split(ansi.Strip(state.view(newTheme(true))), "\n")

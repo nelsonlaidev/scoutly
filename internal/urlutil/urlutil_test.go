@@ -157,25 +157,52 @@ func TestOrigin(t *testing.T) {
 func TestParseTarget(t *testing.T) {
 	t.Parallel()
 
-	target, err := ParseTarget("HTTPS://EXAMPLE.COM:443/path#fragment")
-	if err != nil {
-		t.Fatalf("ParseTarget() error = %v", err)
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{input: "HTTPS://EXAMPLE.COM:443/path#fragment", want: "https://example.com/path#fragment"},
+		{input: "http://example.com/path", want: "http://example.com/path"},
+		{input: "example.com", want: "https://example.com/"},
+		{input: "  example.com/path?key=value#details  ", want: "https://example.com/path?key=value#details"},
+		{input: "localhost:8080/path", want: "https://localhost:8080/path"},
+		{input: "127.0.0.1:8080", want: "https://127.0.0.1:8080/"},
+		{input: "[::1]:8080/path", want: "https://[::1]:8080/path"},
+		{input: "//example.com/path", want: "https://example.com/path"},
 	}
-	if got := target.String(); got != "https://example.com/path#fragment" {
-		t.Fatalf("ParseTarget() = %q", got)
+	for _, test := range tests {
+		t.Run(test.input, func(t *testing.T) {
+			t.Parallel()
+
+			target, err := ParseTarget(test.input)
+			if err != nil {
+				t.Fatalf("ParseTarget() error = %v", err)
+			}
+			if got := target.String(); got != test.want {
+				t.Fatalf("ParseTarget() = %q, want %q", got, test.want)
+			}
+		})
 	}
 
 	for _, value := range []string{
+		"",
 		"://bad",
 		"/relative",
+		"mailto:person@example.com",
+		"file:/tmp/example.html",
 		"ftp://example.com",
+		"localhost:invalid",
 		"https://example.com:0",
 		"https://example.com:65536",
 		"https://example.com:invalid",
 	} {
-		if parsed, err := ParseTarget(value); err == nil || parsed != nil {
-			t.Errorf("ParseTarget(%q) = %v, %v, want nil, error", value, parsed, err)
-		}
+		t.Run("invalid "+value, func(t *testing.T) {
+			t.Parallel()
+
+			if parsed, err := ParseTarget(value); err == nil || parsed != nil {
+				t.Errorf("ParseTarget(%q) = %v, %v, want nil, error", value, parsed, err)
+			}
+		})
 	}
 }
 

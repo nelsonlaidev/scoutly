@@ -266,7 +266,7 @@ func TestRunAuditButtonValidatesAndStartsOnLeftClick(t *testing.T) {
 	if err := state.setup.form.GetFocusedField().Error(); err == nil {
 		t.Fatal("URL field error = nil after validation")
 	}
-	wantError := "Enter a valid HTTP or HTTPS URL"
+	wantError := "Enter a valid website URL"
 	if got := state.setup.validationError; got != wantError {
 		t.Fatalf("validation error = %q, want %q", got, wantError)
 	}
