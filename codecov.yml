@@ -9,9 +9,6 @@ coverage:
         target: 50%
         threshold: 1%
 
-ignore:
-  - './cmd/scoutly/main.go'
-
 comment:
   layout: 'header, diff, flags, files'
   behavior: default

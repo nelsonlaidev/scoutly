@@ -1,0 +1,62 @@
+[
+  {
+    "method": "GET",
+    "target": "/robots.txt",
+    "user_agent": "scoutly-test/0.6",
+    "accept_encoding": "gzip"
+  },
+  {
+    "method": "GET",
+    "target": "/",
+    "user_agent": "scoutly-test/0.6",
+    "accept_encoding": "gzip"
+  },
+  {
+    "method": "GET",
+    "target": "/about",
+    "user_agent": "scoutly-test/0.6",
+    "accept_encoding": "gzip"
+  },
+  {
+    "method": "GET",
+    "target": "/broken",
+    "user_agent": "scoutly-test/0.6",
+    "accept_encoding": "gzip"
+  },
+  {
+    "method": "GET",
+    "target": "/sitemap.xml",
+    "user_agent": "scoutly-test/0.6",
+    "accept_encoding": "gzip"
+  },
+  {
+    "method": "GET",
+    "target": "/sitemap-only",
+    "user_agent": "scoutly-test/0.6",
+    "accept_encoding": "gzip"
+  },
+  {
+    "method": "GET",
+    "target": "/about",
+    "user_agent": "scoutly-test/0.6",
+    "accept_encoding": "gzip"
+  },
+  {
+    "method": "GET",
+    "target": "/broken",
+    "user_agent": "scoutly-test/0.6",
+    "accept_encoding": "gzip"
+  },
+  {
+    "method": "GET",
+    "target": "/private",
+    "user_agent": "scoutly-test/0.6",
+    "accept_encoding": "gzip"
+  },
+  {
+    "method": "GET",
+    "target": "/image.png",
+    "user_agent": "scoutly-test/0.6",
+    "accept_encoding": "gzip"
+  }
+]

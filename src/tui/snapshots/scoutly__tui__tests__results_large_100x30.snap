@@ -1,0 +1,34 @@
+---
+source: src/tui/mod.rs
+expression: "snapshot(&mut app, 100, 30)"
+---
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Scoutly                               https://example.com/                               Results │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+ 1 Overview  2 Issues  3 Pages  4 Links  5 Images
+╭───────────────────────────────────────────────────────────────────────────╮ ╭────────────────────╮
+│ Search: Press / to search                                                 │ │ Filter: all        │
+╰───────────────────────────────────────────────────────────────────────────╯ ╰────────────────────╯
+╭Results (40)───────────────────────────────────╮ ╭Details: Link───────────────────────────────────╮
+│ Links                         Status          █ │ https://example.com/link-00                    │
+│ https://example.com/link-00   HTTP 200        █ │                                                │
+│ https://example.com/link-01   HTTP 200        █ │ HTTP 200                                       │
+│ https://example.com/link-02   HTTP 200        █ │ Status: 200                                    │
+│ https://example.com/link-03   HTTP 200        █ │ Final URL: (missing)                           │
+│ https://example.com/link-04   HTTP 200        █ │                                                │
+│ https://example.com/link-05   HTTP 200        █ │                                                │
+│ https://example.com/link-06   HTTP 200        █ │                                                │
+│ https://example.com/link-07   HTTP 200        █ │                                                │
+│ https://example.com/link-08   HTTP 200        ▀ │                                                │
+│ https://example.com/link-09   HTTP 200        │ │                                                │
+│ https://example.com/link-10   HTTP 200        │ │                                                │
+│ https://example.com/link-11   HTTP 200        │ │                                                │
+│ https://example.com/link-12   HTTP 200        │ │                                                │
+│ https://example.com/link-13   HTTP 200        │ │                                                │
+│ https://example.com/link-14   HTTP 200        │ │                                                │
+│ https://example.com/link-15   HTTP 200        │ │                                                │
+│ https://example.com/link-16   HTTP 200        │ │                                                │
+│ https://example.com/link-17   HTTP 200        │ │                                                │
+│ https://example.com/link-18   HTTP 200        │ │                                                │
+╰───────────────────────────────────────────────╯ ╰────────────────────────────────────────────────╯
+1-5 tabs   / search   f filter   Tab pane   Arrows move   n new   q quit

@@ -3,11 +3,12 @@ dist/
 
 # Binaries
 /scoutly
+/target/
 /npm/bin/
 /npm/node_modules/
 
 # Coverage
-coverage.out
+lcov.info
 
 # Misc
 .DS_Store

@@ -1,0 +1,24 @@
+---
+source: src/tui/mod.rs
+expression: "snapshot(&mut failed, 70, 20)"
+---
+╭────────────────────────────────────────────────────────────────────╮
+│ Scoutly                    Website audit                    Failed │
+╰────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+                             Audit failed
+
+                           connection failed
+
+
+
+
+
+
+
+Enter edit and retry   q quit

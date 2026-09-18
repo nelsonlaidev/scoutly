@@ -2,28 +2,41 @@ default:
     @just --list
 
 run *args:
-    @go run ./cmd/scoutly {{ args }}
+    @cargo run --locked -- {{ args }}
 
 build:
-    @go build -o scoutly ./cmd/scoutly
+    @cargo build --locked
+
+check:
+    @cargo check --locked --all-targets --all-features
 
 fmt:
-    @gofmt -l -w .
-    @golangci-lint fmt
+    @cargo fmt --all
 
 lint:
-    @go vet ./...
-    @golangci-lint run
+    @cargo clippy --locked --all-targets --all-features -- -D warnings
 
-tidy:
-    @go mod tidy
+docs:
+    @RUSTDOCFLAGS="-D warnings" cargo doc --locked --no-deps --all-features
 
 test:
-    @go test -race -count=1 ./...
+    @cargo test --locked
+
+test-integration:
+    @cargo test --locked --test integration
+
+test-e2e:
+    @cargo test --locked --test e2e
 
 test-cover:
-    @go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
-    @go tool cover -func=coverage.out
+    @cargo llvm-cov --locked --all-features --workspace --lcov --output-path lcov.info
+
+audit:
+    @cargo audit --deny warnings
+
+dist-check:
+    @dist generate --check
+    @dist plan --output-format=json
 
 clean:
-    @rm -rf scoutly coverage.out
+    @cargo clean

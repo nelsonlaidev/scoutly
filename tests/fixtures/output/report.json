@@ -1,0 +1,240 @@
+{
+  "url": "{{ORIGIN}}/",
+  "audited_at": "{{AUDITED_AT}}",
+  "summary": {
+    "pages": 4,
+    "links": {
+      "total": 3,
+      "checked": 3,
+      "broken": 1,
+      "blocked": 0,
+      "redirected": 0
+    },
+    "images": {
+      "total": 1,
+      "checked": 1,
+      "broken": 0,
+      "blocked": 0,
+      "redirected": 0,
+      "invalid": 0
+    },
+    "issues": {
+      "total": 4,
+      "error": 3,
+      "warning": 1,
+      "info": 0
+    }
+  },
+  "issues": [
+    {
+      "code": "missing-meta-description",
+      "severity": "error",
+      "message": "Page is missing a meta description",
+      "target": {
+        "type": "page",
+        "url": "{{ORIGIN}}/about"
+      }
+    },
+    {
+      "code": "missing-h1",
+      "severity": "warning",
+      "message": "Page is missing an H1 tag",
+      "target": {
+        "type": "page",
+        "url": "{{ORIGIN}}/about"
+      }
+    },
+    {
+      "code": "page-http-error",
+      "severity": "error",
+      "message": "Page returned HTTP 404",
+      "target": {
+        "type": "page",
+        "url": "{{ORIGIN}}/broken"
+      }
+    },
+    {
+      "code": "broken-link",
+      "severity": "error",
+      "message": "Broken link: {{ORIGIN}}/broken (HTTP 404)",
+      "target": {
+        "type": "link",
+        "url": "{{ORIGIN}}/broken"
+      }
+    }
+  ],
+  "pages": [
+    {
+      "url": "{{ORIGIN}}/",
+      "depth": 0,
+      "status_code": 200,
+      "content_type": "text/html; charset=utf-8",
+      "title": "Scoutly test fixture home",
+      "description": "A deterministic local page used to verify Scoutly report behavior.",
+      "headings": {
+        "h1": [
+          "Test fixture"
+        ]
+      },
+      "images": [
+        {
+          "url": "{{ORIGIN}}/image.png",
+          "alt": "Fixture logo"
+        }
+      ],
+      "open_graph": {
+        "title": "Scoutly fixture",
+        "description": "Test fixture",
+        "image": "{{ORIGIN}}/image.png",
+        "url": "{{ORIGIN}}/",
+        "type": "website",
+        "site_name": null,
+        "locale": null
+      }
+    },
+    {
+      "url": "{{ORIGIN}}/about",
+      "depth": 1,
+      "status_code": 200,
+      "content_type": "text/html",
+      "title": null,
+      "description": null,
+      "headings": {
+        "h1": []
+      },
+      "images": [],
+      "open_graph": {
+        "title": null,
+        "description": null,
+        "image": null,
+        "url": null,
+        "type": null,
+        "site_name": null,
+        "locale": null
+      }
+    },
+    {
+      "url": "{{ORIGIN}}/broken",
+      "depth": 1,
+      "status_code": 404,
+      "content_type": "text/html",
+      "title": null,
+      "description": null,
+      "headings": {
+        "h1": []
+      },
+      "images": [],
+      "open_graph": {
+        "title": null,
+        "description": null,
+        "image": null,
+        "url": null,
+        "type": null,
+        "site_name": null,
+        "locale": null
+      }
+    },
+    {
+      "url": "{{ORIGIN}}/sitemap-only",
+      "depth": -1,
+      "status_code": 200,
+      "content_type": "text/html",
+      "title": "Sitemap fixture page",
+      "description": "A deterministic sitemap-only page used by the Scoutly test fixture.",
+      "headings": {
+        "h1": [
+          "Sitemap page"
+        ]
+      },
+      "images": [],
+      "open_graph": {
+        "title": null,
+        "description": null,
+        "image": null,
+        "url": null,
+        "type": null,
+        "site_name": null,
+        "locale": null
+      }
+    }
+  ],
+  "links": [
+    {
+      "url": "{{ORIGIN}}/about",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "{{ORIGIN}}/about"
+      },
+      "found_on": [
+        {
+          "page_url": "{{ORIGIN}}/",
+          "original_url": "/about",
+          "element": "a",
+          "text": "About"
+        }
+      ]
+    },
+    {
+      "url": "{{ORIGIN}}/broken",
+      "result": {
+        "kind": "response",
+        "status_code": 404,
+        "final_url": "{{ORIGIN}}/broken"
+      },
+      "found_on": [
+        {
+          "page_url": "{{ORIGIN}}/",
+          "original_url": "/broken#details",
+          "element": "a",
+          "text": "Broken"
+        }
+      ]
+    },
+    {
+      "url": "{{ORIGIN}}/private",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "{{ORIGIN}}/private"
+      },
+      "found_on": [
+        {
+          "page_url": "{{ORIGIN}}/",
+          "original_url": "/private",
+          "element": "a",
+          "text": "Private"
+        }
+      ]
+    }
+  ],
+  "images": [
+    {
+      "url": "{{ORIGIN}}/image.png",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "{{ORIGIN}}/image.png",
+        "content_type": "image/png"
+      },
+      "found_on": [
+        {
+          "page_url": "{{ORIGIN}}/",
+          "original_url": "/image.png",
+          "element": "img",
+          "attribute": "src",
+          "descriptor": null,
+          "alt": "Fixture logo"
+        },
+        {
+          "page_url": "{{ORIGIN}}/",
+          "original_url": "{{ORIGIN}}/image.png",
+          "element": "meta",
+          "attribute": "content",
+          "descriptor": null,
+          "alt": null
+        }
+      ]
+    }
+  ]
+}

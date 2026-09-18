@@ -1,0 +1,24 @@
+---
+source: src/tui/mod.rs
+expression: "snapshot(&mut app, 70, 20)"
+---
+╭────────────────────────────────────────────────────────────────────╮
+│ Scoutly                     Website audit                    Setup │
+╰────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────╮
+│  Website URL                       Maximum depth                   █
+│  > example.com                     > 10                            █
+│                                                                    █
+│  Maximum pages                     Maximum sitemap documents       █
+│  > 500                             > 1000                          █
+│                                                                    █
+│  Timeout (ms)                      Maximum redirects               █
+│  > 30000                           > 10                            █
+│                                                                    ▔
+│  Concurrency                       User agent                      │
+│  > 20                              > scoutly/dev                   │
+│                                                                    │
+│  Rate limit (requests/sec)         Keep URL fragments              │
+│  > disabled                         Yes   [No]                     │
+╰────────────────────────────────────────────────────────────────────╯
+Tab/Enter move   Shift+Tab back   Space toggle   Ctrl+C quit

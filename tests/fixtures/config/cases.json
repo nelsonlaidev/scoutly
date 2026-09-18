@@ -1,0 +1,20 @@
+[
+  {"file": "valid.json", "outcome": "success"},
+  {"file": "valid.yaml", "outcome": "success"},
+  {"file": "valid.toml", "outcome": "success"},
+  {
+    "file": "invalid-explicit-null.json",
+    "outcome": "failure",
+    "classification": "cannot be null"
+  },
+  {
+    "file": "invalid-duplicate.yaml",
+    "outcome": "failure",
+    "classification": "duplicate field"
+  },
+  {
+    "file": "invalid-unknown.toml",
+    "outcome": "failure",
+    "classification": "strict mode"
+  }
+]

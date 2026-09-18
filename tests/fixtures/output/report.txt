@@ -1,0 +1,22 @@
+Scoutly Audit Report
+URL: {{ORIGIN}}/
+Audited: {{AUDITED_AT}}
+
+Summary
+Pages: 4
+Links: 3 total, 3 checked, 1 broken, 0 blocked, 0 redirected
+Images: 1 total, 1 checked, 0 broken, 0 blocked, 0 invalid, 0 redirected
+Issues: 4 total, 3 errors, 1 warning, 0 info
+
+Errors (3)
+- Page is missing a meta description [missing-meta-description]
+  Page: {{ORIGIN}}/about
+- Page returned HTTP 404 [page-http-error]
+  Page: {{ORIGIN}}/broken
+- Broken link: {{ORIGIN}}/broken (HTTP 404) [broken-link]
+  Link: {{ORIGIN}}/broken
+  Found on: {{ORIGIN}}/
+
+Warnings (1)
+- Page is missing an H1 tag [missing-h1]
+  Page: {{ORIGIN}}/about

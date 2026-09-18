@@ -1,0 +1,70 @@
+[package]
+name = "scoutly"
+version = "0.6.0-beta.1"
+edition = "2024"
+rust-version = "1.96"
+description = "Fast website auditing tool"
+license = "MIT"
+repository = "https://github.com/nelsonlaidev/scoutly"
+homepage = "https://github.com/nelsonlaidev/scoutly"
+authors = ["Nelson Lai <me@nelsonlai.dev>"]
+readme = "README.md"
+keywords = ["audit", "crawler", "seo", "website"]
+categories = ["command-line-utilities", "web-programming"]
+include = [
+    "/Cargo.lock",
+    "/Cargo.toml",
+    "/LICENSE",
+    "/README.md",
+    "/src/**",
+    "/tests/**",
+]
+
+[[test]]
+name = "integration"
+path = "tests/integration/main.rs"
+
+[[test]]
+name = "e2e"
+path = "tests/e2e/main.rs"
+
+[dependencies]
+clap = { version = "4.6", features = ["derive"] }
+crossterm = "0.29"
+flate2 = "1.1"
+quick-xml = { version = "0.42", features = ["serialize"] }
+ratatui = "0.30"
+reqwest = { version = "0.13", default-features = false, features = [
+    "gzip",
+    "rustls",
+] }
+robotstxt = "0.3"
+scraper = "0.27"
+percent-encoding = "2.3"
+serde = { version = "1.0", features = ["derive"] }
+serde-saphyr = "1.2"
+serde_json = "1.0"
+thiserror = "2.0"
+time = { version = "0.3", features = ["formatting", "parsing", "serde"] }
+tokio = { version = "1.53", features = [
+    "macros",
+    "rt-multi-thread",
+    "signal",
+    "sync",
+    "time",
+] }
+toml = "1.1"
+tui-scrollbar = { version = "0.2", features = ["crossterm"] }
+url = { version = "2.5", features = ["serde"] }
+unicode-width = "0.2"
+
+[dev-dependencies]
+insta = "1.48"
+tempfile = "3.27"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[profile.dist]
+inherits = "release"
+lto = "thin"

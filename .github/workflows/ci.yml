@@ -12,17 +12,73 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  GOTOOLCHAIN: local
-
 permissions:
   contents: read
 
 jobs:
-  ci:
-    name: Build and Test (${{ matrix.name }})
+  rust-quality:
+    name: Rust Quality and Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component clippy,rustfmt
+          rustup default 1.96.0
+
+      - name: Check Rust formatting
+        run: cargo fmt --all --check
+
+      - name: Check Rust package
+        run: cargo check --locked --all-targets --all-features
+
+      - name: Run Clippy
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+
+      - name: Check documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --locked --no-deps --all-features
+
+      - name: Install cargo-dist
+        uses: taiki-e/install-action@26e9283f268b880168bdbd2c545dfcd60ec2c6ab # v2
+        with:
+          tool: cargo-dist@0.33.0
+          fallback: none
+
+      - name: Verify cargo-dist release plan
+        run: |
+          dist generate --check
+          dist plan --output-format=json > dist-plan.json
+
+      - name: Verify crate package
+        run: cargo package --locked
+
+  rust-msrv:
+    name: Rust MSRV (1.96)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust 1.96.0
+        run: rustup toolchain install 1.96.0 --profile minimal
+
+      - name: Verify declared MSRV
+        run: |
+          cargo +1.96.0 metadata --locked --no-deps --format-version 1 > cargo-metadata.json
+          jq -e '.packages | length == 1 and .[0].rust_version == "1.96"' cargo-metadata.json
+
+      - name: Check all targets with the MSRV
+        run: cargo +1.96.0 check --locked --all-targets --all-features
+
+  rust-test:
+    name: Rust Native Test (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    needs: [lint, format, audit]
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -34,120 +90,82 @@ jobs:
             name: macOS
           - os: windows-latest
             name: Windows
-
     steps:
       - name: Checkout branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+      - name: Install Rust 1.96.0
+        run: rustup toolchain install 1.96.0 --profile minimal
 
-      - name: Download modules
-        run: go mod download
+      - name: Run Rust tests and contract harness
+        run: cargo +1.96.0 test --locked
 
-      - name: Build
-        run: go build ./cmd/scoutly
-
-      - name: Run tests
-        run: go test -count=1 ./...
-
-  coverage:
-    name: Code Coverage
+  rust-security:
+    name: Rust Security Audit
     runs-on: ubuntu-latest
-    needs: [ci]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@26e9283f268b880168bdbd2c545dfcd60ec2c6ab # v2
+        with:
+          tool: cargo-audit@0.22.2
+          fallback: none
+
+      - name: Audit locked Rust dependencies
+        run: cargo audit --deny warnings
+
+  rust-coverage:
+    name: Rust Code Coverage
+    runs-on: ubuntu-latest
+    needs: [rust-test]
     if: ${{ github.ref == 'refs/heads/main' || github.base_ref == 'main' }}
     timeout-minutes: 30
     steps:
       - name: Checkout branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component llvm-tools-preview
+          rustup default 1.96.0
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@26e9283f268b880168bdbd2c545dfcd60ec2c6ab # v2
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          tool: cargo-llvm-cov@0.9.1
+          fallback: none
 
-      - name: Run tests with coverage
-        run: go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
+      - name: Run Rust tests with coverage
+        run: cargo llvm-cov --locked --all-features --workspace --lcov --output-path lcov.info
 
-      - name: Upload coverage reports
+      - name: Upload Rust coverage report
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.out
+          files: ./lcov.info
+          flags: rust
           disable_search: true
           fail_ci_if_error: false
 
-  lint:
-    name: Lint
+  rust-stress:
+    name: Rust Stress and Leak Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+      - name: Install Rust 1.96.0
+        run: rustup toolchain install 1.96.0 --profile minimal
 
-      - name: Check module files
-        run: |
-          go mod tidy
-          git diff --exit-code -- go.mod go.sum
-
-      - name: Verify downloaded modules
-        run: go mod verify
-
-      - name: Run go vet
-        run: go vet ./...
-
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          version: v2.13
-
-  format:
-    name: Check formatting
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout branch
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
-
-      - name: Install golangci-lint
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          version: v2.13
-          install-only: true
-
-      - name: Check formatting
-        run: |
-          gofmt -l -w .
-          golangci-lint fmt
-          git diff --exit-code
-
-  audit:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Run govulncheck
-        uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
-        with:
-          go-version-input: ""
-          go-version-file: go.mod
-          go-package: ./...
+      - name: Run repeated audit, cancellation, and body-limit stress gate
+        run: >-
+          cargo +1.96.0 test --locked
+          repeated_audits_cancellation_and_bounded_bodies_do_not_leak --
+          --ignored --test-threads=1
 
   npm-package:
     name: npm Package
