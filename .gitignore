@@ -2,10 +2,7 @@
 dist/
 
 # Binaries
-/scoutly
 /target/
-/npm/bin/
-/npm/node_modules/
 
 # Coverage
 lcov.info

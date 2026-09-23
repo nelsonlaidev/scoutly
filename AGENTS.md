@@ -6,7 +6,7 @@
 - `src/main.rs` and the binary-only `src/cli*.rs`, `src/output.rs`, and `src/tui/` modules own the executable, stream routing, signal handling, report formatting, and terminal interface.
 - Unit tests live beside the Rust code in `#[cfg(test)]` modules. Library integration tests live in `tests/integration/`, executable end-to-end tests in `tests/e2e/`, shared test support in `tests/common/`, and deterministic fixtures in `tests/fixtures/`. Shared unit-test HTTP support remains in `src/test_server.rs` when crate-private access is required.
 - `Cargo.toml`, `Cargo.lock`, and `rust-toolchain.toml` define the package and toolchain requirements. Development recipes live in `justfile`, and CI/release automation in `.github/workflows/`.
-- `npm/` contains the npm CLI wrapper. Its install script selects a cargo-dist archive for the current platform, verifies it against `sha256.sum`, and installs the downloaded binary.
+- cargo-dist generates the npm installer and package during release; there is no source-controlled `npm/` directory.
 
 ## Build, Test, and Development Commands
 
@@ -19,8 +19,6 @@
 - `just fmt` applies rustfmt to all targets.
 - `just lint` runs Clippy for all targets and features with warnings denied.
 - `just docs` builds library documentation with warnings denied.
-- `npm --prefix npm ci --ignore-scripts && npm --prefix npm test` checks the npm installer without downloading a release binary.
-- `npm pack ./npm --dry-run` verifies the files included in the published npm package.
 - The equivalent raw Cargo commands are acceptable when `just` is unavailable.
 
 ## Coding Style & Naming Conventions
@@ -34,13 +32,12 @@
 ## Testing Guidelines
 
 - Add or update unit tests in the closest matching module. Use `tests/` when the public library, CLI process, or package boundary is what the test needs to exercise.
-- Update `npm/install.test.js` whenever release archive names or supported Node.js platform mappings change.
 - Prefer deterministic table-driven tests, loopback HTTP servers, `tests/fixtures/`, and the existing test server support. Do not depend on public websites.
 - `tests/fixtures/` covers CLI, configuration, report, progress, HTTP request, HTML parsing, and TUI behavior. Tests may update fixtures deliberately as the product changes, but unintentional output or ordering drift must fail.
 - The end-to-end audit test normalizes only `audited_at` values, the test server's dynamically allocated origin (including its port), and spinner frames or elapsed timing when a terminal renderer includes them. The non-terminal progress fixture has no spinner or timing data, so only the dynamic origin is replaced; request count and order are never normalized.
 - Library integration tests and CLI end-to-end tests share these fixtures. Ratatui screens use semantic interaction tests plus fixed-size Insta snapshots; ANSI styling and widget padding are not part of the byte-level fixture.
 - Keep tests isolated from process-wide state, shared working directories, and mutable fixtures so the Rust test harness can run them concurrently.
-- CI enforces rustfmt, Clippy, docs, the declared MSRV, native Linux/macOS/Windows tests, `cargo audit`, stress tests, cargo-dist planning, crate/npm package validation, and Rust coverage uploaded to Codecov.
+- CI enforces rustfmt, Clippy, docs, the declared MSRV, native Linux/macOS/Windows tests, `cargo audit`, stress tests, cargo-dist planning, crate packaging, and Rust coverage uploaded to Codecov.
 
 ## Commit & Pull Request Guidelines
 
@@ -50,7 +47,7 @@
 
 ## Releases
 
-- Scoutly is tag-driven: pushing a new `v*` tag triggers the cargo-dist Release workflow, whose custom jobs publish the Homebrew cask, npm package, and crate. Only release when the user explicitly asks.
+- Scoutly is tag-driven: pushing a new `v*` tag triggers the cargo-dist Release workflow. cargo-dist builds the release artifacts, while reusable custom jobs publish the npm package, Homebrew cask, and crate. Only release when the user explicitly asks.
 - Before tagging, confirm all of: (1) `main` is current — `git switch main && git pull --ff-only origin main`; (2) the CI run for `HEAD` passed — `gh run list --workflow "Continuous Integration" --commit "$(git rev-parse HEAD)" --limit 1 --json status,conclusion` shows success; (3) the tree is clean — `git status --porcelain` is empty.
 - Create a new SemVer tag (`vX.Y.Z` or `vX.Y.Z-beta.N`) that does not exist on the remote, then push only that tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
@@ -59,5 +56,5 @@
 - Validate config discovery with `scoutly.config.*`, `scoutly.*`, and `.scoutly.*` JSON, YAML, or TOML fixtures in an isolated temporary directory.
 - Keep HTTP behavior deterministic and bounded: preserve request cancellation, response-size limits, redirect limits, robots.txt handling, and configured concurrency/rate limits.
 - Do not commit secrets or real crawl credentials; use local fixtures and loopback test servers for repeatable regression tests.
-- Keep npm publishing on GitHub Actions trusted publishing. Do not add a long-lived npm token when OIDC is available, and do not bypass release checksum verification in the npm installer.
+- Keep npm package generation managed by cargo-dist and publishing in `.github/workflows/publish-npm.yml`. Use npm Trusted Publishing with provenance and never add a long-lived npm token. Because npm validates the calling workflow for reusable workflows, configure the npm trusted publisher for `release.yml`, not `publish-npm.yml`, and preserve `id-token: write` on both workflows.
 - Use Semantic Versioning release tags: `vX.Y.Z` for stable releases and `vX.Y.Z-beta.N` for prereleases. Prereleases publish to the npm `beta` dist-tag and the Homebrew `scoutly@beta` Cask without replacing stable channels.
