@@ -37,7 +37,7 @@
 - The end-to-end audit test normalizes only `audited_at` values, the test server's dynamically allocated origin (including its port), and spinner frames or elapsed timing when a terminal renderer includes them. The non-terminal progress fixture has no spinner or timing data, so only the dynamic origin is replaced; request count and order are never normalized.
 - Library integration tests and CLI end-to-end tests share these fixtures. Ratatui screens use semantic interaction tests plus fixed-size Insta snapshots; ANSI styling and widget padding are not part of the byte-level fixture.
 - Keep tests isolated from process-wide state, shared working directories, and mutable fixtures so the Rust test harness can run them concurrently.
-- CI enforces rustfmt, Clippy, docs, the declared MSRV, native Linux/macOS/Windows tests, `cargo audit`, stress tests, cargo-dist planning, crate packaging, and Rust coverage uploaded to Codecov.
+- CI enforces rustfmt, Clippy, docs, the declared MSRV, native Linux/macOS/Windows tests, `cargo audit`, cargo-dist planning, crate packaging, and Rust coverage uploaded to Codecov.
 
 ## Commit & Pull Request Guidelines
 
