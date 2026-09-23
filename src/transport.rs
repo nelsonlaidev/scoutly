@@ -176,6 +176,8 @@ impl Transport {
     pub(crate) fn new(options: &Options) -> Result<Self, TransportBuildError> {
         let user_agent = HeaderValue::from_str(&options.user_agent)
             .map_err(TransportBuildError::InvalidUserAgent)?;
+        // Preserve a provider selected by an embedding application; otherwise use ring.
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let client = Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .retry(reqwest::retry::never())
