@@ -2,16 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## v0.6.0-beta.1
+
+[Compare v0.5.0...v0.6.0-beta.1](https://github.com/nelsonlaidev/scoutly/compare/v0.5.0...v0.6.0-beta.1) - 2026-09-23
 
 ### Features
 
 - Accept URLs without protocols - ([7f1912b](https://github.com/nelsonlaidev/scoutly/commit/7f1912b04777173c6f00f870a39f3dee6148cc9e))
-- Add page scope and local rule ignores - ([63306fa](https://github.com/nelsonlaidev/scoutly/commit/63306fa6db924e664cadbf57066bfed6f6c47767))
 
 ### Bug Fixes
 
 - Use application palette for TUI buttons - ([e71cb08](https://github.com/nelsonlaidev/scoutly/commit/e71cb0858e7701b3e8fbb463a27f402ce2424d33))
+- Install nasm for windows i686 release - ([7814d0b](https://github.com/nelsonlaidev/scoutly/commit/7814d0bed7aa2f12c1007a40a3bd170206b23597))
+- Use ring for rustls crypto - ([240c76c](https://github.com/nelsonlaidev/scoutly/commit/240c76c70b654c62226fbea940fa810cc458fe30))
+- Drop windows arm64 release target - ([4b3b397](https://github.com/nelsonlaidev/scoutly/commit/4b3b3977c6fbcf0995431243594bf4c06dc0a16d))
+- Repair prerelease publishing - ([cc0e8a0](https://github.com/nelsonlaidev/scoutly/commit/cc0e8a0a8f9eaefc38a51602020872b04f8379ee))
 
 ### Documentation
 
@@ -19,16 +24,30 @@ All notable changes to this project will be documented in this file.
 
 ### Refactor
 
-- Migrate to Rust - ([1a11639](https://github.com/nelsonlaidev/scoutly/commit/1a11639e88b1eb709dc0a3f2b9a6e77ad9fdb536))
+- Migrate Scoutly to Rust (#8) - ([10aed23](https://github.com/nelsonlaidev/scoutly/commit/10aed23a39b94a71a4b260b2cab55f38a0050f6b))
 
-## [0.5.0](https://github.com/nelsonlaidev/scoutly/compare/v0.4.0...v0.5.0) - 2026-09-08
+## v0.5.0
+
+[Compare v0.5.0-beta.1...v0.5.0](https://github.com/nelsonlaidev/scoutly/compare/v0.5.0-beta.1...v0.5.0) - 2026-09-08
+
+### Features
+
+- Add configurable audit rules - ([65d17c0](https://github.com/nelsonlaidev/scoutly/commit/65d17c082459febe6a127f5929c9a11ee0cec56c))
+
+### Documentation
+
+- Fix stable Homebrew install command - ([d1f070c](https://github.com/nelsonlaidev/scoutly/commit/d1f070c6bc4c0fdf644d99a41885cbd3557123fb))
+- Simplify release process into AGENTS.md - ([77d2389](https://github.com/nelsonlaidev/scoutly/commit/77d23890c0d4d3fda45c74bfe2f5a0e752d927a1))
+
+## v0.5.0-beta.1
+
+[Compare v0.4.0...v0.5.0-beta.1](https://github.com/nelsonlaidev/scoutly/compare/v0.4.0...v0.5.0-beta.1) - 2026-09-06
 
 ### Features
 
 - Add sitemap visibility to crawl reports and TUI - ([fa4e762](https://github.com/nelsonlaidev/scoutly/commit/fa4e76214836983bd9e86418e95ea9de549c01ec))
 - Publish releases to Homebrew - ([2d2667c](https://github.com/nelsonlaidev/scoutly/commit/2d2667c640787980f7397e3bb690bff9579aa923))
 - Add npm and prerelease distribution - ([1da6178](https://github.com/nelsonlaidev/scoutly/commit/1da6178c2e0e13ed469c4a38bda328fe886ea357))
-- Add configurable audit rules - ([65d17c0](https://github.com/nelsonlaidev/scoutly/commit/65d17c082459febe6a127f5929c9a11ee0cec56c))
 
 ### Bug Fixes
 
@@ -46,8 +65,6 @@ All notable changes to this project will be documented in this file.
 
 - Add prebuilt binary install options and remove internal release process - ([6622853](https://github.com/nelsonlaidev/scoutly/commit/6622853ee0227363de3a2feca8f67e8c0be5178c))
 - Sync README with actual CLI help, add Open Graph checks and update checker features - ([746bbb7](https://github.com/nelsonlaidev/scoutly/commit/746bbb7d1de698908ac0a839f35fde948b47223c))
-- Fix stable Homebrew install command - ([d1f070c](https://github.com/nelsonlaidev/scoutly/commit/d1f070c6bc4c0fdf644d99a41885cbd3557123fb))
-- Simplify release process into AGENTS.md - ([77d2389](https://github.com/nelsonlaidev/scoutly/commit/77d23890c0d4d3fda45c74bfe2f5a0e752d927a1))
 
 ### Refactor
 
@@ -58,13 +75,9 @@ All notable changes to this project will be documented in this file.
 
 - Add comprehensive test coverage and extract testable helpers - ([6106d28](https://github.com/nelsonlaidev/scoutly/commit/6106d28c7f23b337c9fa90732f0ea4431dd1d606))
 
-## [0.4.0](https://github.com/nelsonlaidev/scoutly/compare/v0.3.0...v0.4.0) - 2026-04-05
+## v0.4.0
 
-### Highlights
-
-- Added an update checker
-- Redesigned the crawl progress UI
-- Results can now be viewed by page or link URL
+[Compare v0.3.0...v0.4.0](https://github.com/nelsonlaidev/scoutly/compare/v0.3.0...v0.4.0) - 2026-04-05
 
 ### Features
 
@@ -72,6 +85,7 @@ All notable changes to this project will be documented in this file.
 - Enable env-driven debug logging for update checks - ([cd2c54c](https://github.com/nelsonlaidev/scoutly/commit/cd2c54c811d4028a3da969f9c6e25d838f6377db))
 - Make the TUI's primary panes feel focused - ([bca160e](https://github.com/nelsonlaidev/scoutly/commit/bca160e2ddd6690e868fab77b916785fe6f0a8d7))
 - Polish the crawl progress panel for live scans - ([0643eba](https://github.com/nelsonlaidev/scoutly/commit/0643eba3ae1820f1bfad3b445633dfce039b6637))
+- Add aarch64-pc-windows-msvc target to build configurations - ([c558a17](https://github.com/nelsonlaidev/scoutly/commit/c558a17e9773424c90a8c37a096719d806f3d4c8))
 - Make crawl results easier to inspect across page and link slices - ([d092c46](https://github.com/nelsonlaidev/scoutly/commit/d092c46e4d72b565080a1c720335d7851723d23e))
 
 ### Bug Fixes
@@ -84,12 +98,18 @@ All notable changes to this project will be documented in this file.
 
 - Update cliff config - ([a1b7a86](https://github.com/nelsonlaidev/scoutly/commit/a1b7a86e204c346587f0568f273ea0dd5890b131))
 - Update cargo-dist-version to 0.31.0 - ([ca82ec9](https://github.com/nelsonlaidev/scoutly/commit/ca82ec9f28909a1d7236b53243cd269d43e95c82))
+- _(release)_ Prepare v0.4.0 - ([1d3a463](https://github.com/nelsonlaidev/scoutly/commit/1d3a463e2a32133792fab8e161d9f396aec7088e))
+
+### Continuous Integration
+
+- Fix release workflow - ([8ecf44b](https://github.com/nelsonlaidev/scoutly/commit/8ecf44b5a29381bbb2a05dc845cd42f67f308f4b))
 
 ### Documentation
 
 - Add flowchart to illustrate the crawling and analysis process - ([c235d27](https://github.com/nelsonlaidev/scoutly/commit/c235d27dd4cb3e6b1b8531e4548aa634624c2d43))
 - Update release guide - ([9afa460](https://github.com/nelsonlaidev/scoutly/commit/9afa4604a116a42c2c8fc310969089a73d0e8b63))
 - Update release guide - ([29c3152](https://github.com/nelsonlaidev/scoutly/commit/29c3152c0d6131855658e51d650eba6baf3e7db8))
+- Update release guide - ([78a945c](https://github.com/nelsonlaidev/scoutly/commit/78a945cb9831d9ecd025e3ec80e37598436c97cb))
 
 ### Refactor
 
@@ -105,7 +125,9 @@ All notable changes to this project will be documented in this file.
 - Improve launch mode resolution test coverage - ([8421cfb](https://github.com/nelsonlaidev/scoutly/commit/8421cfbbe4654adc9a5c5b4f4a49998a80b7b029))
 - Keep integration tests stable under low file-descriptor limits - ([756bc76](https://github.com/nelsonlaidev/scoutly/commit/756bc76e8cc8d152800713037ab80a0cc685faaf))
 
-## [0.3.0](https://github.com/nelsonlaidev/scoutly/compare/v0.2.0...v0.3.0) - 2026-04-02
+## v0.3.0
+
+[Compare v0.2.0...v0.3.0](https://github.com/nelsonlaidev/scoutly/compare/v0.2.0...v0.3.0) - 2026-04-02
 
 ### Features
 
@@ -130,7 +152,9 @@ All notable changes to this project will be documented in this file.
 
 - Harden Scoutly runtime config and crawl result handling - ([194720e](https://github.com/nelsonlaidev/scoutly/commit/194720ee1ced174ae5cb6119caab8c5bdf172d8d))
 
-## [0.2.0](https://github.com/nelsonlaidev/scoutly/compare/v0.1.1...v0.2.0) - 2025-11-20
+## v0.2.0
+
+[Compare v0.1.1...v0.2.0](https://github.com/nelsonlaidev/scoutly/compare/v0.1.1...v0.2.0) - 2025-11-20
 
 ### Features
 
@@ -173,7 +197,9 @@ All notable changes to this project will be documented in this file.
 - Add tests for content-type validation, rate limiting, concurrency - ([acef227](https://github.com/nelsonlaidev/scoutly/commit/acef227a50cb60e5feb2a220c6110d07c9d84b67))
 - Increase test coverage (#7) - ([6cc3594](https://github.com/nelsonlaidev/scoutly/commit/6cc3594bbfb3320415261112e83f3c47728859eb))
 
-## [0.1.1](https://github.com/nelsonlaidev/scoutly/compare/v0.1.0...v0.1.1) - 2025-11-09
+## v0.1.1
+
+[Compare v0.1.0...v0.1.1](https://github.com/nelsonlaidev/scoutly/compare/v0.1.0...v0.1.1) - 2025-11-09
 
 ### Bug Fixes
 
@@ -185,7 +211,9 @@ All notable changes to this project will be documented in this file.
 - Add tests for max_depth, follow_external params - ([ba9b4ef](https://github.com/nelsonlaidev/scoutly/commit/ba9b4ef7a6f4fc5f06d4779f5d5b4de16ab062a5))
 - Platform-specific pattern in cli_test - ([a02985e](https://github.com/nelsonlaidev/scoutly/commit/a02985e0daf9e5d3e7e098c9a33db8a2cf18539d))
 
-## [0.1.0](https://github.com/nelsonlaidev/scoutly/tree/v0.1.0) - 2025-11-06
+## v0.1.0
+
+[View v0.1.0](https://github.com/nelsonlaidev/scoutly/tree/v0.1.0) - 2025-11-06
 
 ### Bug Fixes
 
@@ -238,3 +266,5 @@ All notable changes to this project will be documented in this file.
 
 - Coverage (#1) - ([979e6eb](https://github.com/nelsonlaidev/scoutly/commit/979e6eb0dba070dd7a7b85f73d38a92f0873bf88))
 - More coverage (#2) - ([3290f46](https://github.com/nelsonlaidev/scoutly/commit/3290f465ffc706eada1c44a34b073a11daf6960b))
+
+

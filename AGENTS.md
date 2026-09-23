@@ -48,6 +48,8 @@
 ## Releases
 
 - Scoutly is tag-driven: pushing a new `v*` tag triggers the cargo-dist Release workflow. cargo-dist builds the release artifacts, while reusable custom jobs publish the npm package, Homebrew cask, and crate. Only release when the user explicitly asks.
+- Prepare the changelog on `main` first: prereleases use `just changelog-prerelease vX.Y.Z-beta.N` (only the commits since the previous tag) and stable releases use `just changelog-stable vX.Y.Z` (one section aggregating every commit since the previous stable tag, so it includes all of that version's prerelease changes). Prerelease sections remain in `CHANGELOG.md`. Review the new section, commit it (for example `docs: update changelog for vX.Y.Z`), and push.
+- The Release workflow reads `CHANGELOG.md` from the tagged commit, and cargo-dist uses the matching version section heading (`vX.Y.Z` for stable releases, `vX.Y.Z-beta.N` for prereleases) as the GitHub Release title; without a matching section it falls back to the `Unreleased` heading and titles prereleases `Version X.Y.Z-beta.N`. Because the changelog commit moves `HEAD`, run the checks below only after it is pushed.
 - Before tagging, confirm all of: (1) `main` is current — `git switch main && git pull --ff-only origin main`; (2) the CI run for `HEAD` passed — `gh run list --workflow "Continuous Integration" --commit "$(git rev-parse HEAD)" --limit 1 --json status,conclusion` shows success; (3) the tree is clean — `git status --porcelain` is empty.
 - Create a new SemVer tag (`vX.Y.Z` or `vX.Y.Z-beta.N`) that does not exist on the remote, then push only that tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 

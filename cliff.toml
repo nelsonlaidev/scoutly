@@ -18,10 +18,11 @@ https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
 {%- endmacro -%}
 
 {%- if version %}\
+    ## {{ version }}\n
     {% if previous.version %}\
-    ## [{{ version | trim_start_matches(pat="v") }}]({{ self::remote_url() }}/compare/{{ previous.version }}...{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}\n
+    [Compare {{ previous.version }}...{{ version }}]({{ self::remote_url() }}/compare/{{ previous.version }}...{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}\n
     {% else %}\
-    ## [{{ version | trim_start_matches(pat="v") }}]({{ self::remote_url() }}/tree/{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}\n
+    [View {{ version }}]({{ self::remote_url() }}/tree/{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}\n
     {% endif %}\
 {% else %}\
     ## [Unreleased]\n
@@ -50,7 +51,6 @@ protect_breaking_commits = false
 filter_unconventional = true
 topo_order = false
 tag_pattern = "v[0-9].*"
-ignore_tags = "v.*-(alpha|beta|rc).*"
 commit_parsers = [
     { message = ".*changelog.*", skip = true },
     { message = "^feat", group = "<!-- 0 -->Features" },

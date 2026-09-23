@@ -19,6 +19,15 @@ lint:
 docs:
     @RUSTDOCFLAGS="-D warnings" cargo doc --locked --no-deps --all-features
 
+changelog-prerelease version:
+    @git cliff --unreleased --tag {{version}} --prepend CHANGELOG.md
+
+changelog-stable version:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    previous="$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude 'v*-*')"
+    git cliff "${previous}..HEAD" --tag "{{version}}" --ignore-tags 'v[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\..*' --prepend CHANGELOG.md
+
 test:
     @cargo test --locked
 
