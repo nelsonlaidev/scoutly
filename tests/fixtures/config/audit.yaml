@@ -1,0 +1,25 @@
+max_depth: 1
+max_pages: 4
+keep_fragments: false
+ignore_redirects: false
+rate_limit: 0
+respect_robots: true
+sitemaps: true
+images: true
+max_sitemap_documents: 2
+timeout: 5000
+max_redirects: 3
+user_agent: scoutly-test/0.6
+concurrency: 1
+format: json
+progress: always
+rules:
+  missing_title: error
+include_paths:
+  - /
+exclude_paths:
+  - /private
+ignore_rules:
+  - url_prefix: "{{ORIGIN}}/about"
+    rules:
+      - missing_title

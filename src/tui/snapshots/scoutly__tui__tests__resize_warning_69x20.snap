@@ -1,0 +1,24 @@
+---
+source: src/tui/mod.rs
+expression: "snapshot(&mut app, 69, MINIMUM_HEIGHT)"
+---
+╭───────────────────────────────────────────────────────────────────╮
+│ Scoutly                    Website audit                    Setup │
+╰───────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+                        Terminal is too small
+
+                        Minimum size: 70 x 20
+                        Current size: 69 x 20
+
+
+
+
+
+
+Ctrl+C quit

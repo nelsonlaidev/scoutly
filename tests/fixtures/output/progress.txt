@@ -1,0 +1,6 @@
+[robots] pages 0/0, sitemaps 0, links 0/--, images 0/-- · {{ORIGIN}}/robots.txt
+[crawl] pages 0/0, sitemaps 0, links 0/--, images 0/-- · {{ORIGIN}}/
+[sitemaps] pages 3/3, sitemaps 0, links 0/--, images 0/--
+[links] pages 4/4, sitemaps 1, links 0/3, images 0/--
+[images] pages 4/4, sitemaps 1, links 3/3, images 0/1
+[report] pages 4/4, sitemaps 1, links 3/3, images 1/1

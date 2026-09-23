@@ -1,0 +1,12 @@
+{
+  "max_depth": 0,
+  "max_pages": 1,
+  "rate_limit": 0,
+  "respect_robots": false,
+  "sitemaps": false,
+  "images": false,
+  "timeout": 5000,
+  "concurrency": 1,
+  "format": "json",
+  "progress": "never"
+}

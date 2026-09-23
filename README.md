@@ -4,7 +4,7 @@ Scoutly audits a website by crawling its HTML pages, analyzing common SEO
 problems, and checking discovered links and images.
 
 Scoutly provides a script-friendly CLI, a keyboard-driven terminal interface,
-and an importable Go library.
+and an idiomatic asynchronous Rust library.
 
 ## Highlights
 
@@ -24,7 +24,7 @@ Install Scoutly on macOS or Linux with Homebrew:
 brew install --cask nelsonlaidev/tap/scoutly
 ```
 
-Or install Scoutly on macOS, Linux, or Windows with npm and Node.js 22.14 or
+Or install Scoutly on macOS, Linux, or Windows with npm and Node.js 14.14 or
 newer:
 
 ```sh
@@ -34,15 +34,15 @@ npm install --global @nelsonlaidev/scoutly
 Prebuilt archives for Linux, macOS, and Windows are available from the
 [latest GitHub release](https://github.com/nelsonlaidev/scoutly/releases/latest).
 
-If Go is already installed, you can instead build and install the CLI directly:
+Or install the CLI from crates.io with Rust 1.96 or newer:
 
 ```sh
-go install github.com/nelsonlaidev/scoutly/cmd/scoutly@latest
+cargo install scoutly --locked
 ```
 
 ### Prerelease builds
 
-Prereleases use Semantic Versioning tags such as `v0.5.0-beta.1`. Install the
+Prereleases use Semantic Versioning tags such as `v0.6.0-beta.1`. Install the
 latest prerelease through the opt-in beta channels:
 
 ```sh
@@ -50,11 +50,11 @@ brew install --cask nelsonlaidev/tap/scoutly@beta
 npm install --global @nelsonlaidev/scoutly@beta
 ```
 
-GitHub publishes prerelease archives under the exact version tag. Go users can
-also install a specific prerelease directly:
+GitHub publishes prerelease archives under the exact version tag. Cargo users
+can install a specific prerelease directly:
 
 ```sh
-go install github.com/nelsonlaidev/scoutly/cmd/scoutly@v0.5.0-beta.1
+cargo install scoutly --version 0.6.0-beta.1 --locked
 ```
 
 Stable installations are never advanced to a prerelease automatically.
@@ -104,15 +104,15 @@ to a terminal fails instead of waiting for interactive input.
 The setup screen contains the target URL and every audit option in one
 scrollable form. Use `Tab` or `Enter` to move forward, `Shift+Tab` to move back,
 and `Space` to toggle settings. You can also click a field to focus it or click
-a confirmation choice directly. Submit or click the final `Run audit` button
-to start.
+a confirmation choice directly, and use the mouse wheel or drag the scrollbar
+to move through the form. Submit or click the final `Run audit` button to start.
 
 While an audit is running, Scoutly displays the active phase, elapsed time,
 page and resource counters, the current URL, and the 200 most recent activity
-entries. Scroll the recent activity pane with the mouse wheel; scrolling up
-pauses automatic following until you return to the bottom. Cancelling or
-failing an audit keeps the configured fields available for editing and
-retrying.
+entries. Scroll the recent activity pane with the mouse wheel or drag its
+scrollbar; scrolling up pauses automatic following until you return to the
+bottom. Cancelling or failing an audit keeps the configured fields available
+for editing and retrying.
 
 Completed reports include five views:
 
@@ -128,8 +128,8 @@ Completed reports include five views:
 You can also click a result tab or overview summary card, focus the search
 field, cycle the current filter, select a result row, or focus a result pane.
 The mouse wheel scrolls the result list or the overview and detail pane under
-the pointer. At widths below 100 columns, clicking a row opens its details;
-press `Esc` to return to the list.
+the pointer, and each visible scrollbar can be dragged. At widths below 100
+columns, clicking a row opens its details; press `Esc` to return to the list.
 
 At widths of 100 columns or more, result lists and details appear side by side.
 Widths from 70 to 99 columns use one pane at a time. Smaller terminals show a
@@ -216,47 +216,97 @@ Discovery fails when more than one conventional config file exists. JSON,
 YAML, and TOML parsing is strict: unknown fields, duplicate fields, null
 values, and multiple documents are rejected.
 
-## Go library
+### Page scope and local rule ignores
 
-Start with `DefaultOptions`, change the desired values, and pass a context to
-`Audit`:
+Limit page crawling to selected path prefixes:
 
-```go
-package main
+```sh
+scoutly https://example.com/docs --include-path /docs --exclude-path /docs/archive
+scoutly https://example.com/docs --include-path /docs --include-path /about
+```
 
-import (
-	"context"
-	"fmt"
-	"log"
+Each flag accepts one path and can be repeated. CLI values replace the entire
+corresponding config list; omitted flags preserve file settings. Empty config
+arrays clear lists. An empty inclusion list allows all paths, and exclusions
+always win. The starting URL must be in scope; an out-of-scope start fails before
+any network requests. Choose a starting page within the included paths.
 
-	"github.com/nelsonlaidev/scoutly/audit"
-)
+Prefixes match path segments: `/docs` and `/docs/` match `/docs` and its children,
+but not `/docs-old`. `/` matches every path. Matching is case-sensitive, uses
+percent-decoded URL paths, and ignores query strings and fragments. Scoutly does
+not additionally collapse dot segments or repeated slashes. Prefixes must be
+rooted URL paths without queries, fragments, or wildcards; glob and regular
+expression matching are not supported.
 
-func main() {
-	options := audit.DefaultOptions()
-	options.MaxDepth = 2
-	options.MaxPages = 100
-	options.Rules["title_too_short"] = audit.RuleLevelWarning
+Scope controls page crawling and SEO analysis, not all HTTP requests. Links and
+images referenced by in-scope pages are still checked, even outside the page
+scope. Out-of-scope pages are not explored and do not consume discovery slots.
+Robots and sitemap documents remain accessible under existing crawl policies;
+page URLs inside sitemaps are filtered before counting toward the page limit.
+Redirects retain existing HTTP and robots policies: an out-of-scope destination
+may be requested, but its HTML is not analyzed or explored. Actual HTTP errors
+are still reported. An initial page redirecting out of scope fails the audit.
 
-	report, err := audit.Audit(
-		context.Background(),
-		"https://example.com",
-		options,
-		func(progress audit.Progress) error {
-			fmt.Printf("%s: %s\n", progress.Phase, progress.CurrentURL)
-			return nil
-		},
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
+Suppress particular findings for an issue target's URL prefix using a config file:
 
-	fmt.Printf("%d issues\n", report.Summary.Issues.Total)
+```toml
+include_paths = ["/docs"]
+exclude_paths = ["/docs/archive"]
+
+[[ignore_rules]]
+url_prefix = "https://example.com/docs/legacy"
+rules = ["missing_meta_description"]
+
+[[ignore_rules]]
+url_prefix = "https://external.example/old"
+rules = ["broken_link"]
+```
+
+Each ignore requires an absolute HTTP(S) URL without credentials, query strings,
+fragments, or wildcards, and at least one known snake_case rule name. Origins
+must match after normalizing host names and default ports; paths use the same
+prefix rules as page scope. Queries and fragments in issue targets are ignored.
+Ignores match the reported target URL, not a redirect destination or the page
+referencing a link or image. Multiple entries combine, and cannot re-enable
+globally disabled rules or override `ignore_redirects`.
+
+Ignored findings are removed from the issue list and issue counts. Raw pages,
+link/image results, occurrences, and resource statistics remain intact: a broken
+link can still appear in the Links view and broken-link total even when its
+`broken_link` finding is suppressed.
+
+JSON and YAML support the same `include_paths`, `exclude_paths`, and
+`ignore_rules` lists. Library callers can set `Options::include_paths`,
+`Options::exclude_paths`, and `Options::ignore_rules`. The TUI shows loaded
+settings above the Run audit button and preserves them across cancellation,
+retries, and new audits. Edit these settings in CLI arguments or the config
+file; the TUI does not provide a scope or ignore editor.
+
+## Rust library
+
+Start with `Options::default()`, change the desired values, and await `audit`:
+
+```rust
+use scoutly::{Options, audit};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let options = Options {
+        max_depth: 2,
+        max_pages: 100,
+        ..Options::default()
+    };
+    let report = audit("https://example.com", options, None).await?;
+
+    println!("{} issues", report.summary.issues.total);
+    Ok(())
 }
 ```
 
-`Audit` returns a nil report on cancellation, invalid input, or progress
-callback failure.
+Pass a Tokio `mpsc::Sender<Progress>` as the third argument to receive progress
+snapshots. Closing its receiver cancels the audit with
+`AuditError::ProgressClosed`; dropping the audit future cancels in-flight work
+without returning a partial report.
 
 The JSON representation of `Report` uses stable snake_case field names.
 
@@ -283,32 +333,27 @@ sitemap documents to 50 MiB and 50,000 entries.
 
 ## Development
 
-Development requires Go 1.26.6 or newer, [just](https://github.com/casey/just),
-and golangci-lint v2. Clone the repository and run the project checks with:
+Development requires Rust 1.96 or newer and
+[just](https://github.com/casey/just). `cargo-llvm-cov`, `cargo-audit`, and
+cargo-dist are used by the corresponding CI and release checks.
 
 ```sh
 git clone https://github.com/nelsonlaidev/scoutly.git
 cd scoutly
-go mod download
 just build
 just fmt
 just lint
 just test
 just test-cover
-just tidy
+just docs
 ```
 
-`just test` enables the race detector and disables cached test results. Tests
-use local HTTP servers and do not depend on public websites. CI additionally
-checks module tidiness, builds and tests on Linux, macOS, and Windows, runs
-`govulncheck`, validates the npm package, and uploads coverage from the Linux
-race-enabled test run.
+Tests use deterministic local HTTP servers and do not depend on public
+websites. CI checks formatting, Clippy with warnings denied, documentation,
+the Rust 1.96 MSRV, native tests on Linux, macOS, and Windows, dependency
+advisories, stress tests, crate packaging, cargo-dist release planning, and
+Rust coverage.
 
-When changing the npm installer, install its dependencies without running the
-download hook, then test and inspect the package contents:
-
-```sh
-npm --prefix npm ci --ignore-scripts
-npm --prefix npm test
-npm pack ./npm --dry-run
-```
+The npm installer and package are generated by cargo-dist and published by the
+reusable release workflow; there is no source-controlled `npm/` directory to
+maintain.

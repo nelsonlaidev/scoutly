@@ -1,0 +1,83 @@
+name: Publish crates.io package
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+concurrency:
+  group: scoutly-crates-io
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PLAN: ${{ inputs.plan }}
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify crate version
+        shell: bash
+        run: |
+          release_count="$(jq -r '[.releases[] | select(.app_name == "scoutly")] | length' <<< "${PLAN}")"
+          if [[ "${release_count}" != "1" ]]; then
+            echo "Expected exactly one Scoutly release, found ${release_count}" >&2
+            exit 1
+          fi
+
+          release_version="$(jq -r '.releases[] | select(.app_name == "scoutly") | .app_version' <<< "${PLAN}")"
+          metadata="$(cargo metadata --locked --no-deps --format-version 1)"
+          crate_count="$(jq -r '[.packages[] | select(.name == "scoutly")] | length' <<< "${metadata}")"
+          if [[ "${crate_count}" != "1" ]]; then
+            echo "Expected exactly one Scoutly crate, found ${crate_count}" >&2
+            exit 1
+          fi
+
+          crate_version="$(jq -r '.packages[] | select(.name == "scoutly") | .version' <<< "${metadata}")"
+          if [[ "${release_version}" != "${crate_version}" ]]; then
+            echo "Release version ${release_version} does not match crate version ${crate_version}" >&2
+            exit 1
+          fi
+
+          echo "SCOUTLY_RELEASE_VERSION=${release_version}" >> "${GITHUB_ENV}"
+
+      - name: Check crates.io publication
+        id: publication
+        shell: bash
+        run: |
+          status="$(curl --silent --show-error --location --output /dev/null --write-out '%{http_code}' \
+            "https://crates.io/api/v1/crates/scoutly/${SCOUTLY_RELEASE_VERSION}")"
+
+          case "${status}" in
+            200)
+              echo "scoutly ${SCOUTLY_RELEASE_VERSION} is already published"
+              echo "already_published=true" >> "${GITHUB_OUTPUT}"
+              ;;
+            404)
+              echo "already_published=false" >> "${GITHUB_OUTPUT}"
+              ;;
+            *)
+              echo "Unexpected crates.io response for scoutly ${SCOUTLY_RELEASE_VERSION}: HTTP ${status}" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Verify crate package
+        if: steps.publication.outputs.already_published != 'true'
+        run: cargo publish --locked --dry-run --package scoutly
+
+      - name: Authenticate with crates.io
+        if: steps.publication.outputs.already_published != 'true'
+        id: auth
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
+
+      - name: Publish crate
+        if: steps.publication.outputs.already_published != 'true'
+        run: cargo publish --locked --package scoutly
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}

@@ -1,0 +1,24 @@
+---
+source: src/tui/mod.rs
+expression: "snapshot(&mut canceled, 70, 20)"
+---
+╭────────────────────────────────────────────────────────────────────╮
+│ Scoutly                   Website audit                   Canceled │
+╰────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+                            Audit canceled
+
+                     No partial report was saved.
+
+
+
+
+
+
+
+Enter edit and retry   q quit

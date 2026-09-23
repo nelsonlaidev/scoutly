@@ -2,41 +2,42 @@
 
 ## Project Structure & Module Organization
 
-- `cmd/scoutly/` contains the executable entry point, CLI flags, signal handling, and CLI/TUI mode selection.
-- `audit/` is the public library package. It owns audit orchestration, options, progress events, report models, and report construction.
-- `internal/` contains implementation packages for crawling, fetching, resource checking, page parsing, configuration, robots.txt, sitemaps, CLI output, and the TUI. Keep implementation-only packages internal unless callers need a stable public API.
-- Tests live beside the code as `*_test.go`. Package fixtures belong in a nearby `testdata/` directory, and shared test-only helpers belong in `internal/testutil/`.
-- `go.mod` and `go.sum` define the module and toolchain requirements. Development recipes live in `justfile`, lint configuration in `.golangci.yml`, and CI/release automation in `.github/workflows/`.
-- `npm/` contains the npm CLI wrapper. Its install script selects a GoReleaser archive for the current platform, verifies its checksum, and installs the downloaded binary.
+- `src/lib.rs` exposes the asynchronous audit library and stable caller-facing types. Implementation modules under `src/` own crawling, transport, parsing, configuration, rules, progress, and report construction.
+- `src/main.rs` and the binary-only `src/cli*.rs`, `src/output.rs`, and `src/tui/` modules own the executable, stream routing, signal handling, report formatting, and terminal interface.
+- Unit tests live beside the Rust code in `#[cfg(test)]` modules. Library integration tests live in `tests/integration/`, executable end-to-end tests in `tests/e2e/`, shared test support in `tests/common/`, and deterministic fixtures in `tests/fixtures/`. Shared unit-test HTTP support remains in `src/test_server.rs` when crate-private access is required.
+- `Cargo.toml`, `Cargo.lock`, and `rust-toolchain.toml` define the package and toolchain requirements. Development recipes live in `justfile`, and CI/release automation in `.github/workflows/`.
+- cargo-dist generates the npm installer and package during release; there is no source-controlled `npm/` directory.
 
 ## Build, Test, and Development Commands
 
-- `just build` compiles the CLI to `./scoutly` using `go build ./cmd/scoutly`.
+- `just build` compiles the library and CLI with the locked dependency graph.
 - `just run https://example.com --progress never` runs the crawler locally.
-- `just test` runs `go test -race -count=1 ./...` across every package.
-- `just test-cover` writes an atomic coverage profile to `coverage.out` and prints the function summary.
-- `just fmt` applies `gofmt` and the formatters configured in `.golangci.yml`.
-- `just lint` runs `go vet ./...` and golangci-lint.
-- `just tidy` updates `go.mod` and `go.sum`; review both files after running it.
-- `npm --prefix npm ci --ignore-scripts && npm --prefix npm test` checks the npm installer without downloading a release binary.
-- `npm pack ./npm --dry-run` verifies the files included in the published npm package.
-- The equivalent raw Go commands are acceptable when `just` is unavailable.
+- `just test` runs the locked Rust test suite.
+- `just test-integration` runs the public library integration suite.
+- `just test-e2e` runs the executable end-to-end suite.
+- `just test-cover` writes `lcov.info` through `cargo llvm-cov`.
+- `just fmt` applies rustfmt to all targets.
+- `just lint` runs Clippy for all targets and features with warnings denied.
+- `just docs` builds library documentation with warnings denied.
+- The equivalent raw Cargo commands are acceptable when `just` is unavailable.
 
 ## Coding Style & Naming Conventions
 
-- Let `gofmt` and the configured goimports formatter determine source and import formatting.
-- Use short lowercase package names, `snake_case.go` file names where multiple words are needed, `PascalCase` for exported identifiers, and `camelCase` for unexported identifiers. Preserve conventional initialisms such as `URL`, `HTTP`, and `CLI`.
-- Put stable caller-facing types and behavior in `audit`; keep executable, output, TUI, and implementation concerns in `cmd/scoutly` or the relevant `internal` package.
-- Pass `context.Context` as the first parameter for cancellable work, propagate cancellation, wrap errors with operation context using `%w`, and avoid logging from library packages.
+- Let rustfmt determine source formatting and import layout.
+- Use `snake_case` for modules, files, functions, and local variables; `PascalCase` for types and traits; and `SCREAMING_SNAKE_CASE` for constants.
+- Put stable caller-facing types and behavior behind `src/lib.rs`; keep executable, output, and TUI concerns private to the binary crate.
+- Use async cancellation through future dropping and Tokio primitives, preserve error sources with `thiserror`, and avoid printing or logging from library code.
 - Prefer small, focused functions and the standard library. Add dependencies only when their production value justifies the maintenance cost.
 
 ## Testing Guidelines
 
-- Add or update tests in the closest matching `*_test.go` file. Use external test packages only when the public API boundary is what the test needs to exercise.
-- Update `npm/install.test.js` whenever release archive names or supported Node.js platform mappings change.
-- Prefer deterministic table-driven tests, `httptest` servers, package-local `testdata/` fixtures, and the helpers in `internal/testutil/`. Do not depend on public websites.
-- Call `t.Parallel()` only when the test does not mutate process-wide state, environment, working directories, or shared fixtures.
-- CI enforces module tidiness, formatting, `go vet`, golangci-lint, `govulncheck`, cross-platform build/test coverage, npm package validation, and a Linux race-enabled coverage run uploaded to Codecov.
+- Add or update unit tests in the closest matching module. Use `tests/` when the public library, CLI process, or package boundary is what the test needs to exercise.
+- Prefer deterministic table-driven tests, loopback HTTP servers, `tests/fixtures/`, and the existing test server support. Do not depend on public websites.
+- `tests/fixtures/` covers CLI, configuration, report, progress, HTTP request, HTML parsing, and TUI behavior. Tests may update fixtures deliberately as the product changes, but unintentional output or ordering drift must fail.
+- The end-to-end audit test normalizes only `audited_at` values, the test server's dynamically allocated origin (including its port), and spinner frames or elapsed timing when a terminal renderer includes them. The non-terminal progress fixture has no spinner or timing data, so only the dynamic origin is replaced; request count and order are never normalized.
+- Library integration tests and CLI end-to-end tests share these fixtures. Ratatui screens use semantic interaction tests plus fixed-size Insta snapshots; ANSI styling and widget padding are not part of the byte-level fixture.
+- Keep tests isolated from process-wide state, shared working directories, and mutable fixtures so the Rust test harness can run them concurrently.
+- CI enforces rustfmt, Clippy, docs, the declared MSRV, native Linux/macOS/Windows tests, `cargo audit`, stress tests, cargo-dist planning, crate packaging, and Rust coverage uploaded to Codecov.
 
 ## Commit & Pull Request Guidelines
 
@@ -46,7 +47,7 @@
 
 ## Releases
 
-- Scoutly is tag-driven: pushing a new `v*` tag triggers the Release workflow (GoReleaser creates the GitHub Release and Homebrew cask, then the npm job publishes). Only release when the user explicitly asks.
+- Scoutly is tag-driven: pushing a new `v*` tag triggers the cargo-dist Release workflow. cargo-dist builds the release artifacts, while reusable custom jobs publish the npm package, Homebrew cask, and crate. Only release when the user explicitly asks.
 - Before tagging, confirm all of: (1) `main` is current — `git switch main && git pull --ff-only origin main`; (2) the CI run for `HEAD` passed — `gh run list --workflow "Continuous Integration" --commit "$(git rev-parse HEAD)" --limit 1 --json status,conclusion` shows success; (3) the tree is clean — `git status --porcelain` is empty.
 - Create a new SemVer tag (`vX.Y.Z` or `vX.Y.Z-beta.N`) that does not exist on the remote, then push only that tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
@@ -54,6 +55,6 @@
 
 - Validate config discovery with `scoutly.config.*`, `scoutly.*`, and `.scoutly.*` JSON, YAML, or TOML fixtures in an isolated temporary directory.
 - Keep HTTP behavior deterministic and bounded: preserve request cancellation, response-size limits, redirect limits, robots.txt handling, and configured concurrency/rate limits.
-- Do not commit secrets or real crawl credentials; use local fixtures and `httptest` servers for repeatable regression tests.
-- Keep npm publishing on GitHub Actions trusted publishing. Do not add a long-lived npm token when OIDC is available, and do not bypass release checksum verification in the npm installer.
+- Do not commit secrets or real crawl credentials; use local fixtures and loopback test servers for repeatable regression tests.
+- Keep npm package generation managed by cargo-dist and publishing in `.github/workflows/publish-npm.yml`. Use npm Trusted Publishing with provenance and never add a long-lived npm token. Because npm validates the calling workflow for reusable workflows, configure the npm trusted publisher for `release.yml`, not `publish-npm.yml`, and preserve `id-token: write` on both workflows.
 - Use Semantic Versioning release tags: `vX.Y.Z` for stable releases and `vX.Y.Z-beta.N` for prereleases. Prereleases publish to the npm `beta` dist-tag and the Homebrew `scoutly@beta` Cask without replacing stable channels.
