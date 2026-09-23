@@ -149,20 +149,3 @@ jobs:
           flags: rust
           disable_search: true
           fail_ci_if_error: false
-
-  rust-stress:
-    name: Rust Stress and Leak Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout branch
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install Rust 1.96.0
-        run: rustup toolchain install 1.96.0 --profile minimal
-
-      - name: Run repeated audit, cancellation, and body-limit stress gate
-        run: >-
-          cargo +1.96.0 test --locked
-          repeated_audits_cancellation_and_bounded_bodies_do_not_leak --
-          --ignored --test-threads=1

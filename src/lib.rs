@@ -512,7 +512,6 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    #[ignore = "phase 7 stress gate"]
     async fn repeated_audits_cancellation_and_bounded_bodies_do_not_leak() {
         let descriptors_before = open_file_descriptor_count();
         let stable_server = TestServer::start(|request| match request.target.as_str() {
