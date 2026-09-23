@@ -581,24 +581,446 @@ fn issue(
 
 #[cfg(test)]
 mod tests {
+    use time::OffsetDateTime;
     use url::Url;
 
-    use super::{analyze_page, reachable_fields};
-    use crate::html::ParsedPage;
+    use super::{analyze_image, analyze_link, analyze_page, build_report, reachable_fields};
+    use crate::checker::{CheckedImage, CheckedLink};
+    use crate::crawler::CrawledPage;
+    use crate::html::{
+        ImageReference, ImageReferenceAttribute, ImageReferenceElement, LinkElement, ParsedImage,
+        ParsedLink, ParsedPage,
+    };
     use crate::resource::ResourceResult;
-    use crate::{FailureReason, IssueTarget, ResultKind, TargetType};
+    use crate::{
+        FailureReason, Headings, Image, ImageResult, IssueCode, IssueTarget, Link, LinkResult,
+        OpenGraph, Options, ResultKind, TargetType,
+    };
+
+    fn page_target() -> IssueTarget {
+        IssueTarget {
+            target_type: TargetType::Page,
+            url: "https://example.com/page".to_owned(),
+        }
+    }
+
+    fn link(kind: ResultKind, status_code: Option<u16>, final_url: Option<&str>) -> Link {
+        Link {
+            url: "https://example.com/original".to_owned(),
+            result: LinkResult {
+                kind,
+                status_code,
+                final_url: final_url.map(str::to_owned),
+                reason: Some(FailureReason::RequestTimedOut),
+            },
+            found_on: Vec::new(),
+        }
+    }
+
+    fn image(
+        kind: ResultKind,
+        status_code: Option<u16>,
+        final_url: Option<&str>,
+        content_type: Option<&str>,
+    ) -> Image {
+        Image {
+            url: "https://example.com/image.png".to_owned(),
+            result: ImageResult {
+                kind,
+                status_code,
+                final_url: final_url.map(str::to_owned),
+                content_type: content_type.map(str::to_owned),
+                reason: Some(FailureReason::ConnectionFailed),
+            },
+            found_on: Vec::new(),
+        }
+    }
 
     #[test]
     fn page_analysis_constructs_every_issue_with_the_real_target() {
-        let target = IssueTarget {
-            target_type: TargetType::Page,
-            url: "https://example.com/page".to_owned(),
-        };
+        let target = page_target();
 
         let issues = analyze_page(&ParsedPage::default(), target.clone());
 
         assert!(!issues.is_empty());
         assert!(issues.iter().all(|issue| issue.target == target));
+    }
+
+    #[test]
+    fn page_analysis_covers_length_heading_alt_content_and_open_graph_boundaries() {
+        let healthy = ParsedPage {
+            title: Some("t".repeat(50)),
+            description: Some("d".repeat(160)),
+            headings: Headings {
+                h1: vec!["Primary".to_owned()],
+            },
+            links: (0..3)
+                .map(|index| ParsedLink {
+                    element: LinkElement::Anchor,
+                    url: Url::parse(&format!("https://example.com/{index}")).unwrap(),
+                    original_url: format!("/{index}"),
+                    text: format!("Link {index}"),
+                    is_external: false,
+                })
+                .collect(),
+            images: vec![ParsedImage {
+                src: Url::parse("https://example.com/image.png").unwrap(),
+                alt: Some("Image".to_owned()),
+            }],
+            image_alt_texts: vec![Some("Image".to_owned())],
+            image_references: Vec::new(),
+            open_graph: OpenGraph {
+                title: Some("Title".to_owned()),
+                description: Some("Description".to_owned()),
+                image: Some("https://example.com/image.png".to_owned()),
+                url: Some("https://example.com/page".to_owned()),
+                object_type: Some("website".to_owned()),
+                ..OpenGraph::default()
+            },
+        };
+
+        assert!(analyze_page(&healthy, page_target()).is_empty());
+
+        let mut unhealthy = healthy;
+        unhealthy.title = Some("t".repeat(61));
+        unhealthy.description = Some("d".repeat(149));
+        unhealthy.headings.h1.push("Secondary".to_owned());
+        unhealthy.image_alt_texts = vec![None, None];
+        unhealthy.links.clear();
+        unhealthy.images.clear();
+        unhealthy.open_graph = OpenGraph {
+            title: Some("  ".to_owned()),
+            ..OpenGraph::default()
+        };
+
+        let issues = analyze_page(&unhealthy, page_target());
+        let codes = issues.iter().map(|issue| issue.code).collect::<Vec<_>>();
+
+        for code in [
+            IssueCode::TitleTooLong,
+            IssueCode::MetaDescriptionTooShort,
+            IssueCode::MultipleH1,
+            IssueCode::MissingImageAlt,
+            IssueCode::ThinContent,
+            IssueCode::MissingOgTitle,
+            IssueCode::MissingOgDescription,
+            IssueCode::MissingOgImage,
+            IssueCode::MissingOgUrl,
+            IssueCode::MissingOgType,
+        ] {
+            assert!(codes.contains(&code), "missing issue {code:?}");
+        }
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.message.contains("2 image(s)"))
+        );
+    }
+
+    #[test]
+    fn page_analysis_treats_blank_metadata_as_missing_and_accepts_upper_boundaries() {
+        let blank = ParsedPage {
+            title: Some(" \n ".to_owned()),
+            description: Some(String::new()),
+            ..ParsedPage::default()
+        };
+        let blank_codes = analyze_page(&blank, page_target())
+            .into_iter()
+            .map(|issue| issue.code)
+            .collect::<Vec<_>>();
+
+        assert!(blank_codes.contains(&IssueCode::MissingTitle));
+        assert!(blank_codes.contains(&IssueCode::MissingMetaDescription));
+
+        let boundaries = ParsedPage {
+            title: Some("t".repeat(60)),
+            description: Some("d".repeat(150)),
+            headings: Headings {
+                h1: vec!["Primary".to_owned()],
+            },
+            links: (0..4)
+                .map(|index| ParsedLink {
+                    element: LinkElement::Anchor,
+                    url: Url::parse(&format!("https://example.com/{index}")).unwrap(),
+                    original_url: format!("/{index}"),
+                    text: String::new(),
+                    is_external: false,
+                })
+                .collect(),
+            open_graph: OpenGraph {
+                title: Some("title".to_owned()),
+                description: Some("description".to_owned()),
+                image: Some("image".to_owned()),
+                url: Some("url".to_owned()),
+                object_type: Some("website".to_owned()),
+                ..OpenGraph::default()
+            },
+            ..ParsedPage::default()
+        };
+
+        assert!(analyze_page(&boundaries, page_target()).is_empty());
+    }
+
+    #[test]
+    fn link_analysis_handles_every_result_kind() {
+        let failed = analyze_link(&link(ResultKind::Failed, None, None));
+        assert_eq!(failed.len(), 1);
+        assert_eq!(failed[0].code, IssueCode::BrokenLink);
+        assert!(failed[0].message.contains("request timed out"));
+
+        assert!(analyze_link(&link(ResultKind::Skipped, None, None)).is_empty());
+        assert!(analyze_link(&link(ResultKind::Invalid, None, None)).is_empty());
+
+        let blocked = analyze_link(&link(
+            ResultKind::Blocked,
+            Some(403),
+            Some("https://example.com/challenge"),
+        ));
+        assert_eq!(
+            blocked.iter().map(|issue| issue.code).collect::<Vec<_>>(),
+            vec![IssueCode::LinkCheckBlocked, IssueCode::Redirect]
+        );
+
+        let broken_redirect = analyze_link(&link(
+            ResultKind::Response,
+            Some(404),
+            Some("https://example.com/missing"),
+        ));
+        assert_eq!(
+            broken_redirect
+                .iter()
+                .map(|issue| issue.code)
+                .collect::<Vec<_>>(),
+            vec![IssueCode::Redirect, IssueCode::BrokenLink]
+        );
+
+        assert!(
+            analyze_link(&link(
+                ResultKind::Response,
+                Some(200),
+                Some("https://example.com/original")
+            ))
+            .is_empty()
+        );
+    }
+
+    #[test]
+    fn image_analysis_handles_every_result_kind_and_combined_outcomes() {
+        let invalid_url = analyze_image(&image(ResultKind::Invalid, None, None, None));
+        assert_eq!(invalid_url[0].code, IssueCode::InvalidImageUrl);
+
+        let failed = analyze_image(&image(ResultKind::Failed, None, None, None));
+        assert_eq!(failed[0].code, IssueCode::BrokenImage);
+        assert!(failed[0].message.contains("connection failed"));
+
+        assert!(analyze_image(&image(ResultKind::Skipped, None, None, None)).is_empty());
+
+        let blocked = analyze_image(&image(
+            ResultKind::Blocked,
+            Some(403),
+            Some("https://example.com/protected.png"),
+            Some("image/png"),
+        ));
+        assert_eq!(
+            blocked.iter().map(|issue| issue.code).collect::<Vec<_>>(),
+            vec![IssueCode::ImageCheckBlocked, IssueCode::ImageRedirect]
+        );
+
+        let broken = analyze_image(&image(
+            ResultKind::Response,
+            Some(500),
+            Some("https://example.com/image.png"),
+            Some("text/html"),
+        ));
+        assert_eq!(
+            broken.iter().map(|issue| issue.code).collect::<Vec<_>>(),
+            vec![IssueCode::BrokenImage]
+        );
+
+        let invalid_content = analyze_image(&image(
+            ResultKind::Response,
+            Some(200),
+            Some("https://example.com/final.png"),
+            None,
+        ));
+        assert_eq!(
+            invalid_content
+                .iter()
+                .map(|issue| issue.code)
+                .collect::<Vec<_>>(),
+            vec![IssueCode::InvalidImageContentType, IssueCode::ImageRedirect]
+        );
+
+        assert!(
+            analyze_image(&image(
+                ResultKind::Response,
+                Some(200),
+                Some("https://example.com/image.png"),
+                Some("image/png")
+            ))
+            .is_empty()
+        );
+    }
+
+    #[test]
+    fn report_building_preserves_occurrences_and_classifies_page_results() {
+        let page_url = Url::parse("https://example.com/page").unwrap();
+        let link_url = Url::parse("https://example.com/next").unwrap();
+        let image_url = Url::parse("https://example.com/image.png").unwrap();
+        let parsed = ParsedPage {
+            title: Some("t".repeat(50)),
+            description: Some("d".repeat(150)),
+            headings: Headings {
+                h1: vec!["Primary".to_owned()],
+            },
+            links: vec![ParsedLink {
+                element: LinkElement::Anchor,
+                url: link_url.clone(),
+                original_url: "/next".to_owned(),
+                text: "Next".to_owned(),
+                is_external: false,
+            }],
+            images: vec![ParsedImage {
+                src: image_url.clone(),
+                alt: Some("Image".to_owned()),
+            }],
+            image_alt_texts: vec![Some("Image".to_owned())],
+            image_references: vec![ImageReference {
+                url: Some(image_url.clone()),
+                original_url: "/image.png".to_owned(),
+                element: ImageReferenceElement::Image,
+                attribute: ImageReferenceAttribute::Src,
+                descriptor: None,
+                alt: Some("Image".to_owned()),
+            }],
+            open_graph: OpenGraph::default(),
+        };
+        let crawled = vec![
+            CrawledPage {
+                outside_scope: false,
+                page: parsed,
+                url: page_url.clone(),
+                final_url: page_url.clone(),
+                depth: 1,
+                status_code: Some(200),
+                content_type: Some("text/html".to_owned()),
+            },
+            CrawledPage {
+                outside_scope: false,
+                page: ParsedPage::default(),
+                url: Url::parse("https://example.com/failed").unwrap(),
+                final_url: Url::parse("https://example.com/failed").unwrap(),
+                depth: 0,
+                status_code: None,
+                content_type: None,
+            },
+            CrawledPage {
+                outside_scope: false,
+                page: ParsedPage::default(),
+                url: Url::parse("https://example.com/server-error").unwrap(),
+                final_url: Url::parse("https://example.com/server-error").unwrap(),
+                depth: 0,
+                status_code: Some(503),
+                content_type: Some("text/html".to_owned()),
+            },
+            CrawledPage {
+                outside_scope: false,
+                page: ParsedPage::default(),
+                url: Url::parse("https://example.com/file.pdf").unwrap(),
+                final_url: Url::parse("https://example.com/file.pdf").unwrap(),
+                depth: 0,
+                status_code: Some(200),
+                content_type: Some("application/pdf".to_owned()),
+            },
+            CrawledPage {
+                outside_scope: true,
+                page: ParsedPage::default(),
+                url: Url::parse("https://other.example/page").unwrap(),
+                final_url: Url::parse("https://other.example/page").unwrap(),
+                depth: 0,
+                status_code: Some(200),
+                content_type: Some("text/html".to_owned()),
+            },
+        ];
+        let links = vec![CheckedLink {
+            url: link_url.to_string(),
+            result: ResourceResult {
+                kind: ResultKind::Response,
+                status_code: Some(200),
+                final_url: None,
+                content_type: Some("text/html".to_owned()),
+                reason: None,
+            },
+        }];
+        let images = vec![CheckedImage {
+            key: image_url.to_string(),
+            url: image_url.to_string(),
+            result: ResourceResult {
+                kind: ResultKind::Response,
+                status_code: Some(200),
+                final_url: None,
+                content_type: Some("image/png".to_owned()),
+                reason: None,
+            },
+        }];
+
+        let report = build_report(
+            &page_url,
+            &crawled,
+            links,
+            images,
+            true,
+            &Options::default(),
+            OffsetDateTime::UNIX_EPOCH,
+        );
+
+        assert_eq!(report.pages.len(), 3);
+        assert_eq!(report.links[0].found_on[0].original_url, "/next");
+        assert_eq!(report.images[0].found_on[0].attribute, "src");
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.code == IssueCode::PageCrawlFailed)
+        );
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.code == IssueCode::PageHttpError)
+        );
+    }
+
+    #[test]
+    fn report_building_skips_image_analysis_when_disabled() {
+        let page_url = Url::parse("https://example.com/").unwrap();
+        let report = build_report(
+            &page_url,
+            &[],
+            Vec::new(),
+            vec![CheckedImage {
+                key: "invalid:image".to_owned(),
+                url: "image".to_owned(),
+                result: ResourceResult {
+                    kind: ResultKind::Invalid,
+                    status_code: None,
+                    final_url: None,
+                    content_type: None,
+                    reason: Some(FailureReason::InvalidUrl),
+                },
+            }],
+            false,
+            &Options::default(),
+            OffsetDateTime::UNIX_EPOCH,
+        );
+
+        assert_eq!(report.images.len(), 1);
+        assert!(
+            !report
+                .issues
+                .iter()
+                .any(|issue| issue.code == IssueCode::InvalidImageUrl)
+        );
     }
 
     #[test]
@@ -614,6 +1036,18 @@ mod tests {
         assert_eq!(
             reachable_fields(&response, "https://example.com/original"),
             (Some(204), Some("https://example.com/final".to_owned()))
+        );
+
+        let blocked_without_redirect = ResourceResult {
+            kind: ResultKind::Blocked,
+            status_code: Some(403),
+            final_url: None,
+            content_type: None,
+            reason: Some(FailureReason::AntiBotChallenge),
+        };
+        assert_eq!(
+            reachable_fields(&blocked_without_redirect, "https://example.com/original"),
+            (Some(403), Some("https://example.com/original".to_owned()))
         );
 
         let failed = ResourceResult {

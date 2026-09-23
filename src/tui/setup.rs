@@ -871,10 +871,10 @@ mod tests {
     };
     use ratatui::layout::Rect;
     use ratatui::{Terminal, backend::TestBackend};
-    use scoutly::Options;
+    use scoutly::{Options, Rule, RuleIgnore};
     use unicode_width::UnicodeWidthStr;
 
-    use super::{SetupAction, SetupField, SetupState, fit_width};
+    use super::{SetupAction, SetupField, SetupState, content_height, fit_width};
 
     #[test]
     fn setup_uses_example_domain_as_a_placeholder_only() {
@@ -982,5 +982,254 @@ mod tests {
 
         assert_eq!(UnicodeWidthStr::width(fitted.as_str()), 6);
         assert!(fitted.ends_with('…'));
+    }
+
+    #[test]
+    fn setup_field_metadata_and_display_values_cover_every_control() {
+        let options = Options {
+            rate_limit: 2.5,
+            keep_fragments: true,
+            ignore_redirects: true,
+            respect_robots: false,
+            sitemaps: false,
+            images: false,
+            ..Options::default()
+        };
+        let state = SetupState::new(options);
+
+        for field in SetupField::ALL {
+            assert!(!field.option_field().is_empty());
+            assert_eq!(
+                field.is_input(),
+                !field.is_boolean() && field != SetupField::Run
+            );
+            if field != SetupField::Run {
+                assert!(!field.label().is_empty());
+            }
+            assert!(!state.display_value(field).is_empty());
+        }
+
+        assert_eq!(state.display_value(SetupField::RateLimit), "> 2.5");
+        assert_eq!(state.display_value(SetupField::KeepFragments), "[Yes]   No");
+        assert_eq!(state.display_value(SetupField::Images), " Yes   [No]");
+        assert_eq!(state.display_value(SetupField::Run), "[ Run audit ]");
+    }
+
+    #[test]
+    fn setup_parse_reports_each_numeric_policy_and_scope_error() {
+        let mut state = SetupState::new(Options {
+            include_paths: vec!["/docs".to_owned()],
+            ignore_rules: vec![RuleIgnore {
+                url_prefix: "not a URL".to_owned(),
+                rules: Vec::new(),
+            }],
+            ..Options::default()
+        });
+        state.values.url = "https://example.com/outside".to_owned();
+        state.values.max_depth = "depth".to_owned();
+        state.values.max_pages = "pages".to_owned();
+        state.values.max_sitemap_documents = "sitemaps".to_owned();
+        state.values.timeout = "0".to_owned();
+        state.values.max_redirects = "redirects".to_owned();
+        state.values.concurrency = "workers".to_owned();
+        state.values.rate_limit = "fast".to_owned();
+        state.values.user_agent.clear();
+
+        let errors = state.parse().unwrap_err();
+
+        for field in [
+            SetupField::Url,
+            SetupField::MaxDepth,
+            SetupField::MaxPages,
+            SetupField::MaxSitemapDocuments,
+            SetupField::Timeout,
+            SetupField::MaxRedirects,
+            SetupField::Concurrency,
+            SetupField::UserAgent,
+            SetupField::RateLimit,
+            SetupField::Run,
+        ] {
+            assert!(errors.contains_key(&field), "missing error for {field:?}");
+        }
+
+        state.values.timeout = "later".to_owned();
+        assert_eq!(
+            state.parse().unwrap_err().get(&SetupField::Timeout),
+            Some(&"Enter a whole number".to_owned())
+        );
+    }
+
+    #[test]
+    fn setup_keyboard_navigation_edits_inputs_toggles_booleans_and_submits() {
+        let mut state = SetupState::new(Options::default());
+        state.values.url = "ab".to_owned();
+        state.cursor = 2;
+
+        for key in [KeyCode::Left, KeyCode::Home, KeyCode::Right, KeyCode::End] {
+            state.handle_key(KeyEvent::new(key, KeyModifiers::NONE), 8);
+        }
+        state.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE), 8);
+        state.handle_key(KeyEvent::new(KeyCode::Delete, KeyModifiers::NONE), 8);
+        state.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL), 8);
+        assert_eq!(state.values.url, "a");
+
+        state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE), 8);
+        assert_eq!(state.field(), SetupField::MaxDepth);
+        state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::SHIFT), 8);
+        assert_eq!(state.field(), SetupField::Url);
+        state.handle_key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::NONE), 8);
+        assert_eq!(state.field(), SetupField::Run);
+        state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE), 8);
+        assert_eq!(state.field(), SetupField::Url);
+        state.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), 8);
+        assert_eq!(state.field(), SetupField::MaxDepth);
+
+        state.scroll = 20;
+        state.handle_key(KeyEvent::new(KeyCode::PageUp, KeyModifiers::NONE), 8);
+        assert_eq!(state.scroll, 12);
+        state.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::NONE), 8);
+        assert_eq!(state.scroll, 20);
+
+        for field in [
+            SetupField::KeepFragments,
+            SetupField::IgnoreRedirects,
+            SetupField::RespectRobots,
+            SetupField::Sitemaps,
+            SetupField::Images,
+        ] {
+            state.focused = field;
+            state.handle_key(KeyEvent::new(KeyCode::Left, KeyModifiers::NONE), 8);
+            assert!(state.boolean(field));
+            state.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE), 8);
+            assert!(!state.boolean(field));
+            state.handle_key(KeyEvent::new(KeyCode::Char('h'), KeyModifiers::NONE), 8);
+            assert!(state.boolean(field));
+        }
+
+        state.values.url = "example.com".to_owned();
+        state.focused = SetupField::Run;
+        assert!(matches!(
+            state.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), 8),
+            SetupAction::Start { .. }
+        ));
+
+        state.reset();
+        assert_eq!(state.field(), SetupField::Url);
+        assert!(state.errors.is_empty());
+    }
+
+    #[test]
+    fn setup_mouse_selects_inputs_booleans_and_run_action() {
+        let mut state = SetupState::new(Options::default());
+        state.values.url = "example.com".to_owned();
+        let area = Rect::new(0, 0, 70, 30);
+
+        state.handle_mouse(
+            MouseEvent {
+                kind: MouseEventKind::ScrollDown,
+                column: 2,
+                row: 2,
+                modifiers: KeyModifiers::NONE,
+            },
+            area,
+        );
+        assert_eq!(state.scroll, 3);
+        state.handle_mouse(
+            MouseEvent {
+                kind: MouseEventKind::ScrollUp,
+                column: 2,
+                row: 2,
+                modifiers: KeyModifiers::NONE,
+            },
+            area,
+        );
+        assert_eq!(state.scroll, 0);
+
+        state.handle_mouse(
+            MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: 36,
+                row: 13,
+                modifiers: KeyModifiers::NONE,
+            },
+            area,
+        );
+        assert_eq!(state.field(), SetupField::KeepFragments);
+        assert!(state.values.keep_fragments);
+
+        assert!(matches!(
+            state.handle_mouse(
+                MouseEvent {
+                    kind: MouseEventKind::Down(MouseButton::Left),
+                    column: 1,
+                    row: 22,
+                    modifiers: KeyModifiers::NONE,
+                },
+                area,
+            ),
+            SetupAction::Start { .. }
+        ));
+
+        let before = state.field();
+        state.handle_mouse(
+            MouseEvent {
+                kind: MouseEventKind::Moved,
+                column: 100,
+                row: 100,
+                modifiers: KeyModifiers::NONE,
+            },
+            area,
+        );
+        assert_eq!(state.field(), before);
+    }
+
+    #[test]
+    fn setup_render_includes_scope_details_errors_overflow_and_focus_variants() {
+        let options = Options {
+            include_paths: vec!["/docs".to_owned()],
+            exclude_paths: vec!["/docs/archive".to_owned()],
+            ignore_rules: vec![RuleIgnore {
+                url_prefix: "https://example.com/private".to_owned(),
+                rules: vec![Rule::BrokenLink, Rule::MissingTitle],
+            }],
+            ..Options::default()
+        };
+        let mut state = SetupState::new(options);
+        state.values.url = "invalid url".to_owned();
+        state.submit();
+
+        let details = state.scope_details();
+        assert_eq!(details.len(), 3);
+        assert!(details[2].contains("broken_link, missing_title"));
+
+        for (width, height, focus) in [
+            (70, 20, SetupField::Url),
+            (100, 30, SetupField::Images),
+            (10, 5, SetupField::Run),
+        ] {
+            state.focused = focus;
+            state.scroll_to_focus = true;
+            let backend = TestBackend::new(width, height);
+            let mut terminal = Terminal::new(backend).unwrap();
+            terminal
+                .draw(|frame| state.render(frame, Rect::new(0, 0, width, height)))
+                .unwrap();
+            assert!(
+                terminal
+                    .backend()
+                    .buffer()
+                    .content()
+                    .iter()
+                    .any(|cell| !cell.symbol().is_empty())
+            );
+        }
+    }
+
+    #[test]
+    fn setup_layout_helpers_handle_zero_padding_and_details() {
+        assert_eq!(content_height(0), 24);
+        assert_eq!(content_height(3), 28);
+        assert_eq!(fit_width("anything", 0), "");
+        assert_eq!(fit_width("ok", 4), "ok  ");
     }
 }

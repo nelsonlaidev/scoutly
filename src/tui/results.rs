@@ -1558,11 +1558,200 @@ mod tests {
     use crossterm::event::{
         KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
     };
+    use ratatui::{Terminal, backend::TestBackend, layout::Rect};
+    use scoutly::{
+        FailureReason, Image, ImageResult, Issue, IssueCode, IssueTarget, Link, LinkResult,
+        ResultKind, Severity, TargetType,
+    };
 
     use super::{
-        ResultItem, ResultTab, ResultsAction, ResultsState, create_detail_lines, describe_image,
+        ResultFocus, ResultItem, ResultTab, ResultsAction, ResultsState, completed_timestamp,
+        create_detail_lines, describe_image, describe_link, matches_image_filter,
+        matches_link_filter, matches_page_filter, offset_by, overview_lines, pane_areas,
+        select_items, tab_at, wrapped_line_count,
     };
     use crate::tui::tests::{large_report, sample_report};
+
+    fn varied_report() -> scoutly::Report {
+        let mut report = sample_report();
+
+        let mut failed_page = report.pages[0].clone();
+
+        failed_page.url = "https://example.com/failed".to_owned();
+        failed_page.title = None;
+        failed_page.status_code = None;
+        failed_page.content_type = None;
+        failed_page.description = None;
+        failed_page.headings.h1.clear();
+
+        report.pages.push(failed_page);
+
+        let mut non_success_page = report.pages[0].clone();
+
+        non_success_page.url = "https://example.com/error".to_owned();
+        non_success_page.status_code = Some(503);
+
+        report.pages.push(non_success_page);
+
+        report.links.extend([
+            Link {
+                url: "https://example.com/blocked".to_owned(),
+                result: LinkResult {
+                    kind: ResultKind::Blocked,
+                    status_code: Some(403),
+                    final_url: Some("https://example.com/challenge".to_owned()),
+                    reason: Some(FailureReason::AntiBotChallenge),
+                },
+                found_on: Vec::new(),
+            },
+            Link {
+                url: "mailto:test@example.com".to_owned(),
+                result: LinkResult {
+                    kind: ResultKind::Skipped,
+                    status_code: None,
+                    final_url: None,
+                    reason: Some(FailureReason::UnsupportedProtocol),
+                },
+                found_on: Vec::new(),
+            },
+            Link {
+                url: "https://example.com/old".to_owned(),
+                result: LinkResult {
+                    kind: ResultKind::Response,
+                    status_code: Some(301),
+                    final_url: Some("https://example.com/new".to_owned()),
+                    reason: None,
+                },
+                found_on: Vec::new(),
+            },
+            Link {
+                url: "https://example.com/timeout".to_owned(),
+                result: LinkResult {
+                    kind: ResultKind::Failed,
+                    status_code: None,
+                    final_url: None,
+                    reason: Some(FailureReason::RequestTimedOut),
+                },
+                found_on: vec![scoutly::LinkOccurrence {
+                    page_url: "https://example.com/".to_owned(),
+                    original_url: "/timeout".to_owned(),
+                    element: "a".to_owned(),
+                    text: String::new(),
+                }],
+            },
+            Link {
+                url: "https://example.com/healthy".to_owned(),
+                result: LinkResult {
+                    kind: ResultKind::Response,
+                    status_code: Some(200),
+                    final_url: Some("https://example.com/healthy".to_owned()),
+                    reason: None,
+                },
+                found_on: Vec::new(),
+            },
+        ]);
+
+        report.images.extend([
+            Image {
+                url: "https://example.com/blocked.png".to_owned(),
+                result: ImageResult {
+                    kind: ResultKind::Blocked,
+                    status_code: Some(403),
+                    final_url: Some("https://example.com/challenge.png".to_owned()),
+                    content_type: Some("image/png".to_owned()),
+                    reason: Some(FailureReason::AntiBotChallenge),
+                },
+                found_on: Vec::new(),
+            },
+            Image {
+                url: "data:image/png;base64,AA".to_owned(),
+                result: ImageResult {
+                    kind: ResultKind::Skipped,
+                    status_code: None,
+                    final_url: None,
+                    content_type: None,
+                    reason: Some(FailureReason::UnsupportedProtocol),
+                },
+                found_on: Vec::new(),
+            },
+            Image {
+                url: "bad image".to_owned(),
+                result: ImageResult {
+                    kind: ResultKind::Invalid,
+                    status_code: None,
+                    final_url: None,
+                    content_type: None,
+                    reason: Some(FailureReason::InvalidUrl),
+                },
+                found_on: Vec::new(),
+            },
+            Image {
+                url: "https://example.com/missing.png".to_owned(),
+                result: ImageResult {
+                    kind: ResultKind::Response,
+                    status_code: Some(404),
+                    final_url: None,
+                    content_type: Some("image/png".to_owned()),
+                    reason: None,
+                },
+                found_on: Vec::new(),
+            },
+            Image {
+                url: "https://example.com/old.png".to_owned(),
+                result: ImageResult {
+                    kind: ResultKind::Response,
+                    status_code: Some(200),
+                    final_url: Some("https://example.com/new.png".to_owned()),
+                    content_type: Some("image/png".to_owned()),
+                    reason: None,
+                },
+                found_on: vec![scoutly::ImageOccurrence {
+                    page_url: "https://example.com/".to_owned(),
+                    original_url: "/old.png".to_owned(),
+                    element: "source".to_owned(),
+                    attribute: "srcset".to_owned(),
+                    descriptor: Some("2x".to_owned()),
+                    alt: Some("Large image".to_owned()),
+                }],
+            },
+            Image {
+                url: "https://example.com/healthy.png".to_owned(),
+                result: ImageResult {
+                    kind: ResultKind::Response,
+                    status_code: Some(200),
+                    final_url: Some("https://example.com/healthy.png".to_owned()),
+                    content_type: Some("image/png".to_owned()),
+                    reason: None,
+                },
+                found_on: Vec::new(),
+            },
+        ]);
+
+        report.issues.extend([
+            Issue {
+                code: IssueCode::Redirect,
+                severity: Severity::Info,
+                message: "Link redirected".to_owned(),
+                target: IssueTarget {
+                    target_type: TargetType::Link,
+                    url: "https://example.com/old".to_owned(),
+                },
+            },
+            Issue {
+                code: IssueCode::MissingTitle,
+                severity: Severity::Warning,
+                message: "Page is missing a title".to_owned(),
+                target: IssueTarget {
+                    target_type: TargetType::Page,
+                    url: "https://example.com/failed".to_owned(),
+                },
+            },
+        ]);
+
+        report.refresh_summary();
+
+        report
+    }
 
     #[test]
     fn keyboard_switches_tabs_filters_search_and_narrow_detail() {
@@ -1827,5 +2016,514 @@ mod tests {
 
         assert!(issue_lines.iter().any(|line| line == "  Source: <img> src"));
         assert!(!issue_lines.iter().any(|line| line == "  <a> Broken"));
+    }
+
+    #[test]
+    fn resource_filters_and_descriptions_cover_all_result_states() {
+        let report = varied_report();
+
+        for filter in ["all", "healthy", "non-2xx", "failed"] {
+            assert!(
+                report
+                    .pages
+                    .iter()
+                    .any(|page| matches_page_filter(page, filter))
+            );
+        }
+
+        for filter in [
+            "all",
+            "healthy",
+            "broken",
+            "blocked",
+            "redirected",
+            "skipped",
+        ] {
+            assert!(
+                report
+                    .links
+                    .iter()
+                    .any(|link| matches_link_filter(link, filter)),
+                "missing link filter {filter}"
+            );
+        }
+
+        for filter in [
+            "all",
+            "healthy",
+            "broken",
+            "blocked",
+            "invalid",
+            "redirected",
+            "skipped",
+        ] {
+            assert!(
+                report
+                    .images
+                    .iter()
+                    .any(|image| matches_image_filter(image, filter)),
+                "missing image filter {filter}"
+            );
+        }
+
+        assert!(describe_link(&report.links[1]).starts_with("BLOCKED:"));
+        assert!(describe_link(&report.links[2]).starts_with("skipped:"));
+        assert!(describe_image(&report.images[5]).contains("->"));
+
+        assert_eq!(
+            select_items(&report, ResultTab::Overview, "", "none").len(),
+            0
+        );
+        assert_eq!(
+            select_items(&report, ResultTab::Pages, "FAILED", "all").len(),
+            1
+        );
+        assert_eq!(
+            select_items(&report, ResultTab::Links, "timeout", "all").len(),
+            1
+        );
+        assert_eq!(
+            select_items(&report, ResultTab::Images, "INVALID", "all").len(),
+            1
+        );
+        assert_eq!(
+            select_items(&report, ResultTab::Issues, "redirect", "info").len(),
+            1
+        );
+    }
+
+    #[test]
+    fn detail_lines_cover_pages_resources_occurrences_and_empty_selection() {
+        let report = varied_report();
+        let failed_page = create_detail_lines(&ResultItem::page(1, &report.pages[1]), &report);
+
+        assert!(failed_page.iter().any(|line| line == "(untitled page)"));
+        assert!(failed_page.iter().any(|line| line == "Status: failed"));
+        assert!(failed_page.iter().any(|line| line == "H1: (missing)"));
+
+        let failed_link = create_detail_lines(&ResultItem::link(4, &report.links[4]), &report);
+
+        assert!(
+            failed_link
+                .iter()
+                .any(|line| line == "Reason: request-timed-out")
+        );
+        assert!(failed_link.iter().any(|line| line == "  <a> (no text)"));
+
+        let redirected_image =
+            create_detail_lines(&ResultItem::image(5, &report.images[5]), &report);
+
+        assert!(
+            redirected_image
+                .iter()
+                .any(|line| line == "  Descriptor: 2x")
+        );
+        assert!(
+            redirected_image
+                .iter()
+                .any(|line| line == "  Alt: Large image")
+        );
+
+        let page_issue = create_detail_lines(&ResultItem::issue(3, &report.issues[3]), &report);
+
+        assert!(page_issue.iter().any(|line| line == "Target: page"));
+
+        let mut empty = ResultsState::new(&scoutly::Report {
+            pages: Vec::new(),
+            links: Vec::new(),
+            images: Vec::new(),
+            issues: Vec::new(),
+            ..report.clone()
+        });
+
+        empty.change_tab(ResultTab::Pages, &report);
+        empty.items.clear();
+
+        assert_eq!(empty.detail_lines(&report), vec!["No item selected."]);
+    }
+
+    #[test]
+    fn keyboard_navigation_edits_unicode_search_and_visits_every_tab() {
+        let report = varied_report();
+        let area = Rect::new(0, 0, 80, 14);
+        let mut state = ResultsState::new(&report);
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Left, KeyModifiers::NONE),
+            &report,
+            area,
+        );
+        assert_eq!(state.tab, ResultTab::Images);
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Right, KeyModifiers::NONE),
+            &report,
+            area,
+        );
+        assert_eq!(state.tab, ResultTab::Overview);
+
+        for (key, tab) in [
+            ('2', ResultTab::Issues),
+            ('3', ResultTab::Pages),
+            ('4', ResultTab::Links),
+            ('5', ResultTab::Images),
+        ] {
+            state.handle_key(
+                KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE),
+                &report,
+                area,
+            );
+            assert_eq!(state.tab, tab);
+        }
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Char('/'), KeyModifiers::NONE),
+            &report,
+            area,
+        );
+
+        for character in "圖ab".chars() {
+            state.handle_key(
+                KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE),
+                &report,
+                area,
+            );
+        }
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Left, KeyModifiers::NONE),
+            &report,
+            area,
+        );
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
+            &report,
+            area,
+        );
+
+        assert_eq!(state.query, "圖b");
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Home, KeyModifiers::NONE),
+            &report,
+            area,
+        );
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Delete, KeyModifiers::NONE),
+            &report,
+            area,
+        );
+
+        assert_eq!(state.query, "b");
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::End, KeyModifiers::NONE),
+            &report,
+            area,
+        );
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Right, KeyModifiers::NONE),
+            &report,
+            area,
+        );
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL),
+            &report,
+            area,
+        );
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
+            &report,
+            area,
+        );
+
+        assert_eq!(state.focus, ResultFocus::List);
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
+            &report,
+            area,
+        );
+
+        assert!(state.query.is_empty());
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::End, KeyModifiers::NONE),
+            &report,
+            area,
+        );
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Home, KeyModifiers::NONE),
+            &report,
+            area,
+        );
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::PageDown, KeyModifiers::NONE),
+            &report,
+            area,
+        );
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::PageUp, KeyModifiers::NONE),
+            &report,
+            area,
+        );
+
+        assert_eq!(
+            state.handle_key(
+                KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE),
+                &report,
+                area
+            ),
+            ResultsAction::Quit
+        );
+    }
+
+    #[test]
+    fn result_rendering_covers_overview_lists_search_and_narrow_details() {
+        let report = varied_report();
+
+        for (tab, width) in [
+            (ResultTab::Overview, 120),
+            (ResultTab::Issues, 120),
+            (ResultTab::Pages, 120),
+            (ResultTab::Links, 120),
+            (ResultTab::Images, 80),
+        ] {
+            let backend = TestBackend::new(width, 24);
+            let mut terminal = Terminal::new(backend).unwrap();
+            let mut state = ResultsState::new(&report);
+
+            state.change_tab(tab, &report);
+
+            if tab != ResultTab::Overview {
+                state.focus = ResultFocus::Search;
+                state.query = "example".to_owned();
+                state.query_cursor = state.query.chars().count();
+                state.refresh(&report);
+            }
+
+            if width < 100 {
+                state.detail_open = true;
+                state.focus = ResultFocus::Detail;
+            }
+
+            terminal
+                .draw(|frame| state.render(frame, Rect::new(0, 0, width, 24), &report))
+                .unwrap();
+
+            assert!(
+                terminal
+                    .backend()
+                    .buffer()
+                    .content()
+                    .iter()
+                    .any(|cell| !cell.symbol().is_empty())
+            );
+        }
+    }
+
+    #[test]
+    fn geometry_timestamp_wrapping_and_offsets_handle_edges() {
+        assert_eq!(tab_at(1), Some(ResultTab::Overview));
+        assert_eq!(tab_at(u16::MAX), None);
+        assert_eq!(pane_areas(Rect::new(2, 3, 99, 10)).1, None);
+        assert!(pane_areas(Rect::new(2, 3, 100, 10)).1.is_some());
+        assert_eq!(offset_by(2, -5), 0);
+        assert_eq!(offset_by(2, 5), 7);
+        assert_eq!(
+            wrapped_line_count(&["abcdef".to_owned(), String::new()], 3),
+            3
+        );
+        assert_eq!(
+            completed_timestamp(time::OffsetDateTime::UNIX_EPOCH),
+            "1970-01-01 00:00:00 UTC"
+        );
+
+        let offset = time::UtcOffset::from_hms(8, 0, 0).unwrap();
+
+        assert!(
+            completed_timestamp(time::OffsetDateTime::UNIX_EPOCH.to_offset(offset))
+                .ends_with("+08:00:00")
+        );
+        assert!(
+            overview_lines(&sample_report())
+                .iter()
+                .any(|line| line.starts_with("Audited "))
+        );
+    }
+
+    #[test]
+    fn result_state_edge_navigation_covers_focus_filters_and_empty_rendering() {
+        let report = varied_report();
+        let narrow = Rect::new(0, 0, 80, 14);
+        let wide = Rect::new(0, 0, 120, 20);
+        let mut state = ResultsState::new(&report);
+
+        state.change_tab(ResultTab::Links, &report);
+        state.handle_key(
+            KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE),
+            &report,
+            wide,
+        );
+        assert_eq!(state.focus, ResultFocus::Detail);
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
+            &report,
+            wide,
+        );
+        assert_eq!(state.focus, ResultFocus::List);
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE),
+            &report,
+            wide,
+        );
+        state.handle_key(
+            KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE),
+            &report,
+            wide,
+        );
+        assert_eq!(state.focus, ResultFocus::List);
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+            &report,
+            narrow,
+        );
+        assert!(state.detail_open);
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+            &report,
+            narrow,
+        );
+        assert!(!state.detail_open);
+
+        state.handle_key(
+            KeyEvent::new(KeyCode::Up, KeyModifiers::NONE),
+            &report,
+            narrow,
+        );
+        state.handle_key(
+            KeyEvent::new(KeyCode::Null, KeyModifiers::NONE),
+            &report,
+            narrow,
+        );
+
+        state.focus = ResultFocus::Search;
+        state.query = "x".to_owned();
+        state.query_cursor = 0;
+        state.handle_key(
+            KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
+            &report,
+            wide,
+        );
+        assert_eq!(state.query, "x");
+
+        state.change_tab(ResultTab::Pages, &report);
+        state.cycle_filter();
+        assert_eq!(state.current_filter(), "healthy");
+        state.change_tab(ResultTab::Images, &report);
+        state.cycle_filter();
+        assert_eq!(state.current_filter(), "healthy");
+        state.change_tab(ResultTab::Overview, &report);
+        state.cycle_filter();
+        assert_eq!(state.current_filter(), "none");
+        state.move_vertical(3, wide);
+        assert_eq!(state.overview_offset, 3);
+        state.move_to_edge(true);
+        assert_eq!(state.overview_offset, usize::MAX);
+        state.move_to_edge(false);
+        assert_eq!(state.overview_offset, 0);
+
+        state.change_tab(ResultTab::Pages, &report);
+        state.items.clear();
+        let backend = TestBackend::new(120, 20);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| state.render(frame, wide, &report))
+            .unwrap();
+        let rendered = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(rendered.contains("No matching results."));
+        assert!(rendered.contains("Details"));
+    }
+
+    #[test]
+    fn result_mouse_edges_cover_outside_scroll_and_narrow_detail_routing() {
+        let report = varied_report();
+        let area = Rect::new(1, 3, 78, 20);
+        let mut state = ResultsState::new(&report);
+
+        state.handle_mouse(
+            MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: 100,
+                row: 100,
+                modifiers: KeyModifiers::NONE,
+            },
+            &report,
+            area,
+        );
+        state.handle_mouse(
+            MouseEvent {
+                kind: MouseEventKind::ScrollUp,
+                column: 2,
+                row: 5,
+                modifiers: KeyModifiers::NONE,
+            },
+            &report,
+            area,
+        );
+        state.handle_mouse(
+            MouseEvent {
+                kind: MouseEventKind::Moved,
+                column: 2,
+                row: 5,
+                modifiers: KeyModifiers::NONE,
+            },
+            &report,
+            area,
+        );
+
+        state.change_tab(ResultTab::Links, &report);
+        state.handle_mouse(
+            MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: 2,
+                row: area.y + super::RESULT_HEADER_ROWS + 2,
+                modifiers: KeyModifiers::NONE,
+            },
+            &report,
+            area,
+        );
+        assert!(state.detail_open);
+        assert_eq!(state.focus, ResultFocus::Detail);
+
+        state.handle_mouse(
+            MouseEvent {
+                kind: MouseEventKind::ScrollDown,
+                column: 2,
+                row: area.y + super::RESULT_HEADER_ROWS + 2,
+                modifiers: KeyModifiers::NONE,
+            },
+            &report,
+            area,
+        );
+        assert!(state.detail_offset > 0);
     }
 }

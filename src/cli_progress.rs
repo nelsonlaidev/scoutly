@@ -333,4 +333,48 @@ mod tests {
             assert_eq!(truncate_chars(value, maximum), expected);
         }
     }
+
+    #[test]
+    fn terminal_progress_redraws_on_phase_changes_and_clears_on_close() {
+        let mut output = Vec::new();
+        let mut display = ProgressDisplay::new(ProgressMode::Always, &mut output, true, 80);
+
+        display.render(std::time::Instant::now()).unwrap();
+        display.update(progress(Phase::Crawl)).unwrap();
+        let first_length = display.writer.len();
+        display.update(progress(Phase::Crawl)).unwrap();
+        assert_eq!(display.writer.len(), first_length);
+
+        display.update(progress(Phase::Report)).unwrap();
+        assert!(display.writer.len() > first_length);
+        display.close().unwrap();
+        let closed_length = display.writer.len();
+        display.close().unwrap();
+        assert_eq!(display.writer.len(), closed_length);
+
+        let output = String::from_utf8(output).unwrap();
+        assert!(output.contains("Crawling pages"));
+        assert!(output.contains("Building report"));
+        assert!(output.contains("\x1b[3A"));
+        assert!(output.ends_with("\r\x1b[2K"));
+    }
+
+    #[test]
+    fn terminal_frames_label_every_phase_and_handle_an_empty_current_url() {
+        for (phase, label) in [
+            (Phase::Robots, "Checking robots.txt"),
+            (Phase::Crawl, "Crawling pages"),
+            (Phase::Sitemaps, "Reading sitemaps"),
+            (Phase::Links, "Checking links"),
+            (Phase::Images, "Checking images"),
+            (Phase::Report, "Building report"),
+        ] {
+            let mut snapshot = progress(phase);
+            snapshot.current_url.clear();
+            let frame = format_progress_frame(&snapshot, Duration::ZERO, 19, 200);
+
+            assert!(frame.contains(label));
+            assert!(frame.contains("Waiting for the next request..."));
+        }
+    }
 }

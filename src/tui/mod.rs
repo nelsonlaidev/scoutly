@@ -831,18 +831,25 @@ pub(super) fn title_case(value: &str) -> String {
 
 #[cfg(test)]
 pub(super) mod tests {
-    use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+    use crossterm::event::{
+        Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent,
+        MouseEventKind,
+    };
     use insta::assert_snapshot;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::style::Color;
     use scoutly::{
         Headings, Image, ImageResult, ImageSummary, Issue, IssueCode, IssueSummary, IssueTarget,
-        Link, LinkResult, LinkSummary, OpenGraph, Page, Report, ResultKind, Severity, Summary,
-        TargetType,
+        Link, LinkResult, LinkSummary, OpenGraph, Page, PageProgress, Phase, Progress, Report,
+        ResourceProgress, ResultKind, Severity, SitemapProgress, Summary, TargetType,
     };
+    use tui_scrollbar::ScrollBarInteraction;
 
-    use super::{App, AppAction, MINIMUM_HEIGHT, Screen};
+    use super::{
+        App, AppAction, MINIMUM_HEIGHT, Screen, TuiError, handle_scrollbar_mouse, render_pane,
+        render_scrollbar,
+    };
     use crate::tui::results::ResultsState;
     use crate::tui::running::RunningState;
 
@@ -1135,5 +1142,203 @@ pub(super) mod tests {
         assert_eq!(app.screen, Screen::Failed);
         assert!(app.report.is_none());
         assert!(app.failure_message.contains("absolute HTTP"));
+    }
+
+    #[test]
+    fn application_routes_resize_release_quit_and_repeated_cancel_events() {
+        let mut app = App::new(scoutly::Options::default());
+
+        assert!(matches!(
+            app.handle_event(Event::Resize(0, 0)),
+            AppAction::None
+        ));
+        assert_eq!(app.area.width, 1);
+        assert_eq!(app.area.height, 1);
+
+        app.area.width = 70;
+        app.area.height = 20;
+
+        let release = KeyEvent::new_with_kind(
+            KeyCode::Char('q'),
+            KeyModifiers::NONE,
+            KeyEventKind::Release,
+        );
+
+        assert!(matches!(
+            app.handle_event(Event::Key(release)),
+            AppAction::None
+        ));
+        assert!(matches!(
+            app.handle_event(Event::Key(KeyEvent::new(
+                KeyCode::Char('c'),
+                KeyModifiers::CONTROL,
+            ))),
+            AppAction::Quit
+        ));
+
+        app.screen = Screen::Running;
+        app.running = Some(RunningState::new("https://example.com".to_owned()));
+
+        let cancel = Event::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
+
+        assert!(matches!(
+            app.handle_event(cancel.clone()),
+            AppAction::CancelAudit
+        ));
+        assert!(matches!(app.handle_event(cancel), AppAction::None));
+    }
+
+    #[test]
+    fn application_routes_mouse_progress_ticks_and_result_actions() {
+        let mut app = App::new(scoutly::Options::default());
+
+        app.area.width = 70;
+        app.area.height = 20;
+
+        let mouse = MouseEvent {
+            kind: MouseEventKind::Moved,
+            column: 5,
+            row: 5,
+            modifiers: KeyModifiers::NONE,
+        };
+
+        assert!(matches!(
+            app.handle_event(Event::Mouse(mouse)),
+            AppAction::None
+        ));
+
+        app.screen = Screen::Running;
+        app.running = Some(RunningState::new("https://example.com".to_owned()));
+        app.receive_progress(Progress {
+            phase: Phase::Crawl,
+            current_url: "https://example.com/page".to_owned(),
+            pages: PageProgress {
+                discovered: 2,
+                crawled: 1,
+            },
+            sitemaps: SitemapProgress::default(),
+            links: ResourceProgress::default(),
+            images: ResourceProgress::default(),
+        });
+        app.tick();
+
+        assert!(matches!(
+            app.handle_event(Event::Mouse(MouseEvent {
+                kind: MouseEventKind::ScrollDown,
+                ..mouse
+            })),
+            AppAction::None
+        ));
+
+        let report = sample_report();
+
+        app.screen = Screen::Results;
+        app.results = Some(ResultsState::new(&report));
+        app.report = Some(report);
+
+        assert!(matches!(
+            app.handle_event(Event::Mouse(mouse)),
+            AppAction::None
+        ));
+        assert!(matches!(
+            app.handle_event(Event::Key(KeyEvent::new(
+                KeyCode::Char('q'),
+                KeyModifiers::NONE,
+            ))),
+            AppAction::Quit
+        ));
+        assert!(matches!(
+            app.handle_event(Event::Key(KeyEvent::new(
+                KeyCode::Char('n'),
+                KeyModifiers::NONE,
+            ))),
+            AppAction::None
+        ));
+        assert_eq!(app.screen, Screen::Setup);
+
+        for screen in [Screen::Canceled, Screen::Failed] {
+            app.screen = screen;
+
+            assert!(matches!(
+                app.handle_event(Event::Mouse(mouse)),
+                AppAction::None
+            ));
+            assert!(matches!(
+                app.handle_event(Event::Key(KeyEvent::new(
+                    KeyCode::Char('q'),
+                    KeyModifiers::NONE,
+                ))),
+                AppAction::Quit
+            ));
+            assert!(matches!(
+                app.handle_event(Event::Key(KeyEvent::new(
+                    KeyCode::Char('x'),
+                    KeyModifiers::NONE,
+                ))),
+                AppAction::None
+            ));
+        }
+    }
+
+    #[test]
+    fn application_targets_and_tiny_rendering_use_safe_fallbacks() {
+        let mut app = App::new(scoutly::Options::default());
+
+        assert_eq!(app.target(), "Website audit");
+        app.screen = Screen::Running;
+        assert_eq!(app.target(), "Website audit");
+        app.screen = Screen::Results;
+        assert_eq!(app.target(), "Website audit");
+        app.screen = Screen::Failed;
+        assert_eq!(app.target(), "Website audit");
+
+        let rendered = snapshot(&mut app, 1, 1);
+        assert_eq!(rendered.lines().count(), 1);
+
+        let error = TuiError::io("test operation", std::io::Error::other("boom"));
+        assert_eq!(error.to_string(), "test operation: boom");
+    }
+
+    #[test]
+    fn shared_pane_and_scrollbar_helpers_handle_empty_and_scrollable_areas() {
+        let backend = TestBackend::new(20, 8);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal
+            .draw(|frame| {
+                render_pane(
+                    frame,
+                    ratatui::layout::Rect::new(0, 0, 0, 0),
+                    "Empty",
+                    false,
+                    |_, _| panic!("empty panes must not render content"),
+                );
+                render_scrollbar(
+                    frame,
+                    ratatui::layout::Rect::new(0, 0, 20, 8),
+                    100,
+                    5,
+                    10,
+                    true,
+                );
+            })
+            .unwrap();
+
+        let mut position = 0;
+        let mut interaction = ScrollBarInteraction::new();
+
+        assert!(!handle_scrollbar_mouse(
+            MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: 0,
+                row: 0,
+                modifiers: KeyModifiers::NONE,
+            },
+            ratatui::layout::Rect::new(0, 0, 0, 0),
+            10,
+            1,
+            &mut position,
+            &mut interaction,
+        ));
     }
 }
