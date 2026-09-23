@@ -40,6 +40,9 @@ github-custom-job-permissions = { publish-npm = { contents = "read", id-token = 
 # Whether publish prereleases
 publish-prereleases = true
 
+[dist.dependencies.apt]
+nasm = { stage = ["build"], targets = ["i686-pc-windows-msvc"] }
+
 
 [dist.github-action-commits]
 "actions/attest" = "1e69f48acb82d1966a394da916b4c1698aa569d6"            # 4.2.2
