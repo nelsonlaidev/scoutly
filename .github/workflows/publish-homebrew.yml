@@ -166,6 +166,7 @@ jobs:
           EOF
 
           echo "path=${cask_path}" >> "${GITHUB_OUTPUT}"
+          echo "prerelease=${is_prerelease}" >> "${GITHUB_OUTPUT}"
           echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
           echo "token=${cask_token}" >> "${GITHUB_OUTPUT}"
 
@@ -199,7 +200,11 @@ jobs:
           brew trust --tap nelsonlaidev/tap
           tap_path="$(brew --repo nelsonlaidev/tap)"
           brew style --cask "${tap_path}/${CASK_PATH}"
-          brew audit --cask --strict --online --os=all --arch=all "nelsonlaidev/tap/${{ steps.cask.outputs.token }}"
+          audit_args=(--cask --strict --online --os=all --arch=all)
+          if [[ "${{ steps.cask.outputs.prerelease }}" == "true" ]]; then
+            audit_args+=(--except=github_prerelease_version)
+          fi
+          brew audit "${audit_args[@]}" "nelsonlaidev/tap/${{ steps.cask.outputs.token }}"
 
       - name: Push Homebrew cask
         working-directory: tap

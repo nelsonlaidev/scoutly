@@ -160,7 +160,7 @@ jobs:
       - name: Publish npm package
         if: steps.publication.outputs.already_published != 'true'
         run: >-
-          npm publish "artifacts/${NPM_ARTIFACT_NAME}"
+          npm publish "./artifacts/${NPM_ARTIFACT_NAME}"
           --access public
           --tag "${NPM_DIST_TAG}"
           --provenance

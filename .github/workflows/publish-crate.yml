@@ -50,7 +50,9 @@ jobs:
         id: publication
         shell: bash
         run: |
-          status="$(curl --silent --show-error --location --output /dev/null --write-out '%{http_code}' \
+          status="$(curl --silent --show-error --location \
+            --user-agent 'scoutly-release-workflow/1.0 (https://github.com/nelsonlaidev/scoutly)' \
+            --output /dev/null --write-out '%{http_code}' \
             "https://crates.io/api/v1/crates/scoutly/${SCOUTLY_RELEASE_VERSION}")"
 
           case "${status}" in
