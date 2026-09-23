@@ -2,8 +2,7 @@ name: Continuous Integration
 
 on:
   push:
-    branches: ["**"]
-    tags-ignore: [v*]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -44,10 +43,11 @@ jobs:
         run: cargo doc --locked --no-deps --all-features
 
       - name: Install cargo-dist
-        uses: taiki-e/install-action@26e9283f268b880168bdbd2c545dfcd60ec2c6ab # v2
-        with:
-          tool: cargo-dist@0.33.0
-          fallback: none
+        shell: bash
+        run: >-
+          curl --proto '=https' --tlsv1.2 -LsSf
+          https://github.com/axodotdev/cargo-dist/releases/download/v0.33.0/cargo-dist-installer.sh
+          | sh
 
       - name: Verify cargo-dist release plan
         run: |
