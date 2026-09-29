@@ -327,7 +327,7 @@ impl SetupState {
 
         if field.is_boolean() && content_y % FIELD_ROWS == 1 {
             let cell_x = usize::from(mouse.column - inner.x) % column_width.max(1);
-            self.set_boolean(cell_x < column_width / 2);
+            self.set_boolean(self.boolean_value_at(field, cell_x));
         }
 
         SetupAction::None
@@ -798,6 +798,16 @@ impl SetupState {
         }
     }
 
+    fn boolean_value_at(&self, field: SetupField, cell_x: usize) -> bool {
+        let value = format!("  {}", self.display_value(field));
+        let yes = value.find("Yes").map_or(0, |start| start + "Yes".len() / 2);
+        let no = value
+            .find("No")
+            .map_or(usize::MAX, |start| start + "No".len() / 2);
+
+        cell_x.abs_diff(yes) <= cell_x.abs_diff(no)
+    }
+
     fn toggle_boolean(&mut self) {
         self.set_boolean(!self.boolean(self.field()));
     }
@@ -1181,6 +1191,60 @@ mod tests {
             area,
         );
         assert_eq!(state.field(), before);
+    }
+
+    #[test]
+    fn setup_mouse_click_targets_boolean_labels() {
+        let mut state = SetupState::new(Options::default());
+        let area = Rect::new(0, 0, 70, 30);
+
+        state.handle_mouse(
+            MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: 38,
+                row: 13,
+                modifiers: KeyModifiers::NONE,
+            },
+            area,
+        );
+        assert_eq!(state.field(), SetupField::KeepFragments);
+        assert!(state.values.keep_fragments);
+
+        state.handle_mouse(
+            MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: 46,
+                row: 13,
+                modifiers: KeyModifiers::NONE,
+            },
+            area,
+        );
+        assert_eq!(state.field(), SetupField::KeepFragments);
+        assert!(!state.values.keep_fragments);
+
+        state.handle_mouse(
+            MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: 4,
+                row: 16,
+                modifiers: KeyModifiers::NONE,
+            },
+            area,
+        );
+        assert_eq!(state.field(), SetupField::IgnoreRedirects);
+        assert!(state.values.ignore_redirects);
+
+        state.handle_mouse(
+            MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: 10,
+                row: 16,
+                modifiers: KeyModifiers::NONE,
+            },
+            area,
+        );
+        assert_eq!(state.field(), SetupField::IgnoreRedirects);
+        assert!(!state.values.ignore_redirects);
     }
 
     #[test]
