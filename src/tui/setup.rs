@@ -16,6 +16,7 @@ use tui_scrollbar::ScrollBarInteraction;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use super::text_byte_index;
+use super::text_input::{apply_text_edit, text_edit_command};
 use super::title_case;
 use super::{handle_scrollbar_mouse, render_scrollbar};
 
@@ -215,41 +216,50 @@ impl SetupState {
     }
 
     pub(super) fn handle_key(&mut self, key: KeyEvent, viewport_height: u16) -> SetupAction {
-        match key.code {
-            KeyCode::Tab if key.modifiers.contains(KeyModifiers::SHIFT) => {
+        if self.field().is_input()
+            && let Some(command) = text_edit_command(key)
+        {
+            let field = self.field();
+            let cursor = self.cursor;
+            let outcome = apply_text_edit(self.input_mut(), cursor, command);
+            self.cursor = outcome.cursor;
+            if outcome.value_changed {
+                self.errors.remove(&field);
+            }
+            return SetupAction::None;
+        }
+
+        match (key.code, key.modifiers) {
+            (KeyCode::Tab, KeyModifiers::SHIFT)
+            | (KeyCode::BackTab, KeyModifiers::NONE | KeyModifiers::SHIFT) => {
                 self.move_focus(-1, viewport_height);
             }
-            KeyCode::BackTab => self.move_focus(-1, viewport_height),
-            KeyCode::Tab => self.move_focus(1, viewport_height),
-            KeyCode::Enter => {
+            (KeyCode::Tab, KeyModifiers::NONE) => self.move_focus(1, viewport_height),
+            (KeyCode::Enter, KeyModifiers::NONE) => {
                 if self.field() == SetupField::Run {
                     return self.submit();
                 }
                 self.move_focus(1, viewport_height);
             }
-            KeyCode::PageUp => self.scroll = self.scroll.saturating_sub(viewport_height as usize),
-            KeyCode::PageDown => self.scroll = self.scroll.saturating_add(viewport_height as usize),
-            KeyCode::Left if self.field().is_boolean() => self.set_boolean(true),
-            KeyCode::Right if self.field().is_boolean() => self.set_boolean(false),
-            KeyCode::Char(' ') if self.field().is_boolean() => self.toggle_boolean(),
-            KeyCode::Char('h' | 'l') if self.field().is_boolean() => self.toggle_boolean(),
-            KeyCode::Left if self.field().is_input() => {
-                self.cursor = self.cursor.saturating_sub(1);
+            (KeyCode::PageUp, KeyModifiers::NONE) => {
+                self.scroll = self.scroll.saturating_sub(viewport_height as usize);
             }
-            KeyCode::Right if self.field().is_input() => {
-                self.cursor = (self.cursor + 1).min(self.input().chars().count());
+            (KeyCode::PageDown, KeyModifiers::NONE) => {
+                self.scroll = self.scroll.saturating_add(viewport_height as usize);
             }
-            KeyCode::Home if self.field().is_input() => self.cursor = 0,
-            KeyCode::End if self.field().is_input() => self.cursor = self.input().chars().count(),
-            KeyCode::Backspace if self.field().is_input() => self.remove_before_cursor(),
-            KeyCode::Delete if self.field().is_input() => self.remove_at_cursor(),
-            KeyCode::Char(character)
-                if self.field().is_input()
-                    && !key
-                        .modifiers
-                        .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+            (KeyCode::Left, KeyModifiers::NONE) if self.field().is_boolean() => {
+                self.set_boolean(true);
+            }
+            (KeyCode::Right, KeyModifiers::NONE) if self.field().is_boolean() => {
+                self.set_boolean(false);
+            }
+            (KeyCode::Char(' '), KeyModifiers::NONE | KeyModifiers::SHIFT)
+                if self.field().is_boolean() =>
             {
-                self.insert_character(character);
+                self.toggle_boolean();
+            }
+            (KeyCode::Char('h' | 'l'), KeyModifiers::NONE) if self.field().is_boolean() => {
+                self.toggle_boolean();
             }
             _ => {}
         }
@@ -760,33 +770,6 @@ impl SetupState {
         }
     }
 
-    fn insert_character(&mut self, character: char) {
-        let byte = text_byte_index(self.input(), self.cursor);
-
-        self.input_mut().insert(byte, character);
-        self.cursor += 1;
-        self.errors.remove(&self.field());
-    }
-
-    fn remove_before_cursor(&mut self) {
-        if self.cursor == 0 {
-            return;
-        }
-
-        self.cursor -= 1;
-        self.remove_at_cursor();
-    }
-
-    fn remove_at_cursor(&mut self) {
-        let start = text_byte_index(self.input(), self.cursor);
-        let end = text_byte_index(self.input(), self.cursor + 1);
-
-        if start < end {
-            self.input_mut().replace_range(start..end, "");
-            self.errors.remove(&self.field());
-        }
-    }
-
     fn boolean(&self, field: SetupField) -> bool {
         match field {
             SetupField::KeepFragments => self.values.keep_fragments,
@@ -885,6 +868,7 @@ mod tests {
     use unicode_width::UnicodeWidthStr;
 
     use super::{SetupAction, SetupField, SetupState, content_height, fit_width};
+    use crate::tui::text_input::TEXT_EDIT_CASES;
 
     #[test]
     fn setup_uses_example_domain_as_a_placeholder_only() {
@@ -1126,6 +1110,41 @@ mod tests {
         state.reset();
         assert_eq!(state.field(), SetupField::Url);
         assert!(state.errors.is_empty());
+    }
+
+    #[test]
+    fn setup_input_supports_readline_navigation_and_deletion() {
+        for case in TEXT_EDIT_CASES {
+            let mut state = SetupState::new(Options::default());
+            state.values.url = case.value.to_owned();
+            state.cursor = case.cursor;
+
+            state.handle_key(KeyEvent::new(case.code, case.modifiers), 8);
+
+            assert_eq!(state.values.url, case.expected_value, "{}", case.name);
+            assert_eq!(state.cursor, case.expected_cursor, "{}", case.name);
+        }
+    }
+
+    #[test]
+    fn setup_modified_keys_do_not_toggle_booleans() {
+        let mut state = SetupState::new(Options::default());
+        state.focused = SetupField::Images;
+        state.values.images = false;
+
+        state.handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::SHIFT), 8);
+        assert!(state.values.images);
+        state.values.images = false;
+
+        for key in [
+            KeyEvent::new(KeyCode::Char('h'), KeyModifiers::CONTROL),
+            KeyEvent::new(KeyCode::Char('l'), KeyModifiers::ALT),
+            KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL),
+            KeyEvent::new(KeyCode::Right, KeyModifiers::ALT),
+        ] {
+            state.handle_key(key, 8);
+            assert!(!state.values.images);
+        }
     }
 
     #[test]

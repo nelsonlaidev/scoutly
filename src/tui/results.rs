@@ -12,6 +12,7 @@ use scoutly::{
 };
 use tui_scrollbar::ScrollBarInteraction;
 
+use super::text_input::{apply_text_edit, text_edit_command};
 use super::{MOUSE_WHEEL_DELTA, text_byte_index};
 use super::{handle_scrollbar_mouse, pane_inner, render_pane, render_scrollbar};
 
@@ -211,82 +212,61 @@ impl ResultsState {
         area: Rect,
     ) -> ResultsAction {
         if self.focus == ResultFocus::Search {
-            match key.code {
-                KeyCode::Esc | KeyCode::Tab | KeyCode::Enter => {
+            match (key.code, key.modifiers) {
+                (KeyCode::Esc | KeyCode::Enter, KeyModifiers::NONE)
+                | (KeyCode::Tab, KeyModifiers::NONE | KeyModifiers::SHIFT)
+                | (KeyCode::BackTab, KeyModifiers::NONE | KeyModifiers::SHIFT) => {
                     self.focus = ResultFocus::List;
                 }
-                KeyCode::Left => self.query_cursor = self.query_cursor.saturating_sub(1),
-                KeyCode::Right => {
-                    self.query_cursor = (self.query_cursor + 1).min(self.query.chars().count());
-                }
-                KeyCode::Home => self.query_cursor = 0,
-                KeyCode::End => self.query_cursor = self.query.chars().count(),
-                KeyCode::Backspace => {
-                    if self.query_cursor > 0 {
-                        self.query_cursor -= 1;
-                        if self.remove_query_character() {
+                _ => {
+                    if let Some(command) = text_edit_command(key) {
+                        let outcome = apply_text_edit(&mut self.query, self.query_cursor, command);
+                        self.query_cursor = outcome.cursor;
+                        if outcome.value_changed {
                             self.reset_selection();
                             self.refresh(report);
                         }
                     }
                 }
-                KeyCode::Delete => {
-                    if self.remove_query_character() {
-                        self.reset_selection();
-                        self.refresh(report);
-                    }
-                }
-                KeyCode::Char(character)
-                    if !key
-                        .modifiers
-                        .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
-                {
-                    let byte = text_byte_index(&self.query, self.query_cursor);
-                    self.query.insert(byte, character);
-                    self.query_cursor += 1;
-                    self.reset_selection();
-                    self.refresh(report);
-                }
-                _ => {}
             }
 
             return ResultsAction::None;
         }
 
-        match key.code {
-            KeyCode::Char(character @ '1'..='5') => {
+        match (key.code, key.modifiers) {
+            (KeyCode::Char(character @ '1'..='5'), KeyModifiers::NONE) => {
                 let index = character.to_digit(10).unwrap_or(1) as usize - 1;
                 self.change_tab(ResultTab::ALL[index], report);
             }
-            KeyCode::Left => {
+            (KeyCode::Left, KeyModifiers::NONE) => {
                 let index = self.tab_index();
                 self.change_tab(
                     ResultTab::ALL[(index + ResultTab::ALL.len() - 1) % ResultTab::ALL.len()],
                     report,
                 );
             }
-            KeyCode::Right => {
+            (KeyCode::Right, KeyModifiers::NONE) => {
                 let index = self.tab_index();
                 self.change_tab(ResultTab::ALL[(index + 1) % ResultTab::ALL.len()], report);
             }
-            KeyCode::Char('q') => return ResultsAction::Quit,
-            KeyCode::Char('n') => return ResultsAction::NewAudit,
-            KeyCode::Char('/') if self.tab != ResultTab::Overview => {
+            (KeyCode::Char('q'), KeyModifiers::NONE) => return ResultsAction::Quit,
+            (KeyCode::Char('n'), KeyModifiers::NONE) => return ResultsAction::NewAudit,
+            (KeyCode::Char('/'), KeyModifiers::NONE) if self.tab != ResultTab::Overview => {
                 self.focus = ResultFocus::Search;
                 self.query_cursor = self.query.chars().count();
             }
-            KeyCode::Char('f') if self.tab != ResultTab::Overview => {
+            (KeyCode::Char('f'), KeyModifiers::NONE) if self.tab != ResultTab::Overview => {
                 self.cycle_filter();
                 self.refresh(report);
             }
-            KeyCode::Tab if self.tab != ResultTab::Overview => {
+            (KeyCode::Tab, KeyModifiers::NONE) if self.tab != ResultTab::Overview => {
                 self.focus = if self.focus == ResultFocus::List {
                     ResultFocus::Detail
                 } else {
                     ResultFocus::List
                 };
             }
-            KeyCode::Esc => {
+            (KeyCode::Esc, KeyModifiers::NONE) => {
                 if area.width < SPLIT_PANE_WIDTH && self.detail_open {
                     self.detail_open = false;
                     self.focus = ResultFocus::List;
@@ -299,7 +279,7 @@ impl ResultsState {
                     self.refresh(report);
                 }
             }
-            KeyCode::Enter
+            (KeyCode::Enter, KeyModifiers::NONE)
                 if area.width < SPLIT_PANE_WIDTH
                     && self.tab != ResultTab::Overview
                     && !self.items.is_empty() =>
@@ -311,12 +291,16 @@ impl ResultsState {
                     ResultFocus::List
                 };
             }
-            KeyCode::Up => self.move_vertical(-1, area),
-            KeyCode::Down => self.move_vertical(1, area),
-            KeyCode::PageUp => self.move_vertical(-i32::from(area.height.max(1)), area),
-            KeyCode::PageDown => self.move_vertical(i32::from(area.height.max(1)), area),
-            KeyCode::Home => self.move_to_edge(false),
-            KeyCode::End => self.move_to_edge(true),
+            (KeyCode::Up, KeyModifiers::NONE) => self.move_vertical(-1, area),
+            (KeyCode::Down, KeyModifiers::NONE) => self.move_vertical(1, area),
+            (KeyCode::PageUp, KeyModifiers::NONE) => {
+                self.move_vertical(-i32::from(area.height.max(1)), area);
+            }
+            (KeyCode::PageDown, KeyModifiers::NONE) => {
+                self.move_vertical(i32::from(area.height.max(1)), area);
+            }
+            (KeyCode::Home, KeyModifiers::NONE) => self.move_to_edge(false),
+            (KeyCode::End, KeyModifiers::NONE) => self.move_to_edge(true),
             _ => {}
         }
 
@@ -822,18 +806,6 @@ impl ResultsState {
             .iter()
             .position(|tab| *tab == self.tab)
             .unwrap_or(0)
-    }
-
-    fn remove_query_character(&mut self) -> bool {
-        let start = text_byte_index(&self.query, self.query_cursor);
-        let end = text_byte_index(&self.query, self.query_cursor + 1);
-
-        if start < end {
-            self.query.replace_range(start..end, "");
-            true
-        } else {
-            false
-        }
     }
 
     fn move_vertical(&mut self, delta: i32, area: Rect) {
@@ -1571,6 +1543,7 @@ mod tests {
         select_items, tab_at, wrapped_line_count,
     };
     use crate::tui::tests::{large_report, sample_report};
+    use crate::tui::text_input::TEXT_EDIT_CASES;
 
     fn varied_report() -> scoutly::Report {
         let mut report = sample_report();
@@ -2284,6 +2257,48 @@ mod tests {
             ),
             ResultsAction::Quit
         );
+    }
+
+    #[test]
+    fn search_supports_readline_navigation_and_deletion() {
+        let report = varied_report();
+        let area = Rect::new(0, 0, 80, 14);
+
+        for case in TEXT_EDIT_CASES {
+            let mut state = ResultsState::new(&report);
+            state.change_tab(ResultTab::Links, &report);
+            state.focus = ResultFocus::Search;
+            state.query = case.value.to_owned();
+            state.query_cursor = case.cursor;
+
+            state.handle_key(KeyEvent::new(case.code, case.modifiers), &report, area);
+
+            assert_eq!(state.query, case.expected_value, "{}", case.name);
+            assert_eq!(state.query_cursor, case.expected_cursor, "{}", case.name);
+        }
+    }
+
+    #[test]
+    fn modified_keys_do_not_trigger_result_commands() {
+        let report = varied_report();
+        let area = Rect::new(0, 0, 80, 14);
+        let mut state = ResultsState::new(&report);
+        state.change_tab(ResultTab::Issues, &report);
+        let expected_filter = state.current_filter();
+
+        for key in [
+            KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL),
+            KeyEvent::new(KeyCode::Char('n'), KeyModifiers::ALT),
+            KeyEvent::new(KeyCode::Char('/'), KeyModifiers::CONTROL),
+            KeyEvent::new(KeyCode::Char('f'), KeyModifiers::ALT),
+            KeyEvent::new(KeyCode::Char('1'), KeyModifiers::CONTROL),
+            KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL),
+        ] {
+            assert_eq!(state.handle_key(key, &report, area), ResultsAction::None);
+            assert_eq!(state.tab, ResultTab::Issues);
+            assert_eq!(state.focus, ResultFocus::List);
+            assert_eq!(state.current_filter(), expected_filter);
+        }
     }
 
     #[test]

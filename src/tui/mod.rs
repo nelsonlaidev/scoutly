@@ -1,6 +1,7 @@
 mod results;
 mod running;
 mod setup;
+mod text_input;
 
 use std::future::Future;
 use std::io::{self, Stdout, stdout};
@@ -10,11 +11,13 @@ use std::time::{Duration, Instant};
 use crossterm::cursor::Show;
 use crossterm::event::{
     self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers,
-    MouseButton, MouseEvent, MouseEventKind,
+    KeyboardEnhancementFlags, MouseButton, MouseEvent, MouseEventKind, PopKeyboardEnhancementFlags,
+    PushKeyboardEnhancementFlags,
 };
 use crossterm::execute;
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
+    supports_keyboard_enhancement,
 };
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
@@ -589,6 +592,7 @@ async fn run_event_loop(
 struct TerminalSession {
     raw_mode: bool,
     alternate_screen: bool,
+    keyboard_enhancement_pushed: bool,
     mouse_capture: bool,
 }
 
@@ -597,13 +601,22 @@ impl TerminalSession {
         let mut session = Self {
             raw_mode: false,
             alternate_screen: false,
+            keyboard_enhancement_pushed: false,
             mouse_capture: false,
         };
 
         enable_raw_mode()?;
         session.raw_mode = true;
+        let keyboard_enhancement_supported = matches!(supports_keyboard_enhancement(), Ok(true));
         execute!(stdout(), EnterAlternateScreen)?;
         session.alternate_screen = true;
+        if keyboard_enhancement_supported {
+            execute!(
+                stdout(),
+                PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+            )?;
+            session.keyboard_enhancement_pushed = true;
+        }
         execute!(stdout(), EnableMouseCapture)?;
         session.mouse_capture = true;
 
@@ -617,6 +630,14 @@ impl TerminalSession {
             match execute!(stdout(), DisableMouseCapture) {
                 Ok(()) => self.mouse_capture = false,
                 Err(error) => first_error = Some(error),
+            }
+        }
+
+        if self.keyboard_enhancement_pushed {
+            match execute!(stdout(), PopKeyboardEnhancementFlags) {
+                Ok(()) => self.keyboard_enhancement_pushed = false,
+                Err(error) if first_error.is_none() => first_error = Some(error),
+                Err(_) => {}
             }
         }
 
