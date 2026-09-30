@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.6.0-beta.2
+
+[Compare v0.6.0-beta.1...v0.6.0-beta.2](https://github.com/nelsonlaidev/scoutly/compare/v0.6.0-beta.1...v0.6.0-beta.2) - 2026-09-30
+
+### Features
+
+- Add ctrl and alt editing shortcuts to tui inputs - ([7c3fb92](https://github.com/nelsonlaidev/scoutly/commit/7c3fb92d6e5b595b56bfe155bc1c668b242c06df))
+
+### Bug Fixes
+
+- Align boolean mouse clicks with rendered labels - ([8c91cda](https://github.com/nelsonlaidev/scoutly/commit/8c91cda3bedbdfcf847b285f047f5e1404b73ecb))
+
+### Documentation
+
+- Remove non-existent stress test from CI description - ([bd946ee](https://github.com/nelsonlaidev/scoutly/commit/bd946ee14d90343cd899ec9879dda5aca7d02a09))
+
 ## v0.6.0-beta.1
 
 [Compare v0.5.0...v0.6.0-beta.1](https://github.com/nelsonlaidev/scoutly/compare/v0.5.0...v0.6.0-beta.1) - 2026-09-23
